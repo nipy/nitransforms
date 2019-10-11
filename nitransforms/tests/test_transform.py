@@ -12,13 +12,13 @@ from nibabel.nifti1 import Nifti1Image
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from ..patched import shape_zoom_affine
-from nibabel.transform import linear as nbl
+from .. import linear as nbl
 from nibabel.testing import (assert_equal, assert_not_equal, assert_true,
-                       assert_false, assert_raises, data_path,
+                       assert_false, assert_raises,
                        suppress_warnings, assert_dt_equal)
 from nibabel.tmpdirs import InTemporaryDirectory
 
-
+data_path = os.path.join(os.path.dirname(__file__), 'data')
 SOMEONES_ANATOMY = os.path.join(data_path, 'someones_anatomy.nii.gz')
 
 
