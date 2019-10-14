@@ -102,18 +102,25 @@ class DeformationFieldTransform(TransformBase):
     def resample(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
                  output_dtype=None):
         """
-        Resample the `moving` image applying the deformation field.
+        Resample the ``moving`` image applying the deformation field.
+
         Examples
         --------
-        >>> import numpy as np
-        >>> import nibabel as nb
-        >>> ref = nb.load('t1_weighted.nii.gz')
+        >>> ref = nb.load(testfile)
+        >>> refdata = ref.get_fdata()
+        >>> np.allclose(refdata, 0)
+        True
+
+        >>> refdata[5, 5, 5] = 1  # Set a one in the middle voxel
+        >>> moving = nb.Nifti1Image(refdata, ref.affine, ref.header)
         >>> field = np.zeros(tuple(list(ref.shape) + [3]))
         >>> field[..., 0] = 4.0
         >>> fieldimg = nb.Nifti1Image(field, ref.affine, ref.header)
         >>> xfm = nb.transform.DeformationFieldTransform(fieldimg)
-        >>> new = xfm.resample(ref)
-        >>> new.to_filename('deffield.nii.gz')
+        >>> resampled = xfm.resample(moving, order=0).get_fdata()
+        >>> resampled[1, 5, 5]
+        1.0
+
         """
         self._cache_moving(moving)
         return super(DeformationFieldTransform, self).resample(
@@ -222,20 +229,19 @@ class BSplineFieldTransform(TransformBase):
     def resample(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
                  output_dtype=None):
         """
-        Resample the `moving` image applying the deformation field.
+        Resample the ``moving`` image applying the deformation field.
+
         Examples
         --------
-        >>> import numpy as np
-        >>> import nibabel as nb
-        >>> ref = nb.load('t1_weighted.nii.gz')
+        >>> ref = nb.load(os.path.join(datadir, 'someones_anatomy.nii.gz'))
         >>> coeffs = np.zeros((6, 6, 6, 3))
         >>> coeffs[2, 2, 2, ...] = [10.0, -20.0, 0]
         >>> aff = ref.affine
-        >>> aff[:3, :3] = aff.dot(np.eye(3) * np.array(ref.header.get_zooms()[:3] / 6.0)
+        >>> aff[:3, :3] = aff[:3, :3].dot(np.eye(3) * np.array(ref.header.get_zooms()[:3]) / 6.0)
         >>> coeffsimg = nb.Nifti1Image(coeffs, ref.affine, ref.header)
-        >>> xfm = nb.transform.BSplineFieldTransform(ref, coeffsimg)
-        >>> new = xfm.resample(ref)
-        >>> new.to_filename('deffield.nii.gz')
+        >>> xfm = BSplineFieldTransform(ref, coeffsimg)
+        >>> new = xfm.resample(ref)  # doctest: +SKIP
+
         """
         self._cache_moving()
         return super(BSplineFieldTransform, self).resample(

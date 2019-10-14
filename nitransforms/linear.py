@@ -30,6 +30,7 @@ class Affine(TransformBase):
     def __init__(self, matrix=None, reference=None):
         """
         Initialize a linear transform.
+
         Parameters
         ----------
         matrix : ndarray
@@ -37,14 +38,16 @@ class Affine(TransformBase):
             coordinates**, mapping coordinates from *reference* space
             into *moving* space.
             This matrix should be provided in homogeneous coordinates.
+
         Examples
         --------
         >>> xfm = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
         >>> xfm.matrix  # doctest: +NORMALIZE_WHITESPACE
-        array([[1, 0, 0, 4],
-               [0, 1, 0, 0],
-               [0, 0, 1, 0],
-               [0, 0, 0, 1]])
+        array([[[1, 0, 0, 4],
+                [0, 1, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]]])
+
         """
         super(Affine, self).__init__()
         if matrix is None:
@@ -71,6 +74,7 @@ class Affine(TransformBase):
                  output_dtype=None):
         """
         Resample the moving image in reference space.
+
         Parameters
         ----------
         moving : `spatialimage`
@@ -92,17 +96,28 @@ class Affine(TransformBase):
             slightly blurred if *order > 1*, unless the input is prefiltered,
             i.e. it is the result of calling the spline filter on the original
             input.
+
         Returns
         -------
         moved_image : `spatialimage`
             The moving imaged after resampling to reference space.
+
         Examples
         --------
         >>> import nibabel as nib
         >>> xfm = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-        >>> ref = nib.load('image.nii.gz')
+        >>> ref = nib.load(testfile)
         >>> xfm.reference = ref
-        >>> xfm.resample(ref, order=0)
+        >>> refdata = ref.get_fdata()
+        >>> np.allclose(refdata, 0)
+        True
+
+        >>> refdata[5, 5, 5] = 1  # Set a one in the middle voxel
+        >>> moving = nb.Nifti1Image(refdata, ref.affine, ref.header)
+        >>> resampled = xfm.resample(moving, order=0).get_fdata()
+        >>> resampled[1, 5, 5]
+        1.0
+
         """
         if output_dtype is None:
             output_dtype = moving.header.get_data_dtype()
