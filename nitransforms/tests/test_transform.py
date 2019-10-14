@@ -34,6 +34,51 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
     'RAS', 'LAS', 'LPS',  # 'oblique',
 ])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
+def test_linear_load(tmpdir, data_path, get_data, image_orientation, sw_tool):
+    """Check implementation of loading affines from formats."""
+    tmpdir.chdir()
+
+    img = get_data[image_orientation]
+    img.to_filename('img.nii.gz')
+
+    # Generate test transform
+    T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+    xfm = nbl.Affine(T)
+    xfm.reference = img
+
+    ext = ''
+    if sw_tool == 'itk':
+        ext = '.tfm'
+
+    fname = 'affine-%s.%s%s' % (image_orientation, sw_tool, ext)
+    xfm_fname = os.path.join(data_path, fname)
+
+    if sw_tool == 'fsl':
+        with pytest.raises("ValueError"):
+            loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1])
+        with pytest.raises("ValueError"):
+            loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1],
+                              reference='img.nii.gz')
+        with pytest.raises("ValueError"):
+            loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1],
+                              moving='img.nii.gz')
+
+        loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1],
+                          moving='img.nii.gz', reference='img.nii.gz')
+    if sw_tool == 'afni':
+        with pytest.raises("ValueError"):
+            loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1])
+
+        loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1],
+                          reference='img.nii.gz')
+
+    assert loaded == xfm
+
+
+@pytest.mark.parametrize('image_orientation', [
+    'RAS', 'LAS', 'LPS',  # 'oblique',
+])
+@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
 def test_linear_save(data_path, get_data, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
     img = get_data[image_orientation]
