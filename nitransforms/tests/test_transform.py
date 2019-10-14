@@ -2,73 +2,36 @@
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """Tests of the transform module."""
 import os
-import numpy as np
-from numpy.testing import assert_array_equal, assert_almost_equal, \
-    assert_array_almost_equal
 import pytest
 
-from nibabel.loadsave import load as loadimg
-from nibabel.nifti1 import Nifti1Image
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
-from ..patched import shape_zoom_affine
-from .. import linear as nbl
-from nibabel.testing import (assert_equal, assert_not_equal, assert_true,
-                       assert_false, assert_raises,
-                       suppress_warnings, assert_dt_equal)
 from nibabel.tmpdirs import InTemporaryDirectory
+from .. import linear as nbl
+from .checkaffines import assert_affines_by_filename
 
-data_path = os.path.join(os.path.dirname(__file__), 'data')
-SOMEONES_ANATOMY = os.path.join(data_path, 'someones_anatomy.nii.gz')
 
-
-@pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
-def test_affines_save(image_orientation):
+@pytest.mark.parametrize('image_orientation', [
+    'RAS', 'LAS', 'LPS',
+    # 'oblique',
+])
+@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
+def test_affines_save(data_path, get_data, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
+    img = get_data[image_orientation]
     # Generate test transform
-    img = loadimg(SOMEONES_ANATOMY)
-    imgaff = img.affine
-
-    if image_orientation == 'LAS':
-        newaff = imgaff.copy()
-        newaff[0, 0] *= -1.0
-        newaff[0, 3] = imgaff.dot(np.hstack((np.array(img.shape[:3]) - 1, 1.0)))[0]
-        img = Nifti1Image(np.flip(img.get_fdata(), 0), newaff, img.header)
-    elif image_orientation == 'LPS':
-        newaff = imgaff.copy()
-        newaff[0, 0] *= -1.0
-        newaff[1, 1] *= -1.0
-        newaff[:2, 3] = imgaff.dot(np.hstack((np.array(img.shape[:3]) - 1, 1.0)))[:2]
-        img = Nifti1Image(np.flip(np.flip(img.get_fdata(), 0), 1), newaff, img.header)
-    elif image_orientation == 'oblique':
-        A = shape_zoom_affine(img.shape, img.header.get_zooms(), x_flip=False)
-        R = from_matvec(euler2mat(x=0.09, y=0.001, z=0.001))
-        newaff = R.dot(A)
-        img = Nifti1Image(img.get_fdata(), newaff, img.header)
-        img.header.set_qform(newaff, 1)
-        img.header.set_sform(newaff, 1)
-
     T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
-
     xfm = nbl.Affine(T)
     xfm.reference = img
 
-    itk = nbl.load(os.path.join(data_path, 'affine-%s-itk.tfm' % image_orientation),
-                   fmt='itk')
-    fsl = np.loadtxt(os.path.join(data_path, 'affine-%s.fsl' % image_orientation))
-    afni = np.loadtxt(os.path.join(data_path, 'affine-%s.afni' % image_orientation))
+    ext = ''
+    if sw_tool == 'itk':
+        ext = '.tfm'
 
     with InTemporaryDirectory():
-        xfm.to_filename('M.tfm', fmt='itk')
-        xfm.to_filename('M.fsl', fmt='fsl')
-        xfm.to_filename('M.afni', fmt='afni')
+        xfm_fname1 = 'M.%s%s' % (sw_tool, ext)
+        xfm.to_filename(xfm_fname1, fmt=sw_tool)
 
-        nb_itk = nbl.load('M.tfm', fmt='itk')
-        nb_fsl = np.loadtxt('M.fsl')
-        nb_afni = np.loadtxt('M.afni')
-
-    assert_equal(itk, nb_itk)
-    assert_almost_equal(fsl, nb_fsl)
-    assert_almost_equal(afni, nb_afni)
-
-# Create version not aligned to canonical
+        xfm_fname2 = os.path.join(
+            data_path, 'affine-%s.%s%s' % (image_orientation, sw_tool, ext))
+        assert_affines_by_filename(xfm_fname1, xfm_fname2)
