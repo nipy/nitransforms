@@ -106,7 +106,7 @@ class Affine(TransformBase):
         --------
         >>> import nibabel as nib
         >>> xfm = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-        >>> ref = nib.load(testfile)
+        >>> ref = nb.load(testfile)
         >>> xfm.reference = ref
         >>> refdata = ref.get_fdata()
         >>> np.allclose(refdata, 0)

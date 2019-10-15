@@ -116,7 +116,7 @@ class DeformationFieldTransform(TransformBase):
         >>> field = np.zeros(tuple(list(ref.shape) + [3]))
         >>> field[..., 0] = 4.0
         >>> fieldimg = nb.Nifti1Image(field, ref.affine, ref.header)
-        >>> xfm = nb.transform.DeformationFieldTransform(fieldimg)
+         >>> xfm = DeformationFieldTransform(fieldimg)
         >>> resampled = xfm.resample(moving, order=0).get_fdata()
         >>> resampled[1, 5, 5]
         1.0
