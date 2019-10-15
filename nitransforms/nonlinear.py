@@ -29,7 +29,7 @@ class DeformationFieldTransform(TransformBase):
         self._field = field.get_data()
 
         ndim = self._field.ndim - 1
-        if self._field.shape[:-1] != ndim:
+        if len(self._field.shape[:-1]) != ndim:
             raise ValueError(
                 'Number of components of the deformation field does '
                 'not match the number of dimensions')

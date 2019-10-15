@@ -5,6 +5,7 @@ import os
 import pytest
 import numpy as np
 from subprocess import check_call
+import shutil
 
 import nibabel as nb
 from nibabel.eulerangles import euler2mat
@@ -30,6 +31,7 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 }
 
 
+@pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize('image_orientation', [
     'RAS', 'LAS', 'LPS',  # 'oblique',
 ])
@@ -52,25 +54,26 @@ def test_linear_load(tmpdir, data_path, get_data, image_orientation, sw_tool):
 
     fname = 'affine-%s.%s%s' % (image_orientation, sw_tool, ext)
     xfm_fname = os.path.join(data_path, fname)
+    fmt = fname.split('.')[-1]
 
     if sw_tool == 'fsl':
-        with pytest.raises("ValueError"):
-            loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1])
-        with pytest.raises("ValueError"):
-            loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1],
-                              reference='img.nii.gz')
-        with pytest.raises("ValueError"):
-            loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1],
-                              moving='img.nii.gz')
+        with pytest.raises(ValueError):
+            loaded = nbl.load(xfm_fname, fmt=fmt)
+        with pytest.raises(ValueError):
+            loaded = nbl.load(xfm_fname, fmt=fmt, reference='img.nii.gz')
+        with pytest.raises(ValueError):
+            loaded = nbl.load(xfm_fname, fmt=fmt, moving='img.nii.gz')
 
-        loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1],
-                          moving='img.nii.gz', reference='img.nii.gz')
-    if sw_tool == 'afni':
-        with pytest.raises("ValueError"):
-            loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1])
+        loaded = nbl.load(
+            xfm_fname, fmt=fmt, moving='img.nii.gz', reference='img.nii.gz'
+        )
+    elif sw_tool == 'afni':
+        with pytest.raises(ValueError):
+            loaded = nbl.load(xfm_fname, fmt=fmt)
 
-        loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1],
-                          reference='img.nii.gz')
+        loaded = nbl.load(xfm_fname, fmt=fmt, reference='img.nii.gz')
+    elif sw_tool == 'itk':
+        loaded = nbl.load(xfm_fname, fmt=fmt)
 
     assert loaded == xfm
 
@@ -126,6 +129,12 @@ def test_apply_linear_transform(tmpdir, data_path, get_data, image_orientation, 
         transform=os.path.abspath(xfm_fname),
         reference=os.path.abspath('img.nii.gz'),
         moving=os.path.abspath('img.nii.gz'))
+
+    # skip test if command is not available on host
+    exe = cmd.split(" ", 1)[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
     sw_moved = nb.load('resampled.nii.gz')
