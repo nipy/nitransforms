@@ -104,7 +104,6 @@ class Affine(TransformBase):
 
         Examples
         --------
-        >>> import nibabel as nib
         >>> xfm = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
         >>> ref = nb.load(testfile)
         >>> xfm.reference = ref
