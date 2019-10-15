@@ -133,7 +133,7 @@ def test_apply_linear_transform(tmpdir, data_path, get_data, image_orientation, 
     # skip test if command is not available on host
     exe = cmd.split(" ", 1)[0]
     if not shutil.which(exe):
-        pytest.skip(f"Command {exe} not found on host")
+        pytest.skip("Command {} not found on host".format(exe))
 
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
