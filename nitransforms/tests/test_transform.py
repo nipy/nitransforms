@@ -11,7 +11,7 @@ from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from nibabel.tmpdirs import InTemporaryDirectory
 from .. import linear as nbl
-from .checkaffines import assert_affines_by_filename
+from .utils import assert_affines_by_filename
 
 TESTS_BORDER_TOLERANCE = 0.05
 APPLY_LINEAR_CMD = {
@@ -55,21 +55,21 @@ def test_linear_load(tmpdir, data_path, get_data, image_orientation, sw_tool):
 
     if sw_tool == 'fsl':
         with pytest.raises("ValueError"):
-            loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1])
+            loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1])
         with pytest.raises("ValueError"):
-            loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1],
+            loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1],
                               reference='img.nii.gz')
         with pytest.raises("ValueError"):
-            loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1],
+            loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1],
                               moving='img.nii.gz')
 
-        loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1],
+        loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1],
                           moving='img.nii.gz', reference='img.nii.gz')
     if sw_tool == 'afni':
         with pytest.raises("ValueError"):
-            loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1])
+            loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1])
 
-        loaded = nbl.load(xfm_fname, fmt=fname.rsplit('.', 1)[-1],
+        loaded = nbl.load(xfm_fname, fmt=fname.split('.')[-1],
                           reference='img.nii.gz')
 
     assert loaded == xfm
