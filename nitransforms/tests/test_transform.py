@@ -104,7 +104,13 @@ def test_linear_save(data_path, get_data, image_orientation, sw_tool):
     'RAS', 'LAS', 'LPS',  # 'oblique',
 ])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
-def test_apply_linear_transform(tmpdir, data_path, get_data, image_orientation, sw_tool):
+def test_apply_linear_transform(
+        tmpdir,
+        data_path,
+        get_data,
+        image_orientation,
+        sw_tool
+):
     """Check implementation of exporting affines to formats."""
     tmpdir.chdir()
 

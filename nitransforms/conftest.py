@@ -58,8 +58,12 @@ def get_data():
     newaff[0, 0] *= -1.0
     newaff[1, 1] *= -1.0
     newaff[:2, 3] = imgaff.dot(np.hstack((np.array(img.shape[:3]) - 1, 1.0)))[:2]
-    _data['LPS'] = nb.Nifti1Image(np.flip(np.flip(img.get_fdata(), 0), 1), newaff, img.header)
-    A = nb.volumeutils.shape_zoom_affine(img.shape, img.header.get_zooms(), x_flip=False)
+    _data['LPS'] = nb.Nifti1Image(
+        np.flip(np.flip(img.get_fdata(), 0), 1), newaff, img.header
+    )
+    A = nb.volumeutils.shape_zoom_affine(
+        img.shape, img.header.get_zooms(), x_flip=False
+    )
     R = nb.affines.from_matvec(nb.eulerangles.euler2mat(x=0.09, y=0.001, z=0.001))
     newaff = R.dot(A)
     oblique_img = nb.Nifti1Image(img.get_fdata(), newaff, img.header)
