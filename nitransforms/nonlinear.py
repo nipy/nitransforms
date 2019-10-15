@@ -116,7 +116,7 @@ class DeformationFieldTransform(TransformBase):
         >>> field = np.zeros(tuple(list(ref.shape) + [3]))
         >>> field[..., 0] = 4.0
         >>> fieldimg = nb.Nifti1Image(field, ref.affine, ref.header)
-         >>> xfm = DeformationFieldTransform(fieldimg)
+        >>> xfm = DeformationFieldTransform(fieldimg)
         >>> resampled = xfm.resample(moving, order=0).get_fdata()
         >>> resampled[1, 5, 5]
         1.0
@@ -239,7 +239,7 @@ class BSplineFieldTransform(TransformBase):
         >>> aff = ref.affine
         >>> aff[:3, :3] = aff[:3, :3].dot(np.eye(3) * np.array(ref.header.get_zooms()[:3]) / 6.0)
         >>> coeffsimg = nb.Nifti1Image(coeffs, ref.affine, ref.header)
-        >>> xfm = BSplineFieldTransform(ref, coeffsimg)
+        >>> xfm = BSplineFieldTransform(ref, coeffsimg)  # doctest: +SKIP
         >>> new = xfm.resample(ref)  # doctest: +SKIP
 
         """
