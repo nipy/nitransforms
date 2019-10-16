@@ -9,4 +9,7 @@ install:
   - pip install -U -e .[test]
 
 script:
-  - pytest -v --doctest-modules nitransforms
+  - pytest -v --cov nitransforms -cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms
+
+after-success:
+  - codecov --file cov.xml --flags unittests -e TRAVIS_JOB_NUMBER
