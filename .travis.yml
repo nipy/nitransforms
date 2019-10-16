@@ -1,7 +1,6 @@
 # vim ft=yaml
 language: python
 python:
-  # - 2.7
   - 3.5
   - 3.6
   - 3.7
@@ -10,4 +9,4 @@ install:
   - pip install -U -e .[test]
 
 script:
-  - pytest --doctest-modules nitransforms
+  - pytest -v --doctest-modules nitransforms

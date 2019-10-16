@@ -29,7 +29,7 @@ class DeformationFieldTransform(TransformBase):
         self._field = field.get_data()
 
         ndim = self._field.ndim - 1
-        if self._field.shape[:-1] != ndim:
+        if len(self._field.shape[:-1]) != ndim:
             raise ValueError(
                 'Number of components of the deformation field does '
                 'not match the number of dimensions')
@@ -116,7 +116,7 @@ class DeformationFieldTransform(TransformBase):
         >>> field = np.zeros(tuple(list(ref.shape) + [3]))
         >>> field[..., 0] = 4.0
         >>> fieldimg = nb.Nifti1Image(field, ref.affine, ref.header)
-         >>> xfm = DeformationFieldTransform(fieldimg)
+        >>> xfm = DeformationFieldTransform(fieldimg)
         >>> resampled = xfm.resample(moving, order=0).get_fdata()
         >>> resampled[1, 5, 5]
         1.0
@@ -241,7 +241,7 @@ class BSplineFieldTransform(TransformBase):
         ...     ref.header.get_zooms()[:3]) / 6.0
         ... )
         >>> coeffsimg = nb.Nifti1Image(coeffs, ref.affine, ref.header)
-        >>> xfm = BSplineFieldTransform(ref, coeffsimg)
+        >>> xfm = BSplineFieldTransform(ref, coeffsimg)  # doctest: +SKIP
         >>> new = xfm.resample(ref)  # doctest: +SKIP
 
         """
