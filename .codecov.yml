@@ -1,5 +1,5 @@
 coverage:
   range: "0...100"
   ignore:
-    - "nitransforms/tests/data"
+    - "**/data"
     - "setup.py"
