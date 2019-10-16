@@ -58,7 +58,9 @@ class Affine(TransformBase):
 
         self._matrix = np.array(matrix)
         assert self._matrix.ndim == 3, 'affine matrix should be 3D'
-        assert self._matrix.shape[-2] == self._matrix.shape[-1], 'affine matrix is not square'
+        assert (
+            self._matrix.shape[-2] == self._matrix.shape[-1]
+        ), 'affine matrix is not square'
 
         if reference:
             if isinstance(reference, str):
@@ -196,7 +198,9 @@ The moving image contains {0} volumes, while the transform is defined for \
         if index.shape[0] == self._matrix[nindex].shape[0] - 1:
             index = np.append(index, [1])
 
-        matrix = reference.affine.dot(self._matrix[nindex].dot(np.linalg.inv(moving.affine)))
+        matrix = reference.affine.dot(
+            self._matrix[nindex].dot(np.linalg.inv(moving.affine))
+        )
         return tuple(matrix.dot(index)[:-1])
 
     def _to_hdf5(self, x5_root):
@@ -235,7 +239,10 @@ FixedParameters: 0 0 0\n""".format
             T = self.matrix.copy()
             pre = LPS
             post = LPS
-            if obliquity(self.reference.affine).min() * 180 / pi > OBLIQUITY_THRESHOLD_DEG:
+            if (
+                obliquity(self.reference.affine).min() * 180 / pi
+                > OBLIQUITY_THRESHOLD_DEG
+            ):
                 print('Reference affine axes are oblique.')
                 M = self.reference.affine
                 A = shape_zoom_affine(self.reference.shape,
@@ -245,7 +252,11 @@ FixedParameters: 0 0 0\n""".format
                 if not moving:
                     moving = self.reference
 
-            if moving and obliquity(moving.affine).min() * 180 / pi > OBLIQUITY_THRESHOLD_DEG:
+            if (
+                moving
+                and obliquity(moving.affine).min() * 180 / pi
+                > OBLIQUITY_THRESHOLD_DEG
+            ):
                 print('Moving affine axes are oblique.')
                 M2 = moving.affine
                 A2 = shape_zoom_affine(moving.shape,

@@ -3,6 +3,7 @@ from nibabel.affines import from_matvec
 from nibabel.eulerangles import euler2mat
 from ..patched import obliquity
 
+
 def test_obliquity():
     """Check the calculation of inclination of an affine axes."""
     from math import pi

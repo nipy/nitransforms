@@ -87,8 +87,10 @@ class ImageSpace(object):
 
     def __eq__(self, other):
         try:
-            return np.allclose(
-                self.affine, other.affine, rtol=EQUALITY_TOL) and self.shape == other.shape
+            return (
+                np.allclose(self.affine, other.affine, rtol=EQUALITY_TOL)
+                and self.shape == other.shape
+            )
         except AttributeError:
             pass
         return False

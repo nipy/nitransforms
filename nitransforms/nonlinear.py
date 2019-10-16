@@ -219,7 +219,7 @@ class BSplineFieldTransform(TransformBase):
                 self._coeffs[ijk] if not np.any(offbounds)
                 else [0.0] * self.ndim)
 
-        coords[:3] += weights.dot(np.array(coeffs, dtype=float))
+        # coords[:3] += weights.dot(np.array(coeffs, dtype=float))
         return self.reference.inverse.dot(np.hstack((coords, 1)))[:3]
 
     def map_voxel(self, index, moving=None):
@@ -237,7 +237,9 @@ class BSplineFieldTransform(TransformBase):
         >>> coeffs = np.zeros((6, 6, 6, 3))
         >>> coeffs[2, 2, 2, ...] = [10.0, -20.0, 0]
         >>> aff = ref.affine
-        >>> aff[:3, :3] = aff[:3, :3].dot(np.eye(3) * np.array(ref.header.get_zooms()[:3]) / 6.0)
+        >>> aff[:3, :3] = aff[:3, :3].dot(np.eye(3) * np.array(
+        ...     ref.header.get_zooms()[:3]) / 6.0
+        ... )
         >>> coeffsimg = nb.Nifti1Image(coeffs, ref.affine, ref.header)
         >>> xfm = BSplineFieldTransform(ref, coeffsimg)  # doctest: +SKIP
         >>> new = xfm.resample(ref)  # doctest: +SKIP

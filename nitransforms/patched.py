@@ -1,6 +1,7 @@
 import numpy as np
 from nibabel.affines import voxel_sizes
 
+
 def obliquity(affine):
     r"""
     Estimate the *obliquity* an affine's axes represent.
@@ -23,6 +24,7 @@ def obliquity(affine):
     vs = voxel_sizes(affine)
     best_cosines = np.abs((affine[:-1, :-1] / vs).max(axis=1))
     return np.arccos(best_cosines)
+
 
 def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
     ''' Get affine implied by given shape and zooms
