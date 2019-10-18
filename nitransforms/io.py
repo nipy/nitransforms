@@ -1,6 +1,7 @@
 import numpy as np
 from nibabel.wrapstruct import LabeledWrapStruct
 from nibabel.volumeutils import Recoder
+from nibabel.affines import voxel_sizes
 
 transform_codes = Recoder((
     (0, 'LINEAR_VOX_TO_VOX'),
@@ -69,10 +70,10 @@ class VolumeGeometry(StringBasedStruct):
         sa = volgeom.structarr
         sa['valid'] = 1
         sa['volume'][:, 0] = img.shape[:3]    # Assumes xyzt-ordered image
-        sa['voxelsize'][:, 0] = img.header.get_zooms()[:3]
+        sa['voxelsize'][:, 0] = voxel_sizes(img.affine)[:3]
         A = img.affine[:3, :3]
         b = img.affine[:3, [3]]
-        cols = A * (1 / sa['voxelsize'])
+        cols = A / sa['voxelsize']
         sa['xras'] = cols[:, [0]]
         sa['yras'] = cols[:, [1]]
         sa['zras'] = cols[:, [2]]
@@ -208,6 +209,10 @@ class LinearTransformArray(StringBasedStruct):
 
             val = np.genfromtxt([valstring.encode()],
                                 dtype=klass.dtype[key])
+            if val not in (0, 1):
+                raise NotImplementedError(
+                    "LTA type {0} is not currently supported".format(transform_codes.label[val])
+                )
             sa[key] = val.reshape(sa[key].shape) if val.size else ''
         for _ in range(sa['nxforms']):
             lta._xforms.append(

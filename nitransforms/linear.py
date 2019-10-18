@@ -17,7 +17,7 @@ from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec, voxel_sizes, obliquity
 from .base import TransformBase
 from .patched import shape_zoom_affine
-from .io import LinearTransformArray, VolumeGeometry
+from .io import LinearTransformArray, LinearTransform, VolumeGeometry
 
 
 LPS = np.diag([-1, -1, 1, 1])
@@ -300,12 +300,20 @@ FixedParameters: 0 0 0\n""".format
                 np.savetxt(filename, mat[0], delimiter=' ', fmt='%g')
             return filename
         elif fmt.lower() in ('fs', 'lta'):
-            # linear tranform info
-            src = VolumeGeometry.from_image(moving)
-            dst = VolumeGeometry.from_image(self.reference)
+            # xform info
+            lt = LinearTransform()
+            lt['sigma'] = 1.
+            lt['m_L'] = self.matrix
+            lt['src'] = VolumeGeometry.from_image(moving)
+            lt['dst'] = VolumeGeometry.from_image(self.reference)
+            # to make LTA file format
+            lta = LinearTransformArray()
+            lta['type'] = 1  # RAS2RAS
+            lta['xforms'] = [lt]
 
-
-
+            with open(filename, 'w') as f:
+                f.write(lta.to_string())
+            return filename
 
         return super(Affine, self).to_filename(filename, fmt=fmt)
 
@@ -338,8 +346,7 @@ def load(filename, fmt='X5', reference=None):
     elif fmt.lower() in ('fs', 'lta'):
         with open(filename) as ltafile:
             lta = LinearTransformArray.from_fileobj(ltafile)
-        # TODO: multiple transforms?
-        assert lta['nxforms'] == 1
+        assert lta['nxforms'] == 1  # ever have multiple transforms?
         matrix = lta._xforms[0]['m_L']
     elif fmt.lower() in ('x5', 'bids'):
         raise NotImplementedError
