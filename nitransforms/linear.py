@@ -13,9 +13,9 @@ from scipy import ndimage as ndi
 from pathlib import Path
 
 from nibabel.loadsave import load as loadimg
-from nibabel.affines import from_matvec, voxel_sizes
+from nibabel.affines import from_matvec, voxel_sizes, obliquity
 from .base import TransformBase
-from .patched import obliquity, shape_zoom_affine
+from .patched import shape_zoom_affine
 
 
 LPS = np.diag([-1, -1, 1, 1])
