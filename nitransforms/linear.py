@@ -11,11 +11,13 @@ import sys
 import numpy as np
 from scipy import ndimage as ndi
 from pathlib import Path
+import warnings
 
 from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec, voxel_sizes, obliquity
 from .base import TransformBase
 from .patched import shape_zoom_affine
+from .io import LinearTransformArray, VolumeGeometry
 
 
 LPS = np.diag([-1, -1, 1, 1])
@@ -126,8 +128,7 @@ class Affine(TransformBase):
         try:
             reference = self.reference
         except ValueError:
-            print('Warning: no reference space defined, using moving as reference',
-                  file=sys.stderr)
+            warnings.warn('No reference space defined, using moving as reference')
             reference = moving
 
         nvols = 1
@@ -270,13 +271,13 @@ FixedParameters: 0 0 0\n""".format
 3dvolreg matrices (DICOM-to-DICOM, row-by-row):""", fmt='%g')
             return filename
 
+        # for FSL / FS information
+        if not moving:
+            moving = self.reference
+        elif isinstance(moving, str):
+            moving = loadimg(moving)
+
         if fmt.lower() == 'fsl':
-            if not moving:
-                moving = self.reference
-
-            if isinstance(moving, str):
-                moving = loadimg(moving)
-
             # Adjust for reference image offset and orientation
             refswp, refspc = _fsl_aff_adapt(self.reference)
             pre = self.reference.affine.dot(
@@ -298,6 +299,14 @@ FixedParameters: 0 0 0\n""".format
             else:
                 np.savetxt(filename, mat[0], delimiter=' ', fmt='%g')
             return filename
+        elif fmt.lower() in ('fs', 'lta'):
+            # linear tranform info
+            src = VolumeGeometry.from_image(moving)
+            dst = VolumeGeometry.from_image(self.reference)
+
+
+
+
         return super(Affine, self).to_filename(filename, fmt=fmt)
 
 
@@ -326,6 +335,12 @@ def load(filename, fmt='X5', reference=None):
     # elif fmt.lower() == 'afni':
     #     parameters = LPS.dot(self.matrix.dot(LPS))
     #     parameters = parameters[:3, :].reshape(-1).tolist()
+    elif fmt.lower() in ('fs', 'lta'):
+        with open(filename) as ltafile:
+            lta = LinearTransformArray.from_fileobj(ltafile)
+        # TODO: multiple transforms?
+        assert lta['nxforms'] == 1
+        matrix = lta._xforms[0]['m_L']
     elif fmt.lower() in ('x5', 'bids'):
         raise NotImplementedError
     else:
