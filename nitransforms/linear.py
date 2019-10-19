@@ -151,8 +151,7 @@ The moving image contains {0} volumes, while the transform is defined for \
             singlemat = np.linalg.inv(movaff).dot(self._matrix[0].dot(reference.affine))
 
         if singlemat is not None and nvols > nmats:
-            print('Warning: resampling a 4D volume with a single affine matrix',
-                  file=sys.stderr)
+            warnings.warn('Resampling a 4D volume with a single affine matrix')
 
         # Compose an index to index affine matrix
         moved = []
@@ -274,7 +273,7 @@ FixedParameters: 0 0 0\n""".format
         # for FSL / FS information
         if not moving:
             moving = self.reference
-        elif isinstance(moving, str):
+        if isinstance(moving, str):
             moving = loadimg(moving)
 
         if fmt.lower() == 'fsl':
@@ -347,7 +346,9 @@ def load(filename, fmt='X5', reference=None):
         with open(filename) as ltafile:
             lta = LinearTransformArray.from_fileobj(ltafile)
         assert lta['nxforms'] == 1  # ever have multiple transforms?
-        matrix = lta._xforms[0]['m_L']
+        if lta['type'] != 1:
+            lta.as_type(1)
+        matrix = lta['xforms'][0]['m_L']
     elif fmt.lower() in ('x5', 'bids'):
         raise NotImplementedError
     else:

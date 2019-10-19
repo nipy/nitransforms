@@ -209,25 +209,22 @@ class LinearTransformArray(StringBasedStruct):
 
             val = np.genfromtxt([valstring.encode()],
                                 dtype=klass.dtype[key])
-            if val not in (0, 1):
-                raise NotImplementedError(
-                    "LTA type {0} is not currently supported".format(transform_codes.label[val])
-                )
             sa[key] = val.reshape(sa[key].shape) if val.size else ''
         for _ in range(sa['nxforms']):
             lta._xforms.append(
                 LinearTransform.from_string('\n'.join(lines[:25])))
             lines = lines[25:]
-        for key in ('subject', 'fscale'):
-            # Optional keys
-            if not lines[0].startswith(key):
-                continue
-            label, valstring = lines.pop(0).split(' ')
-            assert label.strip() == key
+        if lines:
+            for key in ('subject', 'fscale'):
+                # Optional keys
+                if not lines[0].startswith(key):
+                    continue
+                label, valstring = lines.pop(0).split(' ')
+                assert label.strip() == key
 
-            val = np.genfromtxt([valstring.encode()],
-                                dtype=klass.dtype[key])
-            sa[key] = val.reshape(sa[key].shape) if val.size else ''
+                val = np.genfromtxt([valstring.encode()],
+                                    dtype=klass.dtype[key])
+                sa[key] = val.reshape(sa[key].shape) if val.size else ''
 
         assert len(lta._xforms) == sa['nxforms']
         return lta
@@ -235,3 +232,32 @@ class LinearTransformArray(StringBasedStruct):
     @classmethod
     def from_fileobj(klass, fileobj, check=True):
         return klass.from_string(fileobj.read())
+
+    def as_type(self, target):
+        """
+        Convert the internal transformation matrix to a different type inplace
+
+        Parameters
+        ----------
+        target : str, int
+            Tranformation type
+        """
+        assert self['nxforms'] == 1, "Cannot convert multiple transformations"
+        xform = self['xforms'][0]
+        src = xform['src']
+        dst = xform['dst']
+        current = self['type']
+        if isinstance(target, str):
+            target = transform_codes.code[target]
+
+        # VOX2VOX -> RAS2RAS
+        if current == 0 and target == 1:
+            M = np.linalg.inv(src.as_affine()).dot(xform['m_L']).dot(dst.as_affine())
+            xform['m_L'] = M
+        else:
+            raise NotImplementedError(
+                "Converting {0} to {1} is not yet available".format(
+                    transform_codes.label[current],
+                    transform_codes.label[target]
+                )
+            )
