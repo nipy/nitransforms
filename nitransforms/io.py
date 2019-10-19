@@ -233,7 +233,7 @@ class LinearTransformArray(StringBasedStruct):
     def from_fileobj(klass, fileobj, check=True):
         return klass.from_string(fileobj.read())
 
-    def as_type(self, target):
+    def set_type(self, target):
         """
         Convert the internal transformation matrix to a different type inplace
 
