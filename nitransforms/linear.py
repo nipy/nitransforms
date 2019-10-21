@@ -17,7 +17,7 @@ from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec, voxel_sizes, obliquity
 from .base import TransformBase
 from .patched import shape_zoom_affine
-from .io import LinearTransformArray, LinearTransform, VolumeGeometry
+from . import io
 
 
 LPS = np.diag([-1, -1, 1, 1])
@@ -300,15 +300,15 @@ FixedParameters: 0 0 0\n""".format
             return filename
         elif fmt.lower() == 'lta':
             # xform info
-            lt = LinearTransform()
+            lt = io.LinearTransform()
             lt['sigma'] = 1.
             lt['m_L'] = self.matrix
-            lt['src'] = VolumeGeometry.from_image(moving)
-            lt['dst'] = VolumeGeometry.from_image(self.reference)
+            lt['src'] = io.VolumeGeometry.from_image(moving)
+            lt['dst'] = io.VolumeGeometry.from_image(self.reference)
             # to make LTA file format
-            lta = LinearTransformArray()
+            lta = io.LinearTransformArray()
             lta['type'] = 1  # RAS2RAS
-            lta['xforms'] = [lt]
+            lta['xforms'].append(lt)
 
             with open(filename, 'w') as f:
                 f.write(lta.to_string())
@@ -344,7 +344,7 @@ def load(filename, fmt='X5', reference=None):
     #     parameters = parameters[:3, :].reshape(-1).tolist()
     elif fmt.lower() == 'lta':
         with open(filename) as ltafile:
-            lta = LinearTransformArray.from_fileobj(ltafile)
+            lta = io.LinearTransformArray.from_fileobj(ltafile)
         if lta['nxforms'] > 1:
             raise NotImplementedError("Multiple transforms are not yet supported.")
         if lta['type'] != 1:
