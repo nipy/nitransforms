@@ -1,7 +1,8 @@
 import numpy as np
-from nibabel.wrapstruct import LabeledWrapStruct
 from nibabel.volumeutils import Recoder
 from nibabel.affines import voxel_sizes
+
+from .patched import LabeledWrapStruct
 
 transform_codes = Recoder((
     (0, 'LINEAR_VOX_TO_VOX'),
@@ -150,7 +151,7 @@ class LinearTransform(StringBasedStruct):
             val = np.genfromtxt([valstring.encode()],
                                 dtype=klass.dtype[key])
             sa[key] = val.reshape(sa[key].shape)
-        assert lines.pop(0) == '1 4 4'
+        assert lines.pop(0) == '1 4 4'  # xforms, shape + 1, shape + 1
         val = np.genfromtxt([valstring.encode() for valstring in lines[:4]],
                             dtype='f4')
         sa['m_L'] = val
