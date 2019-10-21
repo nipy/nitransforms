@@ -298,7 +298,7 @@ FixedParameters: 0 0 0\n""".format
             else:
                 np.savetxt(filename, mat[0], delimiter=' ', fmt='%g')
             return filename
-        elif fmt.lower() in ('fs', 'lta'):
+        elif fmt.lower() == 'lta':
             # xform info
             lt = LinearTransform()
             lt['sigma'] = 1.
@@ -342,12 +342,13 @@ def load(filename, fmt='X5', reference=None):
     # elif fmt.lower() == 'afni':
     #     parameters = LPS.dot(self.matrix.dot(LPS))
     #     parameters = parameters[:3, :].reshape(-1).tolist()
-    elif fmt.lower() in ('fs', 'lta'):
+    elif fmt.lower() == 'lta':
         with open(filename) as ltafile:
             lta = LinearTransformArray.from_fileobj(ltafile)
-        assert lta['nxforms'] == 1  # ever have multiple transforms?
+        if lta['nxforms'] > 1:
+            raise NotImplementedError("Multiple transforms are not yet supported.")
         if lta['type'] != 1:
-            lta.as_type(1)
+            lta.set_type(1)
         matrix = lta['xforms'][0]['m_L']
     elif fmt.lower() in ('x5', 'bids'):
         raise NotImplementedError
