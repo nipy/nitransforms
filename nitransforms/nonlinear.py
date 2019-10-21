@@ -9,7 +9,7 @@
 """Nonlinear transforms."""
 from warnings import warn
 import numpy as np
-from scipy import ndimage as ndi
+# from scipy import ndimage as ndi
 # from gridbspline.maths import cubic
 
 from .base import ImageGrid, TransformBase
@@ -18,14 +18,14 @@ from nibabel.funcs import four_to_three
 # vbspl = np.vectorize(cubic)
 
 
-class DeformationFieldTransform(TransformBase):
+class DisplacementsFieldTransform(TransformBase):
     """Represents a dense field of displacements (one vector per voxel)."""
 
     __slots__ = ['_field']
 
     def __init__(self, field, reference=None):
         """Create a dense deformation field transform."""
-        super(DeformationFieldTransform, self).__init__()
+        super(DisplacementsFieldTransform, self).__init__()
         self._field = np.asanyarray(field.dataobj)
 
         ndim = self._field.ndim - 1
@@ -38,7 +38,8 @@ class DeformationFieldTransform(TransformBase):
         # displacement vector per voxel in output (reference)
         # space
         if reference is None:
-            reference = four_to_three(field)[0]
+            reference = field.__class__(np.zeros(self._field.shape[:-1]),
+                                        field.affine, field.header)
         elif reference.shape[:ndim] != field.shape[:ndim]:
             raise ValueError(
                 'Reference ({}) and field ({}) must have the same '
@@ -71,7 +72,7 @@ class DeformationFieldTransform(TransformBase):
         >>> field = np.zeros((10, 10, 10, 3))
         >>> field[..., 0] = 4.0
         >>> fieldimg = nb.Nifti1Image(field, np.diag([2., 2., 2., 1.]))
-        >>> xfm = DeformationFieldTransform(fieldimg)
+        >>> xfm = DisplacementsFieldTransform(fieldimg)
         >>> xfm([4.0, 4.0, 4.0]).tolist()
         [[8.0, 4.0, 4.0]]
 

@@ -9,6 +9,7 @@
 """Common interface for transforms."""
 import numpy as np
 import h5py
+from nibabel.loadsave import load
 
 from scipy import ndimage as ndi
 
@@ -168,6 +169,9 @@ class TransformBase(object):
             The moving imaged after resampling to reference space.
 
         """
+        if isinstance(moving, str):
+            moving = load(moving)
+
         moving_data = np.asanyarray(moving.dataobj)
         if output_dtype is None:
             output_dtype = moving_data.dtype
