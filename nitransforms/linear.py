@@ -298,7 +298,7 @@ FixedParameters: 0 0 0\n""".format
             else:
                 np.savetxt(filename, mat[0], delimiter=' ', fmt='%g')
             return filename
-        elif fmt.lower() == 'lta':
+        elif fmt.lower() == 'fs':
             # xform info
             lt = io.LinearTransform()
             lt['sigma'] = 1.
@@ -342,7 +342,7 @@ def load(filename, fmt='X5', reference=None):
     # elif fmt.lower() == 'afni':
     #     parameters = LPS.dot(self.matrix.dot(LPS))
     #     parameters = parameters[:3, :].reshape(-1).tolist()
-    elif fmt.lower() == 'lta':
+    elif fmt.lower() == 'fs':
         with open(filename) as ltafile:
             lta = io.LinearTransformArray.from_fileobj(ltafile)
         if lta['nxforms'] > 1:
