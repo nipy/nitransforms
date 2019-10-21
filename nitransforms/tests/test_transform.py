@@ -27,7 +27,7 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
     'afni': """\
 3dAllineate -base {reference} -input {moving} \
 -prefix resampled.nii.gz -1Dmatrix_apply {transform} -final NN\
-""".format,-
+""".format,
 }
 
 
