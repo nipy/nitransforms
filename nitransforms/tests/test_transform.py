@@ -27,7 +27,7 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
     'afni': """\
 3dAllineate -base {reference} -input {moving} \
 -prefix resampled.nii.gz -1Dmatrix_apply {transform} -final NN\
-""".format,
+""".format,-
 }
 
 
@@ -35,7 +35,7 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 @pytest.mark.parametrize('image_orientation', [
     'RAS', 'LAS', 'LPS',  # 'oblique',
 ])
-@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
+@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
 def test_linear_load(tmpdir, data_path, get_data, image_orientation, sw_tool):
     """Check implementation of loading affines from formats."""
     tmpdir.chdir()
@@ -51,6 +51,8 @@ def test_linear_load(tmpdir, data_path, get_data, image_orientation, sw_tool):
     ext = ''
     if sw_tool == 'itk':
         ext = '.tfm'
+    elif sw_tool == 'fs':
+        ext = '.lta'
 
     fname = 'affine-%s.%s%s' % (image_orientation, sw_tool, ext)
     xfm_fname = os.path.join(data_path, fname)
@@ -74,6 +76,8 @@ def test_linear_load(tmpdir, data_path, get_data, image_orientation, sw_tool):
         loaded = nbl.load(xfm_fname, fmt=fmt, reference='img.nii.gz')
     elif sw_tool == 'itk':
         loaded = nbl.load(xfm_fname, fmt=fmt)
+    elif sw_tool == 'fs':
+        loaded = nbl.load(xfm_fname, fmt=fmt)
 
     assert loaded == xfm
 
@@ -81,7 +85,7 @@ def test_linear_load(tmpdir, data_path, get_data, image_orientation, sw_tool):
 @pytest.mark.parametrize('image_orientation', [
     'RAS', 'LAS', 'LPS',  # 'oblique',
 ])
-@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
+@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
 def test_linear_save(data_path, get_data, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
     img = get_data[image_orientation]
@@ -93,6 +97,8 @@ def test_linear_save(data_path, get_data, image_orientation, sw_tool):
     ext = ''
     if sw_tool == 'itk':
         ext = '.tfm'
+    elif sw_tool == 'fs':
+        ext = '.lta'
 
     with InTemporaryDirectory():
         xfm_fname1 = 'M.%s%s' % (sw_tool, ext)
