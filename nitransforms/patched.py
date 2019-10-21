@@ -68,12 +68,4 @@ def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
 
 class LabeledWrapStruct(LWS):
     def __setitem__(self, item, value):
-        ''' Set values in structured data
-        Examples
-        --------
-        >>> wstr = WrapStruct()
-        >>> wstr['integer'] = 3
-        >>> wstr['integer']
-        array(3, dtype=int16)
-        '''
         self._structarr[item] = np.asanyarray(value)
