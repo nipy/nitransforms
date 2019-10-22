@@ -11,11 +11,13 @@ import sys
 import numpy as np
 from scipy import ndimage as ndi
 from pathlib import Path
+import warnings
 
 from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec, voxel_sizes, obliquity
 from .base import TransformBase
 from .patched import shape_zoom_affine
+from . import io
 
 
 LPS = np.diag([-1, -1, 1, 1])
@@ -126,8 +128,7 @@ class Affine(TransformBase):
         try:
             reference = self.reference
         except ValueError:
-            print('Warning: no reference space defined, using moving as reference',
-                  file=sys.stderr)
+            warnings.warn('No reference space defined, using moving as reference')
             reference = moving
 
         nvols = 1
@@ -150,8 +151,7 @@ The moving image contains {0} volumes, while the transform is defined for \
             singlemat = np.linalg.inv(movaff).dot(self._matrix[0].dot(reference.affine))
 
         if singlemat is not None and nvols > nmats:
-            print('Warning: resampling a 4D volume with a single affine matrix',
-                  file=sys.stderr)
+            warnings.warn('Resampling a 4D volume with a single affine matrix')
 
         # Compose an index to index affine matrix
         moved = []
@@ -270,13 +270,13 @@ FixedParameters: 0 0 0\n""".format
 3dvolreg matrices (DICOM-to-DICOM, row-by-row):""", fmt='%g')
             return filename
 
+        # for FSL / FS information
+        if not moving:
+            moving = self.reference
+        if isinstance(moving, str):
+            moving = loadimg(moving)
+
         if fmt.lower() == 'fsl':
-            if not moving:
-                moving = self.reference
-
-            if isinstance(moving, str):
-                moving = loadimg(moving)
-
             # Adjust for reference image offset and orientation
             refswp, refspc = _fsl_aff_adapt(self.reference)
             pre = self.reference.affine.dot(
@@ -298,6 +298,22 @@ FixedParameters: 0 0 0\n""".format
             else:
                 np.savetxt(filename, mat[0], delimiter=' ', fmt='%g')
             return filename
+        elif fmt.lower() == 'fs':
+            # xform info
+            lt = io.LinearTransform()
+            lt['sigma'] = 1.
+            lt['m_L'] = self.matrix
+            lt['src'] = io.VolumeGeometry.from_image(moving)
+            lt['dst'] = io.VolumeGeometry.from_image(self.reference)
+            # to make LTA file format
+            lta = io.LinearTransformArray()
+            lta['type'] = 1  # RAS2RAS
+            lta['xforms'].append(lt)
+
+            with open(filename, 'w') as f:
+                f.write(lta.to_string())
+            return filename
+
         return super(Affine, self).to_filename(filename, fmt=fmt)
 
 
@@ -326,6 +342,14 @@ def load(filename, fmt='X5', reference=None):
     # elif fmt.lower() == 'afni':
     #     parameters = LPS.dot(self.matrix.dot(LPS))
     #     parameters = parameters[:3, :].reshape(-1).tolist()
+    elif fmt.lower() == 'fs':
+        with open(filename) as ltafile:
+            lta = io.LinearTransformArray.from_fileobj(ltafile)
+        if lta['nxforms'] > 1:
+            raise NotImplementedError("Multiple transforms are not yet supported.")
+        if lta['type'] != 1:
+            lta.set_type(1)
+        matrix = lta['xforms'][0]['m_L']
     elif fmt.lower() in ('x5', 'bids'):
         raise NotImplementedError
     else:
