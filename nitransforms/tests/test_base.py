@@ -8,7 +8,7 @@ def test_ImageSpace(get_data):
     im = get_data['RAS']
 
     img = ImageSpace(im)
-    assert img.affine == np.linalg.inv(img.inverse)
+    assert np.all(img.affine == np.linalg.inv(img.inverse))
 
     # nd index / coords
     idxs = img.ndindex
