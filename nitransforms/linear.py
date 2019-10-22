@@ -108,6 +108,13 @@ class Affine(TransformBase):
 
         Examples
         --------
+        >>> a = Affine()
+        >>> a.matrix
+        array([[[1., 0., 0., 0.],
+                [0., 1., 0., 0.],
+                [0., 0., 1., 0.],
+                [0., 0., 0., 1.]]])
+
         >>> xfm = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
         >>> ref = nb.load(testfile)
         >>> xfm.reference = ref
@@ -172,7 +179,34 @@ The moving image contains {0} volumes, while the transform is defined for \
         return moved_image
 
     def map_point(self, coords, index=0, forward=True):
-        """Apply y = f(x), where x is the argument `coords`."""
+        """
+        Apply y = f(x), where x is the argument `coords`.
+
+        Parameters
+        ----------
+        coords : array_like
+            RAS coordinates to map
+        index : int, optional
+            Transformation index
+        forward: bool, optional
+            Direction of mapping. Default is set to ``True``. If ``False``,
+            the inverse transformation is applied.
+
+        Returns
+        -------
+        out: ndarray
+            Transformed coordinates
+
+        Examples
+        --------
+        >>> xfm = Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
+        >>> xfm.map_point((0,0,0))
+        array([1, 2, 3])
+
+        >>> xfm.map_point((0,0,0), forward=False)
+        array([-1., -2., -3.])
+
+        """
         coords = np.array(coords)
         if coords.shape[0] == self._matrix[index].shape[0] - 1:
             coords = np.append(coords, [1])
