@@ -178,7 +178,7 @@ The moving image contains {0} volumes, while the transform is defined for \
 
         return moved_image
 
-    def map_point(self, coords, index=0, forward=True):
+    def map(self, coords, index=0, forward=True):
         """
         Apply y = f(x), where x is the argument `coords`.
 
@@ -200,10 +200,10 @@ The moving image contains {0} volumes, while the transform is defined for \
         Examples
         --------
         >>> xfm = Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
-        >>> xfm.map_point((0,0,0))
+        >>> xfm((0,0,0))
         array([1, 2, 3])
 
-        >>> xfm.map_point((0,0,0), forward=False)
+        >>> xfm((0,0,0), forward=False)
         array([-1., -2., -3.])
 
         """
@@ -213,7 +213,7 @@ The moving image contains {0} volumes, while the transform is defined for \
         affine = self._matrix[index] if forward else np.linalg.inv(self._matrix[index])
         return affine.dot(coords)[:-1]
 
-    def map_voxel(self, index, nindex=0, moving=None):
+    def _map_voxel(self, index, nindex=0, moving=None):
         """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
         try:
             reference = self.reference

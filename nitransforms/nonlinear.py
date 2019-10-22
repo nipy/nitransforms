@@ -11,7 +11,7 @@ import numpy as np
 from scipy import ndimage as ndi
 # from gridbspline.maths import cubic
 
-from .base import ImageSpace, TransformBase
+from .base import ImageGrid, TransformBase
 from nibabel.funcs import four_to_three
 
 # vbspl = np.vectorize(cubic)
@@ -53,7 +53,7 @@ class DeformationFieldTransform(TransformBase):
 
     def _cache_moving(self, moving):
         # Check whether input (moving) space is cached
-        moving_space = ImageSpace(moving)
+        moving_space = ImageGrid(moving)
         if self._moving_space == moving_space:
             return
 
@@ -126,14 +126,13 @@ class DeformationFieldTransform(TransformBase):
         return super(DeformationFieldTransform, self).resample(
             moving, order=order, mode=mode, cval=cval, prefilter=prefilter)
 
-    def map_voxel(self, index, moving=None):
+    def _map_voxel(self, index, moving=None):
         """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
         return tuple(self._moving[index + self.__s])
 
-    def map_coordinates(self, coordinates, order=3, mode='mirror', cval=0.0,
-                        prefilter=True):
+    def map(self, x, order=3, mode='mirror', cval=0.0, prefilter=True):
         """Apply y = f(x), where x is the argument `coords`."""
-        coordinates = np.array(coordinates)
+        coordinates = np.array(x)
         # Extract shapes and dimensions, then flatten
         ndim = coordinates.shape[-1]
         output_shape = coordinates.shape[:-1]
@@ -176,7 +175,7 @@ class BSplineFieldTransform(TransformBase):
                 'not match the number of dimensions')
 
         self._coeffs = coefficients.get_data()
-        self._knots = ImageSpace(four_to_three(coefficients)[0])
+        self._knots = ImageGrid(four_to_three(coefficients)[0])
         self._cache_moving()
 
     def _cache_moving(self):
@@ -222,7 +221,7 @@ class BSplineFieldTransform(TransformBase):
         # coords[:3] += weights.dot(np.array(coeffs, dtype=float))
         return self.reference.inverse.dot(np.hstack((coords, 1)))[:3]
 
-    def map_voxel(self, index, moving=None):
+    def _map_voxel(self, index, moving=None):
         """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
         return tuple(self._moving[index + self.__s])
 

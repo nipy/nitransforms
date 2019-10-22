@@ -1,13 +1,16 @@
-"""Tests of the base module"""
+"""Tests of the base module."""
 import numpy as np
+import pytest
 
-from ..base import ImageSpace
+from ..base import ImageGrid
 
 
-def test_ImageSpace(get_data):
-    im = get_data['RAS']
+@pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
+def test_ImageGrid(get_data, image_orientation):
+    """Check the grid object."""
+    im = get_data[image_orientation]
 
-    img = ImageSpace(im)
+    img = ImageGrid(im)
     assert np.all(img.affine == np.linalg.inv(img.inverse))
 
     # nd index / coords
