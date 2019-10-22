@@ -31,6 +31,27 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 }
 
 
+def test_map_voxel(tmpdir, get_data):
+    xfm = nbl.Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
+    with pytest.raises(ValueError):
+        # reference / moving are not set
+        xfm.map_voxel((0, 0, 0))
+
+    img = get_data['RAS']
+    xfm.reference = img
+    assert xfm.map_voxel((0, 0, 0)) == (2.75, 5.5, 8.25)
+    del xfm
+
+    # use moving space as reference
+    xfm = nbl.Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
+    mov = get_data['LPS']
+    assert xfm.map_voxel((0, 0, 0), moving=mov) == (-2.75, -5.5, 8.25)
+
+    # use RAS space as reference
+    xfm.reference = img
+    assert xfm.map_voxel((0, 0, 0), moving=mov) == (0.75, 5.0, 8.25)
+
+
 @pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize('image_orientation', [
     'RAS', 'LAS', 'LPS',  # 'oblique',

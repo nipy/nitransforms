@@ -53,4 +53,4 @@ def test_LinearTransformArray(tmpdir, data_path):
 
     with open(outlta) as fp:
         lta2 = LTA.from_fileobj(fp)
-    np.allclose(lta['xforms'][0]['m_L'], lta2['xforms'][0]['m_L'])
+    assert np.allclose(lta['xforms'][0]['m_L'], lta2['xforms'][0]['m_L'])
