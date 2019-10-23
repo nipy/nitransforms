@@ -1,8 +1,10 @@
 """Tests of the base module."""
 import numpy as np
+import nibabel as nb
 import pytest
+import h5py
 
-from ..base import ImageGrid
+from ..base import ImageGrid, TransformBase
 
 
 @pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
@@ -30,9 +32,36 @@ def test_ImageGrid(get_testdata, image_orientation):
     assert idxs.shape[1] == coords.shape[1] == img.nvox == np.prod(im.shape)
 
 
-def test_ImageGrid_load(data_path, get_testdata):
+def test_ImageGrid_utils(tmpdir, data_path, get_testdata):
     """Check that images can be objects or paths and equality."""
+    tmpdir.chdir()
+
     im1 = get_testdata['RAS']
     im2 = data_path / 'someones_anatomy.nii.gz'
 
     assert ImageGrid(im1) == ImageGrid(im2)
+
+    with h5py.File('xfm.x5', 'w') as f:
+        ImageGrid(im1)._to_hdf5(f.create_group('Reference'))
+
+
+def test_TransformBase(monkeypatch, data_path, tmpdir):
+    """Check the correctness of TransformBase components."""
+    tmpdir.chdir()
+
+    def _fakemap(klass, x, inverse=False, index=0):
+        return x
+
+    def _to_hdf5(klass, x5_root):
+        return None
+
+    monkeypatch.setattr(TransformBase, 'map', _fakemap)
+    monkeypatch.setattr(TransformBase, '_to_hdf5', _to_hdf5)
+    nii = nb.load(str(data_path / 'someones_anatomy.nii.gz'))
+    xfm = TransformBase()
+    xfm.reference = str(data_path / 'someones_anatomy.nii.gz')
+    assert xfm.ndim == 3
+    moved = xfm.resample(nii, order=0)
+    assert np.all(nii.get_fdata() == moved.get_fdata())
+
+    xfm.to_filename('data.x5')
