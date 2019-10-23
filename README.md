@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/poldracklab/nitransforms.svg?branch=master)](https://travis-ci.org/poldracklab/nitransforms)
 [![codecov](https://codecov.io/gh/poldracklab/nitransforms/branch/master/graph/badge.svg)](https://codecov.io/gh/poldracklab/nitransforms)
+[![doi](https://img.shields.io/badge/doi-10.31219%2Fosf.io%2F8aq7b-blue.svg)](https://doi.org/10.31219/osf.io/8aq7b)
 
 A development repo for [nipy/nibabel#656](https://github.com/nipy/nibabel/pull/656)
 
