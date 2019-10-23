@@ -17,7 +17,7 @@ Geometric transforms.
    transform
 """
 from .linear import Affine
-from .nonlinear import DeformationFieldTransform
+from .nonlinear import DisplacementsFieldTransform
 
 
-__all__ = ['Affine', 'DeformationFieldTransform']
+__all__ = ['Affine', 'DisplacementsFieldTransform']

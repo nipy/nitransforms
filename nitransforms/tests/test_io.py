@@ -1,5 +1,6 @@
-import os
-
+# emacs: -*- mode: python-mode; py-indent-offset: 4; indent-tabs-mode: nil -*-
+# vi: set ft=python sts=4 ts=4 sw=4 et:
+"""I/O test cases."""
 import numpy as np
 
 from ..io import (
@@ -35,7 +36,7 @@ def test_LinearTransformArray(tmpdir, data_path):
     assert lta['nxforms'] == 0
     assert len(lta['xforms']) == 0
 
-    test_lta = os.path.join(data_path, 'inv.lta')
+    test_lta = str(data_path / 'inv.lta')
     with open(test_lta) as fp:
         lta = LTA.from_fileobj(fp)
 
