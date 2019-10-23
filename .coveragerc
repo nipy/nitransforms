@@ -4,3 +4,9 @@ omit =
     */tests/*
     nitransforms/conftest.py
     nitransforms/patched.py
+
+[report]
+# Regexes for lines to exclude from consideration
+exclude_lines =
+    raise NotImplementedError
+    warnings\.warn
