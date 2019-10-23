@@ -143,7 +143,7 @@ class Affine(TransformBase):
             nvols = moving.shape[3]
 
         movaff = moving.affine
-        movingdata = moving.get_data()
+        movingdata = np.asanyarray(moving.dataobj)
         if nvols == 1:
             movingdata = movingdata[..., np.newaxis]
 
@@ -178,39 +178,42 @@ The moving image contains {0} volumes, while the transform is defined for \
 
         return moved_image
 
-    def map(self, coords, index=0, forward=True):
-        """
-        Apply y = f(x), where x is the argument `coords`.
+    def map(self, x, inverse=False, index=0):
+        r"""
+        Apply :math:`y = f(x)`.
 
         Parameters
         ----------
-        coords : array_like
-            RAS coordinates to map
+        x : N x D numpy.ndarray
+            Input RAS+ coordinates (i.e., physical coordinates).
+        inverse : bool
+            If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
         index : int, optional
             Transformation index
-        forward: bool, optional
-            Direction of mapping. Default is set to ``True``. If ``False``,
-            the inverse transformation is applied.
 
         Returns
         -------
-        out: ndarray
-            Transformed coordinates
+        y : N x D numpy.ndarray
+            Transformed (mapped) RAS+ coordinates (i.e., physical coordinates).
 
         Examples
         --------
         >>> xfm = Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
-        >>> xfm((0,0,0))
+        >>> xfm.map((0,0,0))
         array([1, 2, 3])
 
-        >>> xfm((0,0,0), forward=False)
+        >>> xfm.map((0,0,0), inverse=True)
         array([-1., -2., -3.])
 
         """
-        coords = np.array(coords)
+        coords = np.array(x)
         if coords.shape[0] == self._matrix[index].shape[0] - 1:
             coords = np.append(coords, [1])
-        affine = self._matrix[index] if forward else np.linalg.inv(self._matrix[index])
+        affine = self._matrix[index]
+
+        if inverse is True:
+            affine = np.linalg.inv(self._matrix[index])
+
         return affine.dot(coords)[:-1]
 
     def _map_voxel(self, index, nindex=0, moving=None):

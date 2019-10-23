@@ -78,14 +78,15 @@ class ImageGrid(object):
             )[:3, ...]
         return self._coords
 
-    def index(self, coordinates):
-        """Get the image array's indexes corresponding to coordinates."""
-        coordinates = np.array(coordinates)
-        ncoords = coordinates.shape[-1]
-        coordinates = np.vstack((coordinates, np.ones((1, ncoords))))
+    def ras(self, ijk):
+        """Get RAS+ coordinates from input indexes."""
+        ras = self._affine.dot(_as_homogeneous(ijk).T)[:3, ...]
+        return ras.T
 
-        # Back to grid coordinates
-        return np.tensordot(self._inverse, coordinates, axes=1)[:3, ...]
+    def index(self, x):
+        """Get the image array's indexes corresponding to coordinates."""
+        ijk = self._inverse.dot(_as_homogeneous(x).T)[:3, ...]
+        return ijk.T
 
     def _to_hdf5(self, group):
         group.attrs['Type'] = 'image'
@@ -114,9 +115,9 @@ class TransformBase(object):
             return False
         return np.allclose(self.matrix, other.matrix, rtol=EQUALITY_TOL)
 
-    def __call__(self, x):
+    def __call__(self, x, inverse=False, index=0):
         """Apply y = f(x)."""
-        return self.map(x)
+        return self.map(x, inverse=inverse, index=index)
 
     @property
     def reference(self):
@@ -171,30 +172,46 @@ class TransformBase(object):
         if output_dtype is None:
             output_dtype = moving_data.dtype
 
-        moving_grid = ImageGrid(moving)
-
-        def _map_indexes(ijk):
-            return moving_grid.inverse.dot(self.map(self.reference.affine.dot(ijk)))
-
         moved = ndi.geometric_transform(
             moving_data,
-            mapping=_map_indexes,
+            mapping=self._map_index,
             output_shape=self.reference.shape,
             output=output_dtype,
             order=order,
             mode=mode,
             cval=cval,
             prefilter=prefilter,
-            extra_keywords={'moving': moving},
+            extra_keywords={'moving': ImageGrid(moving)},
         )
 
         moved_image = moving.__class__(moved, self.reference.affine, moving.header)
         moved_image.header.set_data_dtype(output_dtype)
         return moved_image
 
-    def map(self, x):
-        """Apply y = f(x)."""
+    def map(self, x, inverse=False, index=0):
+        r"""
+        Apply :math:`y = f(x)`.
+
+        Parameters
+        ----------
+        x : N x D numpy.ndarray
+            Input RAS+ coordinates (i.e., physical coordinates).
+        inverse : bool
+            If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
+        index : int, optional
+            Transformation index
+
+        Returns
+        -------
+        y : N x D numpy.ndarray
+            Transformed (mapped) RAS+ coordinates (i.e., physical coordinates).
+
+        """
         raise NotImplementedError
+
+    def _map_index(self, ijk, moving):
+        x = self.reference.ras(_as_homogeneous(ijk))
+        return moving.index(self.map(x))
 
     def to_filename(self, filename, fmt='X5'):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
@@ -209,3 +226,24 @@ class TransformBase(object):
     def _to_hdf5(self, x5_root):
         """Serialize this object into the x5 file format."""
         raise NotImplementedError
+
+
+def _as_homogeneous(xyz, dtype='float32'):
+    """
+    Convert 2D and 3D coordinates into homogeneous coordinates.
+
+    Examples
+    --------
+    >>> _as_homogeneous((4, 5), dtype='int8').tolist()
+    [[4, 5, 1]]
+
+    >>> _as_homogeneous((4, 5, 6),dtype='int8').tolist()
+    [[4, 5, 6, 1]]
+
+    >>> _as_homogeneous([(1, 2, 3), (4, 5, 6)]).tolist()
+    [[1.0, 2.0, 3.0, 1.0], [4.0, 5.0, 6.0, 1.0]]
+
+
+    """
+    xyz = np.atleast_2d(np.array(xyz, dtype=dtype))
+    return np.hstack((xyz, np.ones((xyz.shape[0], 1), dtype=dtype)))
