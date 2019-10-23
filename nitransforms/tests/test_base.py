@@ -1,14 +1,26 @@
-"""Tests of the base module"""
+"""Tests of the base module."""
 import numpy as np
+import pytest
 
-from ..base import ImageSpace
+from ..base import ImageGrid
 
 
-def test_ImageSpace(get_data):
-    im = get_data['RAS']
+@pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
+def test_ImageGrid(get_testdata, image_orientation):
+    """Check the grid object."""
+    im = get_testdata[image_orientation]
 
-    img = ImageSpace(im)
-    assert np.all(img.affine == np.linalg.inv(img.inverse))
+    img = ImageGrid(im)
+    assert np.allclose(img.affine, np.linalg.inv(img.inverse))
+
+    # Test ras2vox and vox2ras conversions
+    ijk = [[10, 10, 10], [40, 4, 20], [0, 0, 0], [s - 1 for s in im.shape[:3]]]
+    xyz = [img._affine.dot(idx + [1])[:-1] for idx in ijk]
+
+    assert np.allclose(img.ras(ijk[0]), xyz[0])
+    assert np.allclose(np.round(img.index(xyz[0])), ijk[0])
+    assert np.allclose(img.ras(ijk), xyz)
+    assert np.allclose(np.round(img.index(xyz)), ijk)
 
     # nd index / coords
     idxs = img.ndindex

@@ -7,11 +7,12 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Nonlinear transforms."""
+from warnings import warn
 import numpy as np
 from scipy import ndimage as ndi
 # from gridbspline.maths import cubic
 
-from .base import ImageSpace, TransformBase
+from .base import ImageGrid, TransformBase
 from nibabel.funcs import four_to_three
 
 # vbspl = np.vectorize(cubic)
@@ -20,22 +21,18 @@ from nibabel.funcs import four_to_three
 class DeformationFieldTransform(TransformBase):
     """Represents a dense field of displacements (one vector per voxel)."""
 
-    __slots__ = ['_field', '_moving', '_moving_space']
-    __s = (slice(None), )
+    __slots__ = ['_field']
 
     def __init__(self, field, reference=None):
         """Create a dense deformation field transform."""
         super(DeformationFieldTransform, self).__init__()
-        self._field = field.get_data()
+        self._field = np.asanyarray(field.dataobj)
 
         ndim = self._field.ndim - 1
         if len(self._field.shape[:-1]) != ndim:
             raise ValueError(
                 'Number of components of the deformation field does '
                 'not match the number of dimensions')
-
-        self._moving = None  # Where each voxel maps to
-        self._moving_space = None  # Input space cache
 
         # By definition, a free deformation field has a
         # displacement vector per voxel in output (reference)
@@ -51,111 +48,45 @@ class DeformationFieldTransform(TransformBase):
 
         self.reference = reference
 
-    def _cache_moving(self, moving):
-        # Check whether input (moving) space is cached
-        moving_space = ImageSpace(moving)
-        if self._moving_space == moving_space:
-            return
+    def map(self, x, inverse=False, index=0):
+        r"""
+        Apply :math:`y = f(x)`.
 
-        # Generate grid of pixel indexes (ijk)
-        ndim = self._field.ndim - 1
-        if ndim == 2:
-            grid = np.meshgrid(
-                np.arange(self._field.shape[0]),
-                np.arange(self._field.shape[1]),
-                indexing='ij')
-        elif ndim == 3:
-            grid = np.meshgrid(
-                np.arange(self._field.shape[0]),
-                np.arange(self._field.shape[1]),
-                np.arange(self._field.shape[2]),
-                indexing='ij')
-        else:
-            raise ValueError('Wrong dimensions (%d)' % ndim)
+        Parameters
+        ----------
+        x : N x D numpy.ndarray
+            Input RAS+ coordinates (i.e., physical coordinates).
+        inverse : bool
+            If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
+        index : int, optional
+            Transformation index
 
-        grid = np.array(grid)
-        flatgrid = grid.reshape(ndim, -1)
-
-        # Calculate physical coords of all voxels (xyz)
-        flatxyz = np.tensordot(
-            self.reference.affine,
-            np.vstack((flatgrid, np.ones((1, flatgrid.shape[1])))),
-            axes=1
-        )
-
-        # Add field
-        newxyz = flatxyz + np.vstack((
-            np.moveaxis(self._field, -1, 0).reshape(ndim, -1),
-            np.zeros((1, flatgrid.shape[1]))))
-
-        # Back to grid coordinates
-        newijk = np.tensordot(np.linalg.inv(moving.affine),
-                              newxyz, axes=1)
-
-        # Reshape as grid
-        self._moving = np.moveaxis(
-            newijk[0:3, :].reshape((ndim, ) + self._field.shape[:-1]),
-            0, -1)
-
-        self._moving_space = moving_space
-
-    def resample(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
-                 output_dtype=None):
-        """
-        Resample the ``moving`` image applying the deformation field.
+        Returns
+        -------
+        y : N x D numpy.ndarray
+            Transformed (mapped) RAS+ coordinates (i.e., physical coordinates).
 
         Examples
         --------
-        >>> ref = nb.load(testfile)
-        >>> refdata = ref.get_fdata()
-        >>> np.allclose(refdata, 0)
-        True
-
-        >>> refdata[5, 5, 5] = 1  # Set a one in the middle voxel
-        >>> moving = nb.Nifti1Image(refdata, ref.affine, ref.header)
-        >>> field = np.zeros(tuple(list(ref.shape) + [3]))
+        >>> field = np.zeros((10, 10, 10, 3))
         >>> field[..., 0] = 4.0
-        >>> fieldimg = nb.Nifti1Image(field, ref.affine, ref.header)
+        >>> fieldimg = nb.Nifti1Image(field, np.diag([2., 2., 2., 1.]))
         >>> xfm = DeformationFieldTransform(fieldimg)
-        >>> resampled = xfm.resample(moving, order=0).get_fdata()
-        >>> resampled[1, 5, 5]
-        1.0
+        >>> xfm([4.0, 4.0, 4.0]).tolist()
+        [[8.0, 4.0, 4.0]]
+
+        >>> xfm([[4.0, 4.0, 4.0], [8, 2, 10]]).tolist()
+        [[8.0, 4.0, 4.0], [12.0, 2.0, 10.0]]
 
         """
-        self._cache_moving(moving)
-        return super(DeformationFieldTransform, self).resample(
-            moving, order=order, mode=mode, cval=cval, prefilter=prefilter)
-
-    def map_voxel(self, index, moving=None):
-        """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
-        return tuple(self._moving[index + self.__s])
-
-    def map_coordinates(self, coordinates, order=3, mode='mirror', cval=0.0,
-                        prefilter=True):
-        """Apply y = f(x), where x is the argument `coords`."""
-        coordinates = np.array(coordinates)
-        # Extract shapes and dimensions, then flatten
-        ndim = coordinates.shape[-1]
-        output_shape = coordinates.shape[:-1]
-        flatcoord = np.moveaxis(coordinates, -1, 0).reshape(ndim, -1)
-
-        # Convert coordinates to voxel indices
-        ijk = np.tensordot(
-            np.linalg.inv(self.reference.affine),
-            np.vstack((flatcoord, np.ones((1, flatcoord.shape[1])))),
-            axes=1)
-        deltas = ndi.map_coordinates(
-            self._field,
-            ijk,
-            order=order,
-            mode=mode,
-            cval=cval,
-            prefilter=prefilter)
-
-        deltas = np.moveaxis(deltas[0:3, :].reshape((ndim, ) + output_shape),
-                             0, -1)
-
-        return coordinates + deltas
+        if inverse is True:
+            raise NotImplementedError
+        ijk = self.reference.index(x)
+        indexes = np.round(ijk).astype('int')
+        if np.any(np.abs(ijk - indexes) > 0.05):
+            warn('Some coordinates are off-grid of the displacements field.')
+        indexes = tuple(tuple(i) for i in indexes.T)
+        return x + self._field[indexes]
 
 
 class BSplineFieldTransform(TransformBase):
@@ -175,8 +106,8 @@ class BSplineFieldTransform(TransformBase):
                 'Number of components of the coefficients does '
                 'not match the number of dimensions')
 
-        self._coeffs = coefficients.get_data()
-        self._knots = ImageSpace(four_to_three(coefficients)[0])
+        self._coeffs = np.asanyarray(coefficients.dataobj)
+        self._knots = ImageGrid(four_to_three(coefficients)[0])
         self._cache_moving()
 
     def _cache_moving(self):
@@ -222,7 +153,7 @@ class BSplineFieldTransform(TransformBase):
         # coords[:3] += weights.dot(np.array(coeffs, dtype=float))
         return self.reference.inverse.dot(np.hstack((coords, 1)))[:3]
 
-    def map_voxel(self, index, moving=None):
+    def _map_voxel(self, index, moving=None):
         """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
         return tuple(self._moving[index + self.__s])
 

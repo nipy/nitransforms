@@ -9,11 +9,11 @@ from ..io import (
 )
 
 
-def test_VolumeGeometry(tmpdir, get_data):
+def test_VolumeGeometry(tmpdir, get_testdata):
     vg = VG()
     assert vg['valid'] == 0
 
-    img = get_data['RAS']
+    img = get_testdata['RAS']
     vg = VG.from_image(img)
     assert vg['valid'] == 1
     assert np.all(vg['voxelsize'] == img.header.get_zooms()[:3])
@@ -22,7 +22,7 @@ def test_VolumeGeometry(tmpdir, get_data):
     assert len(vg.to_string().split('\n')) == 8
 
 
-def test_LinearTransform(tmpdir, get_data):
+def test_LinearTransform(tmpdir, get_testdata):
     lt = LT()
     assert lt['m_L'].shape == (4, 4)
     assert np.all(lt['m_L'] == 0)

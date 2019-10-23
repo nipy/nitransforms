@@ -39,7 +39,7 @@ def data_path():
 
 
 @pytest.fixture
-def get_data():
+def get_testdata():
     """Generate data in the requested orientation."""
     global _data
 
