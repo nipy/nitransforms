@@ -7,7 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Nonlinear transforms."""
-import sys
+from warnings import warn
 import numpy as np
 from scipy import ndimage as ndi
 # from gridbspline.maths import cubic
@@ -21,7 +21,7 @@ from nibabel.funcs import four_to_three
 class DeformationFieldTransform(TransformBase):
     """Represents a dense field of displacements (one vector per voxel)."""
 
-    __slots__ = ['_field', '_moving', '_moving_space']
+    __slots__ = ['_field']
 
     def __init__(self, field, reference=None):
         """Create a dense deformation field transform."""
@@ -33,9 +33,6 @@ class DeformationFieldTransform(TransformBase):
             raise ValueError(
                 'Number of components of the deformation field does '
                 'not match the number of dimensions')
-
-        self._moving = None  # Where each voxel maps to
-        self._moving_space = None  # Input space cache
 
         # By definition, a free deformation field has a
         # displacement vector per voxel in output (reference)
@@ -87,8 +84,7 @@ class DeformationFieldTransform(TransformBase):
         ijk = self.reference.index(x)
         indexes = np.round(ijk).astype('int')
         if np.any(np.abs(ijk - indexes) > 0.05):
-            print('Some coordinates are off-grid of the displacements field.',
-                  file=sys.stderr)
+            warn('Some coordinates are off-grid of the displacements field.')
         indexes = tuple(tuple(i) for i in indexes.T)
         return x + self._field[indexes]
 
