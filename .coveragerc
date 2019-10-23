@@ -1,2 +1,6 @@
 [run]
 branch = True
+omit =
+    */tests/*
+    nitransforms/conftest.py
+    nitransforms/patched.py
