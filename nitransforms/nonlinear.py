@@ -89,7 +89,7 @@ class DeformationFieldTransform(TransformBase):
         if np.any(np.abs(ijk - indexes) > 0.05):
             print('Some coordinates are off-grid of the displacements field.',
                   file=sys.stderr)
-        indexes = tuple([tuple(i) for i in indexes.T])
+        indexes = tuple(tuple(i) for i in indexes.T)
         return x + self._field[indexes]
 
 
