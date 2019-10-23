@@ -28,3 +28,11 @@ def test_ImageGrid(get_testdata, image_orientation):
     assert len(idxs.shape) == len(coords.shape) == 2
     assert idxs.shape[0] == coords.shape[0] == img.ndim == 3
     assert idxs.shape[1] == coords.shape[1] == img.nvox == np.prod(im.shape)
+
+
+def test_ImageGrid_load(data_path, get_testdata):
+    """Check that images can be objects or paths and equality."""
+    im1 = get_testdata['RAS']
+    im2 = data_path / 'someones_anatomy.nii.gz'
+
+    assert ImageGrid(im1) == ImageGrid(im2)

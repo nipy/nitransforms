@@ -22,12 +22,23 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 @pytest.mark.parametrize('sw_tool', ['itk'])
 def test_displacements_field(tmp_path, data_path, sw_tool):
     os.chdir(str(tmp_path))
-    img_fname = os.path.join(data_path, 'tpl-OASIS30ANTs_T1w.nii.gz')
-    xfm_fname = os.path.join(
-        data_path, 'ds-005_sub-01_from-OASIS_to-T1_warp.nii.gz')
+    img_fname = str(data_path / 'tpl-OASIS30ANTs_T1w.nii.gz')
+    xfm_fname = str(
+        data_path / 'ds-005_sub-01_from-OASIS_to-T1_warp.nii.gz')
     ants_warp = nb.load(xfm_fname)
+    hdr = ants_warp.header.copy()
+
+    # fieldmap = np.squeeze(np.asanyarray(ants_warp.dataobj))
+    xfm_fname = 'warp.nii.gz'
+    nii = nb.load(img_fname)
+    fieldmap = np.zeros((*nii.shape[:3], 1, 3))
+    fieldmap[..., 2] = -10.0
+    # fieldmap = np.flip(np.flip(fieldmap, 1), 0)
+    ants_warp = nb.Nifti1Image(fieldmap, nii.affine, hdr)
+    ants_warp.to_filename(xfm_fname)
+    fieldmap = np.squeeze(np.asanyarray(ants_warp.dataobj))
     field = nb.Nifti1Image(
-        np.squeeze(np.asanyarray(ants_warp.dataobj)),
+        fieldmap,
         ants_warp.affine, ants_warp.header
     )
 
@@ -49,6 +60,7 @@ def test_displacements_field(tmp_path, data_path, sw_tool):
     sw_moved = nb.load('resampled.nii.gz')
 
     nt_moved = xfm.resample(img_fname, order=0)
+    nt_moved.to_filename('nt_resampled.nii.gz')
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE

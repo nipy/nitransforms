@@ -9,13 +9,11 @@
 """Linear transforms."""
 import sys
 import numpy as np
-from scipy import ndimage as ndi
 from pathlib import Path
-import warnings
 
 from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec, voxel_sizes, obliquity
-from .base import TransformBase
+from .base import TransformBase, _as_homogeneous
 from .patched import shape_zoom_affine
 from . import io
 
@@ -74,110 +72,6 @@ class Affine(TransformBase):
         """Access the internal representation of this affine."""
         return self._matrix
 
-    def resample(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
-                 output_dtype=None):
-        """
-        Resample the moving image in reference space.
-
-        Parameters
-        ----------
-        moving : `spatialimage`
-            The image object containing the data to be resampled in reference
-            space
-        order : int, optional
-            The order of the spline interpolation, default is 3.
-            The order has to be in the range 0-5.
-        mode : {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional
-            Determines how the input image is extended when the resamplings overflows
-            a border. Default is 'constant'.
-        cval : float, optional
-            Constant value for ``mode='constant'``. Default is 0.0.
-        prefilter: bool, optional
-            Determines if the moving image's data array is prefiltered with
-            a spline filter before interpolation. The default is ``True``,
-            which will create a temporary *float64* array of filtered values
-            if *order > 1*. If setting this to ``False``, the output will be
-            slightly blurred if *order > 1*, unless the input is prefiltered,
-            i.e. it is the result of calling the spline filter on the original
-            input.
-
-        Returns
-        -------
-        moved_image : `spatialimage`
-            The moving imaged after resampling to reference space.
-
-        Examples
-        --------
-        >>> a = Affine()
-        >>> a.matrix
-        array([[[1., 0., 0., 0.],
-                [0., 1., 0., 0.],
-                [0., 0., 1., 0.],
-                [0., 0., 0., 1.]]])
-
-        >>> xfm = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-        >>> ref = nb.load(testfile)
-        >>> xfm.reference = ref
-        >>> refdata = ref.get_fdata()
-        >>> np.allclose(refdata, 0)
-        True
-
-        >>> refdata[5, 5, 5] = 1  # Set a one in the middle voxel
-        >>> moving = nb.Nifti1Image(refdata, ref.affine, ref.header)
-        >>> resampled = xfm.resample(moving, order=0).get_fdata()
-        >>> resampled[1, 5, 5]
-        1.0
-
-        """
-        if output_dtype is None:
-            output_dtype = moving.header.get_data_dtype()
-
-        try:
-            reference = self.reference
-        except ValueError:
-            warnings.warn('No reference space defined, using moving as reference')
-            reference = moving
-
-        nvols = 1
-        if len(moving.shape) > 3:
-            nvols = moving.shape[3]
-
-        movaff = moving.affine
-        movingdata = np.asanyarray(moving.dataobj)
-        if nvols == 1:
-            movingdata = movingdata[..., np.newaxis]
-
-        nmats = self._matrix.shape[0]
-        if nvols != nmats and nmats > 1:
-            raise ValueError("""\
-The moving image contains {0} volumes, while the transform is defined for \
-{1} volumes""".format(nvols, nmats))
-
-        singlemat = None
-        if nmats == 1:
-            singlemat = np.linalg.inv(movaff).dot(self._matrix[0].dot(reference.affine))
-
-        if singlemat is not None and nvols > nmats:
-            warnings.warn('Resampling a 4D volume with a single affine matrix')
-
-        # Compose an index to index affine matrix
-        moved = []
-        for i in range(nvols):
-            i2imat = singlemat if singlemat is not None else np.linalg.inv(
-                movaff).dot(self._matrix[i].dot(reference.affine))
-            mdata = movingdata[..., i]
-            moved += [ndi.affine_transform(
-                mdata, matrix=i2imat[:-1, :-1],
-                offset=i2imat[:-1, -1],
-                output_shape=reference.shape, order=order, mode=mode,
-                cval=cval, prefilter=prefilter)]
-
-        moved_image = moving.__class__(
-            np.squeeze(np.stack(moved, -1)), reference.affine, moving.header)
-        moved_image.header.set_data_dtype(output_dtype)
-
-        return moved_image
-
     def map(self, x, inverse=False, index=0):
         r"""
         Apply :math:`y = f(x)`.
@@ -200,45 +94,17 @@ The moving image contains {0} volumes, while the transform is defined for \
         --------
         >>> xfm = Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
         >>> xfm.map((0,0,0))
-        array([1, 2, 3])
+        array([[1., 2., 3.]])
 
         >>> xfm.map((0,0,0), inverse=True)
-        array([-1., -2., -3.])
+        array([[-1., -2., -3.]])
 
         """
-        coords = np.array(x)
-        if coords.shape[0] == self._matrix[index].shape[0] - 1:
-            coords = np.append(coords, [1])
+        coords = _as_homogeneous(x, dim=self._matrix[0].shape[0] - 1).T
         affine = self._matrix[index]
-
         if inverse is True:
             affine = np.linalg.inv(self._matrix[index])
-
-        return affine.dot(coords)[:-1]
-
-    def _map_voxel(self, index, nindex=0, moving=None):
-        """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
-        try:
-            reference = self.reference
-        except ValueError:
-            print('Warning: no reference space defined, using moving as reference',
-                  file=sys.stderr)
-            reference = moving
-        else:
-            if moving is None:
-                moving = reference
-        finally:
-            if reference is None:
-                raise ValueError('Reference and moving spaces are both undefined')
-
-        index = np.array(index)
-        if index.shape[0] == self._matrix[nindex].shape[0] - 1:
-            index = np.append(index, [1])
-
-        matrix = reference.affine.dot(
-            self._matrix[nindex].dot(np.linalg.inv(moving.affine))
-        )
-        return tuple(matrix.dot(index)[:-1])
+        return affine.dot(coords).T[..., :-1]
 
     def _to_hdf5(self, x5_root):
         """Serialize this object into the x5 file format."""

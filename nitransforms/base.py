@@ -7,6 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
+from pathlib import Path
 import numpy as np
 import h5py
 from nibabel.loadsave import load
@@ -24,6 +25,9 @@ class ImageGrid(object):
 
     def __init__(self, image):
         """Create a gridded sampling reference."""
+        if isinstance(image, (str, Path)):
+            image = load(str(image))
+
         self._affine = image.affine
         self._shape = image.shape
         self._ndim = len(image.shape)
@@ -31,8 +35,6 @@ class ImageGrid(object):
         self._ndindex = None
         self._coords = None
         self._inverse = np.linalg.inv(image.affine)
-        if self._ndim not in [2, 3]:
-            raise ValueError('Invalid image space (%d-D)' % self._ndim)
 
     @property
     def affine(self):
@@ -81,13 +83,11 @@ class ImageGrid(object):
 
     def ras(self, ijk):
         """Get RAS+ coordinates from input indexes."""
-        ras = self._affine.dot(_as_homogeneous(ijk).T)[:3, ...]
-        return ras.T
+        return _apply_affine(ijk, self._affine, self._ndim)
 
     def index(self, x):
         """Get the image array's indexes corresponding to coordinates."""
-        ijk = self._inverse.dot(_as_homogeneous(x).T)[:3, ...]
-        return ijk.T
+        return _apply_affine(x, self._inverse, self._ndim)
 
     def _to_hdf5(self, group):
         group.attrs['Type'] = 'image'
@@ -173,22 +173,23 @@ class TransformBase(object):
             moving = load(moving)
 
         moving_data = np.asanyarray(moving.dataobj)
-        if output_dtype is None:
-            output_dtype = moving_data.dtype
+        output_dtype = output_dtype or moving_data.dtype
+        targets = ImageGrid(moving).index(
+            _as_homogeneous(self.map(self.reference.ndcoords.T),
+                            dim=self.reference.ndim))
 
-        moved = ndi.geometric_transform(
+        moved = ndi.map_coordinates(
             moving_data,
-            mapping=self._map_index,
-            output_shape=self.reference.shape,
+            targets.T,
             output=output_dtype,
             order=order,
             mode=mode,
             cval=cval,
             prefilter=prefilter,
-            extra_keywords={'moving': ImageGrid(moving)},
         )
 
-        moved_image = moving.__class__(moved, self.reference.affine, moving.header)
+        moved_image = moving.__class__(moved.reshape(self.reference.shape),
+                                       self.reference.affine, moving.header)
         moved_image.header.set_data_dtype(output_dtype)
         return moved_image
 
@@ -213,10 +214,6 @@ class TransformBase(object):
         """
         raise NotImplementedError
 
-    def _map_index(self, ijk, moving):
-        x = self.reference.ras(_as_homogeneous(ijk))
-        return moving.index(self.map(x))
-
     def to_filename(self, filename, fmt='X5'):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
         with h5py.File(filename, 'w') as out_file:
@@ -232,16 +229,19 @@ class TransformBase(object):
         raise NotImplementedError
 
 
-def _as_homogeneous(xyz, dtype='float32'):
+def _as_homogeneous(xyz, dtype='float32', dim=3):
     """
     Convert 2D and 3D coordinates into homogeneous coordinates.
 
     Examples
     --------
-    >>> _as_homogeneous((4, 5), dtype='int8').tolist()
+    >>> _as_homogeneous((4, 5), dtype='int8', dim=2).tolist()
     [[4, 5, 1]]
 
     >>> _as_homogeneous((4, 5, 6),dtype='int8').tolist()
+    [[4, 5, 6, 1]]
+
+    >>> _as_homogeneous((4, 5, 6, 1),dtype='int8').tolist()
     [[4, 5, 6, 1]]
 
     >>> _as_homogeneous([(1, 2, 3), (4, 5, 6)]).tolist()
@@ -250,4 +250,12 @@ def _as_homogeneous(xyz, dtype='float32'):
 
     """
     xyz = np.atleast_2d(np.array(xyz, dtype=dtype))
+    if np.shape(xyz)[-1] == dim + 1:
+        return xyz
+
     return np.hstack((xyz, np.ones((xyz.shape[0], 1), dtype=dtype)))
+
+
+def _apply_affine(x, affine, dim):
+    """Get the image array's indexes corresponding to coordinates."""
+    return affine.dot(_as_homogeneous(x, dim=dim).T)[:dim, ...].T

@@ -31,24 +31,6 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 }
 
 
-# def test_map_voxel(tmpdir, get_testdata):
-#     xfm = nbl.Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
-
-#     img = get_testdata['RAS']
-#     xfm.reference = img
-#     assert np.allclose(xfm.map((0, 0, 0)), (2.75, 5.5, 8.25))
-#     del xfm
-
-#     # use moving space as reference
-#     xfm = nbl.Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
-#     mov = get_testdata['LPS']
-#     assert xfm.map((0, 0, 0), moving=mov) == (-2.75, -5.5, 8.25)
-
-#     # use RAS space as reference
-#     xfm.reference = img
-#     assert xfm.map((0, 0, 0), moving=mov) == (0.75, 5.0, 8.25)
-
-
 @pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize('image_orientation', [
     'RAS', 'LAS', 'LPS',  # 'oblique',
@@ -73,7 +55,7 @@ def test_linear_load(tmpdir, data_path, get_testdata, image_orientation, sw_tool
         ext = '.lta'
 
     fname = 'affine-%s.%s%s' % (image_orientation, sw_tool, ext)
-    xfm_fname = os.path.join(data_path, fname)
+    xfm_fname = str(data_path / fname)
     fmt = fname.split('.')[-1]
 
     if sw_tool == 'fsl':
@@ -122,8 +104,8 @@ def test_linear_save(data_path, get_testdata, image_orientation, sw_tool):
         xfm_fname1 = 'M.%s%s' % (sw_tool, ext)
         xfm.to_filename(xfm_fname1, fmt=sw_tool)
 
-        xfm_fname2 = os.path.join(
-            data_path, 'affine-%s.%s%s' % (image_orientation, sw_tool, ext))
+        xfm_fname2 = str(data_path / 'affine-%s.%s%s') % (
+            image_orientation, sw_tool, ext)
         assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 

@@ -35,7 +35,7 @@ def doctest_autoimport(doctest_namespace):
 @pytest.fixture
 def data_path():
     """Return the test data folder."""
-    return os.path.join(os.path.dirname(__file__), 'tests/data')
+    return Path(__file__).parent / 'tests' / 'data'
 
 
 @pytest.fixture

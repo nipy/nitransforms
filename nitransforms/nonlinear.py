@@ -7,15 +7,12 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Nonlinear transforms."""
-from warnings import warn
+import warnings
 import numpy as np
-# from scipy import ndimage as ndi
-# from gridbspline.maths import cubic
+from .base import TransformBase
 
-from .base import ImageGrid, TransformBase
-from nibabel.funcs import four_to_three
-
-# vbspl = np.vectorize(cubic)
+# from .base import ImageGrid
+# from nibabel.funcs import four_to_three
 
 
 class DisplacementsFieldTransform(TransformBase):
@@ -34,19 +31,9 @@ class DisplacementsFieldTransform(TransformBase):
                 'Number of components of the deformation field does '
                 'not match the number of dimensions')
 
-        # By definition, a free deformation field has a
-        # displacement vector per voxel in output (reference)
-        # space
         if reference is None:
             reference = field.__class__(np.zeros(self._field.shape[:-1]),
                                         field.affine, field.header)
-        elif reference.shape[:ndim] != field.shape[:ndim]:
-            raise ValueError(
-                'Reference ({}) and field ({}) must have the same '
-                'grid.'.format(
-                    _pprint(reference.shape[:ndim]),
-                    _pprint(field.shape[:ndim])))
-
         self.reference = reference
 
     def map(self, x, inverse=False, index=0):
@@ -85,102 +72,99 @@ class DisplacementsFieldTransform(TransformBase):
         ijk = self.reference.index(x)
         indexes = np.round(ijk).astype('int')
         if np.any(np.abs(ijk - indexes) > 0.05):
-            warn('Some coordinates are off-grid of the displacements field.')
+            warnings.warn(
+                'Some coordinates are off-grid of the displacements field.')
         indexes = tuple(tuple(i) for i in indexes.T)
         return x + self._field[indexes]
 
 
-class BSplineFieldTransform(TransformBase):
-    """Represent a nonlinear transform parameterized by BSpline basis."""
+# class BSplineFieldTransform(TransformBase):
+#     """Represent a nonlinear transform parameterized by BSpline basis."""
 
-    __slots__ = ['_coeffs', '_knots', '_refknots', '_order', '_moving']
-    __s = (slice(None), )
+#     __slots__ = ['_coeffs', '_knots', '_refknots', '_order', '_moving']
+#     __s = (slice(None), )
 
-    def __init__(self, reference, coefficients, order=3):
-        """Create a smooth deformation field using B-Spline basis."""
-        super(BSplineFieldTransform, self).__init__()
-        self._order = order
-        self.reference = reference
+#     def __init__(self, reference, coefficients, order=3):
+#         """Create a smooth deformation field using B-Spline basis."""
+#         super(BSplineFieldTransform, self).__init__()
+#         self._order = order
+#         self.reference = reference
 
-        if coefficients.shape[-1] != self.ndim:
-            raise ValueError(
-                'Number of components of the coefficients does '
-                'not match the number of dimensions')
+#         if coefficients.shape[-1] != self.ndim:
+#             raise ValueError(
+#                 'Number of components of the coefficients does '
+#                 'not match the number of dimensions')
 
-        self._coeffs = np.asanyarray(coefficients.dataobj)
-        self._knots = ImageGrid(four_to_three(coefficients)[0])
-        self._cache_moving()
+#         self._coeffs = np.asanyarray(coefficients.dataobj)
+#         self._knots = ImageGrid(four_to_three(coefficients)[0])
+#         self._cache_moving()
 
-    def _cache_moving(self):
-        self._moving = np.zeros((self.reference.shape) + (3, ),
-                                dtype='float32')
-        ijk = np.moveaxis(self.reference.ndindex, 0, -1).reshape(-1, self.ndim)
-        xyz = np.moveaxis(self.reference.ndcoords, 0, -1).reshape(-1, self.ndim)
-        print(np.shape(xyz))
+#     def _cache_moving(self):
+#         self._moving = np.zeros((self.reference.shape) + (3, ),
+#                                 dtype='float32')
+#         ijk = np.moveaxis(self.reference.ndindex, 0, -1).reshape(-1, self.ndim)
+#         xyz = np.moveaxis(self.reference.ndcoords, 0, -1).reshape(-1, self.ndim)
+#         print(np.shape(xyz))
 
-        for i in range(np.shape(xyz)[0]):
-            print(i, xyz[i, :])
-            self._moving[tuple(ijk[i]) + self.__s] = self._interp_transform(xyz[i, :])
+#         for i in range(np.shape(xyz)[0]):
+#             print(i, xyz[i, :])
+#             self._moving[tuple(ijk[i]) + self.__s] = self._interp_transform(xyz[i, :])
 
-    def _interp_transform(self, coords):
-        # Calculate position in the grid of control points
-        knots_ijk = self._knots.inverse.dot(np.hstack((coords, 1)))[:3]
-        neighbors = []
-        offset = 0.0 if self._order & 1 else 0.5
-        # Calculate neighbors along each dimension
-        for dim in range(self.ndim):
-            first = int(np.floor(knots_ijk[dim] + offset) - self._order // 2)
-            neighbors.append(list(range(first, first + self._order + 1)))
+#     def _interp_transform(self, coords):
+#         # Calculate position in the grid of control points
+#         knots_ijk = self._knots.inverse.dot(np.hstack((coords, 1)))[:3]
+#         neighbors = []
+#         offset = 0.0 if self._order & 1 else 0.5
+#         # Calculate neighbors along each dimension
+#         for dim in range(self.ndim):
+#             first = int(np.floor(knots_ijk[dim] + offset) - self._order // 2)
+#             neighbors.append(list(range(first, first + self._order + 1)))
 
-        # Get indexes of the neighborings clique
-        ndindex = np.moveaxis(
-            np.array(np.meshgrid(*neighbors, indexing='ij')), 0, -1).reshape(
-            -1, self.ndim)
+#         # Get indexes of the neighborings clique
+#         ndindex = np.moveaxis(
+#             np.array(np.meshgrid(*neighbors, indexing='ij')), 0, -1).reshape(
+#             -1, self.ndim)
 
-        # Calculate the tensor B-spline weights of each neighbor
-        # weights = np.prod(vbspl(ndindex - knots_ijk), axis=-1)
-        ndindex = [tuple(v) for v in ndindex]
+#         # Calculate the tensor B-spline weights of each neighbor
+#         # weights = np.prod(vbspl(ndindex - knots_ijk), axis=-1)
+#         ndindex = [tuple(v) for v in ndindex]
 
-        # Retrieve coefficients and deal with boundary conditions
-        zero = np.zeros(self.ndim)
-        shape = np.array(self._knots.shape)
-        coeffs = []
-        for ijk in ndindex:
-            offbounds = (zero > ijk) | (shape <= ijk)
-            coeffs.append(
-                self._coeffs[ijk] if not np.any(offbounds)
-                else [0.0] * self.ndim)
+#         # Retrieve coefficients and deal with boundary conditions
+#         zero = np.zeros(self.ndim)
+#         shape = np.array(self._knots.shape)
+#         coeffs = []
+#         for ijk in ndindex:
+#             offbounds = (zero > ijk) | (shape <= ijk)
+#             coeffs.append(
+#                 self._coeffs[ijk] if not np.any(offbounds)
+#                 else [0.0] * self.ndim)
 
-        # coords[:3] += weights.dot(np.array(coeffs, dtype=float))
-        return self.reference.inverse.dot(np.hstack((coords, 1)))[:3]
+#         # coords[:3] += weights.dot(np.array(coeffs, dtype=float))
+#         return self.reference.inverse.dot(np.hstack((coords, 1)))[:3]
 
-    def _map_voxel(self, index, moving=None):
-        """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
-        return tuple(self._moving[index + self.__s])
+#     def _map_voxel(self, index, moving=None):
+#         """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
+#         return tuple(self._moving[index + self.__s])
 
-    def resample(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
-                 output_dtype=None):
-        """
-        Resample the ``moving`` image applying the deformation field.
+#     def resample(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
+#                  output_dtype=None):
+#         """
+#         Resample the ``moving`` image applying the deformation field.
 
-        Examples
-        --------
-        >>> ref = nb.load(os.path.join(datadir, 'someones_anatomy.nii.gz'))
-        >>> coeffs = np.zeros((6, 6, 6, 3))
-        >>> coeffs[2, 2, 2, ...] = [10.0, -20.0, 0]
-        >>> aff = ref.affine
-        >>> aff[:3, :3] = aff[:3, :3].dot(np.eye(3) * np.array(
-        ...     ref.header.get_zooms()[:3]) / 6.0
-        ... )
-        >>> coeffsimg = nb.Nifti1Image(coeffs, ref.affine, ref.header)
-        >>> xfm = BSplineFieldTransform(ref, coeffsimg)  # doctest: +SKIP
-        >>> new = xfm.resample(ref)  # doctest: +SKIP
+#         Examples
+#         --------
+#         >>> ref = nb.load(os.path.join(datadir, 'someones_anatomy.nii.gz'))
+#         >>> coeffs = np.zeros((6, 6, 6, 3))
+#         >>> coeffs[2, 2, 2, ...] = [10.0, -20.0, 0]
+#         >>> aff = ref.affine
+#         >>> aff[:3, :3] = aff[:3, :3].dot(np.eye(3) * np.array(
+#         ...     ref.header.get_zooms()[:3]) / 6.0
+#         ... )
+#         >>> coeffsimg = nb.Nifti1Image(coeffs, ref.affine, ref.header)
+#         >>> xfm = BSplineFieldTransform(ref, coeffsimg)  # doctest: +SKIP
+#         >>> new = xfm.resample(ref)  # doctest: +SKIP
 
-        """
-        self._cache_moving()
-        return super(BSplineFieldTransform, self).resample(
-            moving, order=order, mode=mode, cval=cval, prefilter=prefilter)
-
-
-def _pprint(inlist):
-    return 'x'.join(['%d' % s for s in inlist])
+#         """
+#         self._cache_moving()
+#         return super(BSplineFieldTransform, self).resample(
+#             moving, order=order, mode=mode, cval=cval, prefilter=prefilter)
