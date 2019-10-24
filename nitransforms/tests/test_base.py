@@ -119,3 +119,8 @@ def test_SampledSpatialData(data_path):
     assert ssd2.ndim == 3
     assert ssd2.ndcoords.shape == (249277, 3)
     assert ssd2.shape is None
+
+    # check what happens with an empty gifti
+    with pytest.raises(TypeError):
+        gii = nb.gifti.GiftiImage()
+        SampledSpatialData(gii)
