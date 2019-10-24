@@ -62,7 +62,7 @@ def test_TransformBase(monkeypatch, data_path, tmpdir):
     xfm = TransformBase()
     xfm.reference = fname
     assert xfm.ndim == 3
-    moved = xfm.resample(fname, order=0)
+    moved = xfm.apply(fname, order=0)
     assert np.all(nb.load(fname).get_fdata() == moved.get_fdata())
 
     xfm.to_filename('data.x5')

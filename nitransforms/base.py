@@ -131,8 +131,8 @@ class TransformBase(object):
         """Access the dimensions of the reference space."""
         return self.reference.ndim
 
-    def resample(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
-                 output_dtype=None):
+    def apply(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
+              output_dtype=None):
         """
         Resample the moving image in reference space.
 

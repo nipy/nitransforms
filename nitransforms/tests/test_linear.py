@@ -151,7 +151,7 @@ def test_apply_linear_transform(
     assert exit_code == 0
     sw_moved = nb.load('resampled.nii.gz')
 
-    nt_moved = xfm.resample(img, order=0)
+    nt_moved = xfm.apply(img, order=0)
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
