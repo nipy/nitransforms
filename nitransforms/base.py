@@ -12,17 +12,82 @@ import numpy as np
 import h5py
 import warnings
 from nibabel.loadsave import load
+from nibabel.nifti1 import intent_codes as INTENT_CODES
+from nibabel.cifti2 import Cifti2Image
 
 from scipy import ndimage as ndi
 
 EQUALITY_TOL = 1e-5
 
 
-class ImageGrid(object):
+class SpatialReference(object):
+    """Factory to create spatial references."""
+
+    @staticmethod
+    def factory(dataset):
+        """Create a reference for spatial transforms."""
+        try:
+            return SampledSpatialData(dataset)
+        except ValueError:
+            return ImageGrid(dataset)
+
+
+class SampledSpatialData(object):
+    """Represent sampled spatial data: regularly gridded (images) and surfaces."""
+
+    __slots__ = ['_ndim', '_coords', '_npoints', '_shape']
+
+    def __init__(self, dataset):
+        """Create a sampling reference."""
+        self._shape = None
+
+        if isinstance(dataset, SampledSpatialData):
+            self._coords = dataset.ndcoords.copy()
+            self._npoints, self._ndim = self._coords.shape
+            return
+
+        if isinstance(dataset, (str, Path)):
+            dataset = load(str(dataset))
+
+        if hasattr(dataset, 'numDA'):  # Looks like a Gifti file
+            _das = dataset.get_arrays_from_intent(INTENT_CODES['pointset'])
+            if not _das:
+                raise TypeError(
+                    'Input Gifti file does not contain reference coordinates.')
+            self._coords = np.vstack([da.data for da in _das])
+            self._npoints, self._ndim = self._coords.shape
+            return
+
+        if isinstance(dataset, Cifti2Image):
+            raise NotImplementedError
+
+        raise ValueError('Dataset could not be interpreted as an irregular sample.')
+
+    @property
+    def npoints(self):
+        """Access the total number of voxels."""
+        return self._npoints
+
+    @property
+    def ndim(self):
+        """Access the number of dimensions."""
+        return self._ndim
+
+    @property
+    def ndcoords(self):
+        """List the physical coordinates of this sample."""
+        return self._coords
+
+    @property
+    def shape(self):
+        """Access the space's size of each dimension."""
+        return self._shape
+
+
+class ImageGrid(SampledSpatialData):
     """Class to represent spaces of gridded data (images)."""
 
-    __slots__ = ['_affine', '_shape', '_ndim', '_ndindex', '_coords', '_nvox',
-                 '_inverse']
+    __slots__ = ['_affine', '_inverse', '_ndindex']
 
     def __init__(self, image):
         """Create a gridded sampling reference."""
@@ -31,11 +96,14 @@ class ImageGrid(object):
 
         self._affine = image.affine
         self._shape = image.shape
-        self._ndim = len(image.shape)
-        self._nvox = np.prod(image.shape)  # Do not access data array
+        self._ndim = getattr(image, 'ndim', len(image.shape))
+
+        self._npoints = getattr(image, 'npoints',
+                                np.prod(image.shape))
         self._ndindex = None
         self._coords = None
-        self._inverse = np.linalg.inv(image.affine)
+        self._inverse = getattr(image, 'inverse',
+                                np.linalg.inv(image.affine))
 
     @property
     def affine(self):
@@ -48,27 +116,12 @@ class ImageGrid(object):
         return self._inverse
 
     @property
-    def shape(self):
-        """Access the space's size of each dimension."""
-        return self._shape
-
-    @property
-    def ndim(self):
-        """Access the number of dimensions."""
-        return self._ndim
-
-    @property
-    def nvox(self):
-        """Access the total number of voxels."""
-        return self._nvox
-
-    @property
     def ndindex(self):
         """List the indexes corresponding to the space grid."""
         if self._ndindex is None:
             indexes = tuple([np.arange(s) for s in self._shape])
             self._ndindex = np.array(np.meshgrid(
-                *indexes, indexing='ij')).reshape(self._ndim, self._nvox)
+                *indexes, indexing='ij')).reshape(self._ndim, self._npoints)
         return self._ndindex
 
     @property
@@ -77,7 +130,7 @@ class ImageGrid(object):
         if self._coords is None:
             self._coords = np.tensordot(
                 self._affine,
-                np.vstack((self.ndindex, np.ones((1, self._nvox)))),
+                np.vstack((self.ndindex, np.ones((1, self._npoints)))),
                 axes=1
             )[:3, ...]
         return self._coords
@@ -131,16 +184,19 @@ class TransformBase(object):
         """Access the dimensions of the reference space."""
         return self.reference.ndim
 
-    def apply(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
-              output_dtype=None):
+    def apply(self, spatialimage, reference=None,
+              order=3, mode='constant', cval=0.0, prefilter=True, output_dtype=None):
         """
-        Resample the moving image in reference space.
+        Apply a transformation to an image, resampling on the reference spatial object.
 
         Parameters
         ----------
-        moving : `spatialimage`
+        spatialimage : `spatialimage`
             The image object containing the data to be resampled in reference
             space
+        reference : spatial object
+            The image, surface, or combination thereof containing the coordinates
+            of samples that will be sampled.
         order : int, optional
             The order of the spline interpolation, default is 3.
             The order has to be in the range 0-5.
@@ -150,7 +206,7 @@ class TransformBase(object):
         cval : float, optional
             Constant value for ``mode='constant'``. Default is 0.0.
         prefilter: bool, optional
-            Determines if the moving image's data array is prefiltered with
+            Determines if the image's data array is prefiltered with
             a spline filter before interpolation. The default is ``True``,
             which will create a temporary *float64* array of filtered values
             if *order > 1*. If setting this to ``False``, the output will be
@@ -160,21 +216,27 @@ class TransformBase(object):
 
         Returns
         -------
-        moved_image : `spatialimage`
-            The moving imaged after resampling to reference space.
+        resampled : `spatialimage` or ndarray
+            The data imaged after resampling to reference space.
 
         """
-        if isinstance(moving, str):
-            moving = load(moving)
+        if reference is not None and isinstance(reference, (str, Path)):
+            reference = load(reference)
 
-        moving_data = np.asanyarray(moving.dataobj)
-        output_dtype = output_dtype or moving_data.dtype
-        targets = ImageGrid(moving).index(
-            _as_homogeneous(self.map(self.reference.ndcoords.T),
-                            dim=self.reference.ndim))
+        _ref = self.reference if reference is None \
+            else SpatialReference.factory(reference)
 
-        moved = ndi.map_coordinates(
-            moving_data,
+        if isinstance(spatialimage, str):
+            spatialimage = load(spatialimage)
+
+        data = np.asanyarray(spatialimage.dataobj)
+        output_dtype = output_dtype or data.dtype
+        targets = ImageGrid(spatialimage).index(  # data should be an image
+            _as_homogeneous(self.map(_ref.ndcoords.T),
+                            dim=_ref.ndim))
+
+        resampled = ndi.map_coordinates(
+            data,
             targets.T,
             output=output_dtype,
             order=order,
@@ -183,10 +245,14 @@ class TransformBase(object):
             prefilter=prefilter,
         )
 
-        moved_image = moving.__class__(moved.reshape(self.reference.shape),
-                                       self.reference.affine, moving.header)
-        moved_image.header.set_data_dtype(output_dtype)
-        return moved_image
+        if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
+            moved = spatialimage.__class__(
+                resampled.reshape(_ref.shape),
+                _ref.affine, spatialimage.header)
+            moved.header.set_data_dtype(output_dtype)
+            return moved
+
+        return resampled
 
     def map(self, x, inverse=False, index=0):
         r"""
