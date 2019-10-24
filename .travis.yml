@@ -23,7 +23,7 @@ before_install:
     if [ ${BUILD_TYPE} == "docker" ]; then
       CI_ENV=`bash <(curl -s https://codecov.io/env)`
       docker pull ${DOCKER_IMAGE}  # pull latest release
-      docker run $CI_ENV -itd --name fmriprep --entrypoint=/bin/bash -v `pwd`:/opt/nt ${DOCKER_IMAGE}
+      docker run $CI_ENV -itd --name fmriprep --entrypoint=/bin/bash -v `pwd`:/opt/nt -w /opt/nt ${DOCKER_IMAGE}
     fi
 
 install:
