@@ -20,7 +20,7 @@ from scipy import ndimage as ndi
 EQUALITY_TOL = 1e-5
 
 
-class SpatialReference(object):
+class SpatialReference:
     """Factory to create spatial references."""
 
     @staticmethod
@@ -32,7 +32,7 @@ class SpatialReference(object):
             return ImageGrid(dataset)
 
 
-class SampledSpatialData(object):
+class SampledSpatialData:
     """Represent sampled spatial data: regularly gridded (images) and surfaces."""
 
     __slots__ = ['_ndim', '_coords', '_npoints', '_shape']
@@ -194,7 +194,7 @@ class TransformBase(object):
         spatialimage : `spatialimage`
             The image object containing the data to be resampled in reference
             space
-        reference : spatial object
+        reference : spatial object, optional
             The image, surface, or combination thereof containing the coordinates
             of samples that will be sampled.
         order : int, optional
@@ -226,7 +226,7 @@ class TransformBase(object):
         _ref = self.reference if reference is None \
             else SpatialReference.factory(reference)
 
-        if isinstance(spatialimage, str):
+        if isinstance(spatialimage, (str, Path)):
             spatialimage = load(spatialimage)
 
         data = np.asanyarray(spatialimage.dataobj)
