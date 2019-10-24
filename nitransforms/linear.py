@@ -7,13 +7,12 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Linear transforms."""
-import sys
 import numpy as np
 from pathlib import Path
 
 from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec, voxel_sizes, obliquity
-from .base import TransformBase, _as_homogeneous
+from .base import TransformBase, _as_homogeneous, EQUALITY_TOL
 from .patched import shape_zoom_affine
 from . import io
 
@@ -66,6 +65,22 @@ class Affine(TransformBase):
             if isinstance(reference, str):
                 reference = loadimg(reference)
             self.reference = reference
+
+    def __eq__(self, other):
+        """
+        Overload equals operator.
+
+        Examples
+        --------
+        >>> xfm1 = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+        >>> xfm2 = Affine(xfm1.matrix)
+        >>> xfm1 == xfm2
+        True
+
+        """
+        if not self._reference == other._reference:
+            return False
+        return np.allclose(self.matrix, other.matrix, rtol=EQUALITY_TOL)
 
     @property
     def matrix(self):

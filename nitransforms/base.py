@@ -10,6 +10,7 @@
 from pathlib import Path
 import numpy as np
 import h5py
+import warnings
 from nibabel.loadsave import load
 
 from scipy import ndimage as ndi
@@ -110,12 +111,6 @@ class TransformBase(object):
         """Instantiate a transform."""
         self._reference = None
 
-    def __eq__(self, other):
-        """Overload equals operator."""
-        if not self._reference == other._reference:
-            return False
-        return np.allclose(self.matrix, other.matrix, rtol=EQUALITY_TOL)
-
     def __call__(self, x, inverse=False, index=0):
         """Apply y = f(x)."""
         return self.map(x, inverse=inverse, index=index)
@@ -124,7 +119,7 @@ class TransformBase(object):
     def reference(self):
         """Access a reference space where data will be resampled onto."""
         if self._reference is None:
-            raise ValueError('Reference space not set')
+            warnings.warn('Reference space not set')
         return self._reference
 
     @reference.setter
