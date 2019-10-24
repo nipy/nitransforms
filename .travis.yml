@@ -5,11 +5,51 @@ python:
   - 3.6
   - 3.7
 
+services:
+  - docker
+
+env:
+  global:
+    - BUILD_TYPE="src"
+    - DOCKER_IMAGE="poldracklab/fmriprep:latest"
+
+matrix:
+  include:
+  - python: 3.7
+    env: BUILD_TYPE="docker"
+
+before_install:
+  - |
+    if [ ${BUILD_TYPE} == "docker" ]; then
+      CI_ENV=`bash <(curl -s https://codecov.io/env)`
+      docker pull ${DOCKER_IMAGE}  # pull latest release
+      docker run $CI_ENV -itd --name fmriprep --entrypoint=/bin/bash -v `pwd`:/opt/nt ${DOCKER_IMAGE}
+    fi
+
 install:
-  - pip install -U -e .[test]
+  # pull the latest release
+  - |
+    if [ ${BUILD_TYPE} == "docker" ]; then
+      # update nibabel pin
+      docker exec fmriprep pip install --upgrade git+https://github.com/nipy/nibabel@cd48bf05bc567387afe4504eda1da15324bb616f
+      docker exec fmriprep pip install -e /opt/nt[test]
+    elif [ ${BUILD_TYPE} == "src" ]; then
+      pip install -U -e .[test]
+    fi
 
 script:
-  - pytest -v --cov nitransforms --cov-config `pwd`/.coveragerc --cov-report xml:`pwd`/cov.xml --doctest-modules nitransforms
+  - |
+    if [ ${BUILD_TYPE} == "docker" ]; then
+      docker exec fmriprep pytest -v --cov nitransforms --cov-config /opt/nt/.coveragerc --cov-report xml:/opt/nt/cov.xml --doctest-modules /opt/nt/nitransforms
+    elif [ ${BUILD_TYPE} == "src" ]; then
+      pytest -v --cov nitransforms --cov-config `pwd`/.coveragerc --cov-report xml:`pwd`/cov.xml --doctest-modules nitransforms
+    fi
 
 after_success:
-  - codecov --file `pwd`/cov.xml --flags unittests -e TRAVIS_JOB_NUMBER
+  - |
+    if [ ${BUILD_TYPE} == "docker" ]; then
+      docker exec fmriprep codecov --root /opt/nt -f /opt/nt/cov.xml -F unittests
+      docker rm -f fmriprep
+    elif [ ${BUILD_TYPE} == "src" ]; then
+      codecov --file `pwd`/cov.xml --flags unittests -e TRAVIS_JOB_NUMBER
+    fi
