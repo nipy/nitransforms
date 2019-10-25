@@ -90,9 +90,10 @@ class ITKLinearTransformArray(StringBasedStruct):
         """Initialize with (optionally) a list of transforms."""
         super().__init__(binaryblock, endianness, check)
         self._xforms = []
-        for mat in xforms or []:
+        for i, mat in enumerate(xforms or []):
             xfm = ITKLinearTransform()
             xfm['parameters'] = mat
+            xfm['index'] = i + 1
             self._xforms.append(xfm)
 
     def __getitem__(self, idx):

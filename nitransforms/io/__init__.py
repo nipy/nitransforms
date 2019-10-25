@@ -9,12 +9,12 @@
 """
 Read and write transforms.
 
-.. currentmodule:: nitransforms
+.. currentmodule:: nitransforms.io
 
 .. autosummary::
    :toctree: ../generated
 
-   transform
+   io
 """
 from .lta import LinearTransform, LinearTransformArray, VolumeGeometry
 
