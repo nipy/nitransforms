@@ -1,8 +1,10 @@
+"""Read/write linear transforms."""
 import numpy as np
 from nibabel.volumeutils import Recoder
 from nibabel.affines import voxel_sizes
 
-from .patched import LabeledWrapStruct
+from .base import StringBasedStruct
+
 
 transform_codes = Recoder((
     (0, 'LINEAR_VOX_TO_VOX'),
@@ -11,21 +13,6 @@ transform_codes = Recoder((
     (14, 'REGISTER_DAT'),
     (21, 'LINEAR_COR_TO_COR')),
     fields=('code', 'label'))
-
-
-class StringBasedStruct(LabeledWrapStruct):
-    def __init__(self,
-                 binaryblock=None,
-                 endianness=None,
-                 check=True):
-        if binaryblock is not None and getattr(binaryblock, 'dtype',
-                                               None) == self.dtype:
-            self._structarr = binaryblock.copy()
-            return
-        super(StringBasedStruct, self).__init__(binaryblock, endianness, check)
-
-    def __array__(self):
-        return self._structarr
 
 
 class VolumeGeometry(StringBasedStruct):

@@ -4,11 +4,11 @@
 import numpy as np
 
 from ..io import (
+    itk,
     VolumeGeometry as VG,
     LinearTransform as LT,
     LinearTransformArray as LTA,
 )
-
 
 def test_VolumeGeometry(tmpdir, get_testdata):
     vg = VG()
@@ -55,3 +55,32 @@ def test_LinearTransformArray(tmpdir, data_path):
     with open(outlta) as fp:
         lta2 = LTA.from_fileobj(fp)
     assert np.allclose(lta['xforms'][0]['m_L'], lta2['xforms'][0]['m_L'])
+
+
+def test_ITKLinearTransformArray(tmpdir, data_path):
+    tmpdir.chdir()
+
+    with open(str(data_path / 'itktflist.tfm')) as f:
+        text = f.read()
+        f.seek(0)
+        itklist = itk.ITKLinearTransformArray.from_fileobj(f)
+
+    assert itklist['nxforms'] == 9
+    assert text == itklist.to_string()
+
+    itklist = itk.ITKLinearTransformArray(
+        xforms=[np.around(np.random.normal(size=(4, 4)), decimals=5)
+                for _ in range(4)])
+
+    assert itklist['nxforms'] == 4
+    assert itklist['xforms'][1].structarr['index'] == 2
+
+    xfm = itklist['xforms'][1]
+    xfm['index'] = 1
+    with open('extracted.tfm', 'w') as f:
+        f.write(xfm.to_string())
+
+    with open('extracted.tfm') as f:
+        xfm2 = itk.ITKLinearTransform.from_fileobj(f)
+    assert np.allclose(xfm.structarr['parameters'][:3, ...],
+                       xfm2.structarr['parameters'][:3, ...])

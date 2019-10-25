@@ -133,19 +133,10 @@ class Affine(TransformBase):
     def to_filename(self, filename, fmt='X5', moving=None):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
         if fmt.lower() in ['itk', 'ants', 'elastix']:
+            itkobj = io.itk.ITKLinearTransformArray(
+                xforms=[LPS.dot(m.dot(LPS)) for m in self.matrix])
             with open(filename, 'w') as f:
-                f.write('#Insight Transform File V1.0\n')
-
-                for i in range(self.matrix.shape[0]):
-                    parameters = LPS.dot(self.matrix[i].dot(LPS))
-                    parameters = parameters[:3, :3].reshape(-1).tolist() + \
-                        parameters[:3, 3].tolist()
-                    itkfmt = """\
-#Transform {0}
-Transform: MatrixOffsetTransformBase_double_3_3
-Parameters: {1}
-FixedParameters: 0 0 0\n""".format
-                    f.write(itkfmt(i, ' '.join(['%g' % p for p in parameters])))
+                f.write(itkobj.to_string())
             return filename
 
         if fmt.lower() == 'afni':
@@ -239,23 +230,16 @@ def load(filename, fmt='X5', reference=None):
     """Load a linear transform."""
     if fmt.lower() in ['itk', 'ants', 'elastix', 'nifty']:
         with open(filename) as itkfile:
-            itkxfm = itkfile.read().splitlines()
-
-        if 'Insight Transform File' not in itkxfm[0]:
-            raise ValueError(
-                "File %s does not look like an ITK transform text file." % filename)
+            itkxfm = io.itk.ITKLinearTransformArray.from_fileobj(
+                itkfile)
 
         matlist = []
-        for nxfm in range(len(itkxfm[1:]) // 4):
-            parameters = np.fromstring(itkxfm[nxfm * 4 + 3].split(':')[-1].strip(),
-                                       dtype=float, sep=' ')
-            offset = np.fromstring(itkxfm[nxfm * 4 + 4].split(':')[-1].strip(),
-                                   dtype=float, sep=' ')
-            if len(parameters) == 12:
-                matrix = from_matvec(parameters[:9].reshape((3, 3)), parameters[9:])
-                c_neg = from_matvec(np.eye(3), offset * -1.0)
-                c_pos = from_matvec(np.eye(3), offset)
-                matlist.append(LPS.dot(c_pos.dot(matrix.dot(c_neg.dot(LPS)))))
+        for xfm in itkxfm['xforms']:
+            matrix = xfm['parameters']
+            offset = xfm['offset']
+            c_neg = from_matvec(np.eye(3), offset * -1.0)
+            c_pos = from_matvec(np.eye(3), offset)
+            matlist.append(LPS.dot(c_pos.dot(matrix.dot(c_neg.dot(LPS)))))
         matrix = np.stack(matlist)
     # elif fmt.lower() == 'afni':
     #     parameters = LPS.dot(self.matrix.dot(LPS))

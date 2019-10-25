@@ -7,18 +7,16 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
-Geometric transforms.
+Read and write transforms.
 
-.. currentmodule:: nitransforms
+.. currentmodule:: nitransforms.io
 
 .. autosummary::
    :toctree: ../generated
 
-   transform
+   io
 """
-from .linear import Affine
-from .nonlinear import DisplacementsFieldTransform
-from .io import itk
+from .lta import LinearTransform, LinearTransformArray, VolumeGeometry
 
 
-__all__ = ['itk', 'Affine', 'DisplacementsFieldTransform']
+__all__ = ['LinearTransform', 'LinearTransformArray', 'VolumeGeometry']
