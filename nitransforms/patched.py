@@ -1,4 +1,5 @@
 import numpy as np
+from nibabel.wrapstruct import LabeledWrapStruct as LWS
 
 
 def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
@@ -63,3 +64,8 @@ def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
     aff[:3, :3] = np.diag(zooms)
     aff[:3, -1] = -origin * zooms
     return aff
+
+
+class LabeledWrapStruct(LWS):
+    def __setitem__(self, item, value):
+        self._structarr[item] = np.asanyarray(value)
