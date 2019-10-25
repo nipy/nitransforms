@@ -145,26 +145,3 @@ class DisplacementsFieldTransform(TransformBase):
 #     def _map_voxel(self, index, moving=None):
 #         """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
 #         return tuple(self._moving[index + self.__s])
-
-#     def resample(self, moving, order=3, mode='constant', cval=0.0, prefilter=True,
-#                  output_dtype=None):
-#         """
-#         Resample the ``moving`` image applying the deformation field.
-
-#         Examples
-#         --------
-#         >>> ref = nb.load(os.path.join(datadir, 'someones_anatomy.nii.gz'))
-#         >>> coeffs = np.zeros((6, 6, 6, 3))
-#         >>> coeffs[2, 2, 2, ...] = [10.0, -20.0, 0]
-#         >>> aff = ref.affine
-#         >>> aff[:3, :3] = aff[:3, :3].dot(np.eye(3) * np.array(
-#         ...     ref.header.get_zooms()[:3]) / 6.0
-#         ... )
-#         >>> coeffsimg = nb.Nifti1Image(coeffs, ref.affine, ref.header)
-#         >>> xfm = BSplineFieldTransform(ref, coeffsimg)  # doctest: +SKIP
-#         >>> new = xfm.resample(ref)  # doctest: +SKIP
-
-#         """
-#         self._cache_moving()
-#         return super(BSplineFieldTransform, self).resample(
-#             moving, order=order, mode=mode, cval=cval, prefilter=prefilter)
