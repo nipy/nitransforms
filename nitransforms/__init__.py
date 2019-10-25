@@ -18,6 +18,7 @@ Geometric transforms.
 """
 from .linear import Affine
 from .nonlinear import DisplacementsFieldTransform
+from .io import itk
 
 
-__all__ = ['Affine', 'DisplacementsFieldTransform']
+__all__ = ['itk', 'Affine', 'DisplacementsFieldTransform']
