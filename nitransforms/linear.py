@@ -7,8 +7,9 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Linear transforms."""
-import numpy as np
 from pathlib import Path
+import warnings
+import numpy as np
 
 from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec, voxel_sizes, obliquity
@@ -40,6 +41,13 @@ class Affine(TransformBase):
 
         Examples
         --------
+        >>> xfm = Affine(reference=datadir / 'someones_anatomy.nii.gz')
+        >>> xfm.matrix  # doctest: +NORMALIZE_WHITESPACE
+        array([[[1., 0., 0., 0.],
+                [0., 1., 0., 0.],
+                [0., 0., 1., 0.],
+                [0., 0., 0., 1.]]])
+
         >>> xfm = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
         >>> xfm.matrix  # doctest: +NORMALIZE_WHITESPACE
         array([[[1, 0, 0, 4],
@@ -62,8 +70,6 @@ class Affine(TransformBase):
         ), 'affine matrix is not square'
 
         if reference:
-            if isinstance(reference, str):
-                reference = loadimg(reference)
             self.reference = reference
 
     def __eq__(self, other):
@@ -78,9 +84,10 @@ class Affine(TransformBase):
         True
 
         """
-        if not self._reference == other._reference:
-            return False
-        return np.allclose(self.matrix, other.matrix, rtol=EQUALITY_TOL)
+        _eq = np.allclose(self.matrix, other.matrix, rtol=EQUALITY_TOL)
+        if _eq and self._reference != other._reference:
+            warnings.warn('Affines are equal, but references do not match.')
+        return _eq
 
     @property
     def matrix(self):
@@ -257,9 +264,7 @@ def load(filename, fmt='X5', reference=None):
     else:
         raise NotImplementedError
 
-    if reference and isinstance(reference, str):
-        reference = loadimg(reference)
-    return Affine(matrix, reference)
+    return Affine(matrix, reference=reference)
 
 
 def _fsl_aff_adapt(space):

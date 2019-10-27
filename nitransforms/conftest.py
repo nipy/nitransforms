@@ -19,7 +19,7 @@ def doctest_autoimport(doctest_namespace):
     doctest_namespace['nb'] = nb
     doctest_namespace['os'] = os
     doctest_namespace['Path'] = Path
-    doctest_namespace['datadir'] = os.path.join(os.path.dirname(__file__), 'tests/data')
+    doctest_namespace['datadir'] = Path(__file__).parent / 'tests' / 'data'
 
     tmpdir = tempfile.TemporaryDirectory()
     doctest_namespace['tmpdir'] = tmpdir.name
