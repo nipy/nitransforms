@@ -12,7 +12,7 @@ import warnings
 import numpy as np
 
 from nibabel.loadsave import load as loadimg
-from nibabel.affines import from_matvec, voxel_sizes, obliquity
+from nibabel.affines import voxel_sizes, obliquity
 from .base import TransformBase, _as_homogeneous, EQUALITY_TOL
 from .patched import shape_zoom_affine
 from . import io
@@ -140,10 +140,8 @@ class Affine(TransformBase):
     def to_filename(self, filename, fmt='X5', moving=None):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
         if fmt.lower() in ['itk', 'ants', 'elastix']:
-            itkobj = io.itk.ITKLinearTransformArray(
-                xforms=[LPS.dot(m.dot(LPS)) for m in self.matrix])
-            with open(filename, 'w') as f:
-                f.write(itkobj.to_string())
+            itkobj = io.itk.ITKLinearTransformArray.from_ras(self.matrix)
+            itkobj.to_filename(filename)
             return filename
 
         if fmt.lower() == 'afni':
@@ -235,19 +233,11 @@ class Affine(TransformBase):
 
 def load(filename, fmt='X5', reference=None):
     """Load a linear transform."""
-    if fmt.lower() in ['itk', 'ants', 'elastix', 'nifty']:
+    if fmt.lower() in ('itk', 'ants', 'elastix'):
         with open(filename) as itkfile:
             itkxfm = io.itk.ITKLinearTransformArray.from_fileobj(
                 itkfile)
-
-        matlist = []
-        for xfm in itkxfm['xforms']:
-            matrix = xfm['parameters']
-            offset = xfm['offset']
-            c_neg = from_matvec(np.eye(3), offset * -1.0)
-            c_pos = from_matvec(np.eye(3), offset)
-            matlist.append(LPS.dot(c_pos.dot(matrix.dot(c_neg.dot(LPS)))))
-        matrix = np.stack(matlist)
+        matrix = itkxfm.to_ras()
     # elif fmt.lower() == 'afni':
     #     parameters = LPS.dot(self.matrix.dot(LPS))
     #     parameters = parameters[:3, :].reshape(-1).tolist()
