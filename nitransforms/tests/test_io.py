@@ -133,8 +133,16 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
     assert np.allclose(xfm.structarr['parameters'][:3, ...],
                        xfm2.structarr['parameters'][:3, ...])
 
+    # ITK does not handle transforms lists in Matlab format
     with pytest.raises(TransformFileError):
         itklist.to_filename('matlablist.mat')
+
+    with pytest.raises(TransformFileError):
+        xfm2 = itk.ITKLinearTransformArray.from_binary({})
+
+    with open('filename.mat', 'ab') as f:
+        with pytest.raises(TransformFileError):
+            xfm2 = itk.ITKLinearTransformArray.from_fileobj(f)
 
 
 @pytest.mark.parametrize('matlab_ver', ['4', '5'])

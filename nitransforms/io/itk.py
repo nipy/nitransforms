@@ -202,13 +202,7 @@ class ITKLinearTransformArray(StringBasedStruct):
     @classmethod
     def from_binary(cls, byte_stream):
         """Read the struct from a matlab binary file."""
-        mdict = _read_mat(byte_stream)
-        nxforms = mdict['fixed'].shape[0]
-
-        _self = cls()
-        _self.xforms = [ITKLinearTransform.from_matlab_dict(mdict, i)
-                        for i in range(nxforms)]
-        return _self
+        raise TransformFileError('Please use the ITK\'s new .h5 format.')
 
     @classmethod
     def from_fileobj(cls, fileobj, check=True):
