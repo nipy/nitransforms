@@ -113,7 +113,7 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
                 for _ in range(4)])
 
     assert itklist['nxforms'] == 4
-    assert itklist['xforms'][1].structarr['index'] == 2
+    assert itklist['xforms'][1].structarr['index'] == 1
 
     with pytest.raises(KeyError):
         itklist['invalid_key']

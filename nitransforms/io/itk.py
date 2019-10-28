@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.io import savemat as _save_mat
 from nibabel.affines import from_matvec
-from .base import StringBasedStruct, _read_mat
+from .base import StringBasedStruct, _read_mat, TransformFileError
 
 LPS = np.diag([-1, -1, 1, 1])
 
@@ -23,7 +23,7 @@ class ITKLinearTransform(StringBasedStruct):
     def __init__(self, parameters=None, offset=None):
         """Initialize with default offset and index."""
         super().__init__()
-        self.structarr['index'] = 1
+        self.structarr['index'] = 0
         self.structarr['offset'] = offset or [0, 0, 0]
         self.structarr['parameters'] = np.eye(4)
         if parameters is not None:
@@ -76,7 +76,7 @@ class ITKLinearTransform(StringBasedStruct):
         string = '%s'
 
         if banner is None:
-            banner = self.structarr['index'] == 1
+            banner = self.structarr['index'] == 0
 
         if banner:
             string = '#Insight Transform File V1.0\n%s'
@@ -103,7 +103,7 @@ class ITKLinearTransform(StringBasedStruct):
         if index is not None:
             raise NotImplementedError
 
-        sa['index'] = 1
+        sa['index'] = 0
         parameters = np.eye(4, dtype='f4')
         parameters[:3, :3] = mdict['AffineTransform_float_3_3'][:-3].reshape((3, 3))
         parameters[:3, 3] = mdict['AffineTransform_float_3_3'][-3:].flatten()
@@ -116,7 +116,7 @@ class ITKLinearTransform(StringBasedStruct):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         tf = cls()
         sa = tf.structarr
-        sa['index'] = index + 1
+        sa['index'] = index
         sa['parameters'] = LPS.dot(ras.dot(LPS))
         return tf
 
@@ -171,7 +171,7 @@ class ITKLinearTransformArray(StringBasedStruct):
 
         # Update indexes
         for i, val in enumerate(self._xforms):
-            val['index'] = i + 1
+            val['index'] = i
 
     def __getitem__(self, idx):
         """Allow dictionary access to the transforms."""
@@ -197,7 +197,7 @@ class ITKLinearTransformArray(StringBasedStruct):
         """Convert to a string directly writeable to file."""
         strings = []
         for i, xfm in enumerate(self.xforms):
-            xfm.structarr['index'] = i + 1
+            xfm.structarr['index'] = i
             strings.append(xfm.to_string())
         return '\n'.join(strings)
 
