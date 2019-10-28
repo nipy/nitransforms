@@ -154,6 +154,10 @@ class ImageGrid(SampledSpatialData):
         return (np.allclose(self.affine, other.affine, rtol=EQUALITY_TOL) and
                 self.shape == other.shape)
 
+    def __ne__(self, other):
+        """Overload not equal operator."""
+        return not self == other
+
 
 class TransformBase(object):
     """Abstract image class to represent transforms."""

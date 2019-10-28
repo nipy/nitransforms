@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 from subprocess import check_call
 import shutil
+import h5py
 
 import nibabel as nb
 from nibabel.eulerangles import euler2mat
@@ -155,3 +156,9 @@ def test_apply_linear_transform(
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
+
+
+def test_Affine(tmpdir):
+    """Test affine's operations."""
+    with h5py.File('xfm.x5', 'w') as f:
+        nbl.Affine()._to_hdf5(f.create_group('Affine'))

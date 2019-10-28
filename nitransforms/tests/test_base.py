@@ -46,6 +46,7 @@ def test_ImageGrid(get_testdata, image_orientation):
 
     img2 = ImageGrid(img)
     assert img2 == img
+    assert (img2 != img) is False
 
 
 def test_ImageGrid_utils(tmpdir, data_path, get_testdata):
