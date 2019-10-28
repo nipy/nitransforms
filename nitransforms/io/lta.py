@@ -191,6 +191,13 @@ class LinearTransformArray(StringBasedStruct):
         lta = klass()
         sa = lta.structarr
         lines = string.splitlines()
+        while lines:
+            if not lines[0].startswith('type'):
+                lines.pop(0)
+                continue
+            break
+        if not lines:
+            raise Exception("Invalid LTA format")
         for key in ('type', 'nxforms'):
             label, valstring = lines.pop(0).split(' = ')
             assert label.strip() == key
