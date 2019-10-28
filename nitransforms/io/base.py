@@ -1,7 +1,7 @@
 """Read/write linear transforms."""
 from scipy.io.matlab.miobase import get_matfile_version
-from scipy.io.matlab.mio4 import MatFile4Reader  # , MatFile4Writer
-from scipy.io.matlab.mio5 import MatFile5Reader  # , MatFile5Writer
+from scipy.io.matlab.mio4 import MatFile4Reader
+from scipy.io.matlab.mio5 import MatFile5Reader
 
 from ..patched import LabeledWrapStruct
 

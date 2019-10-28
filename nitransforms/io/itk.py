@@ -63,7 +63,7 @@ class ITKLinearTransform(StringBasedStruct):
             f.write(self.to_string())
 
     def to_ras(self):
-        """Return a nitransforms' internal RAS matrix."""
+        """Return a nitransforms internal RAS+ matrix."""
         sa = self.structarr
         matrix = sa['parameters']
         offset = sa['offset']
@@ -165,10 +165,10 @@ class ITKLinearTransformArray(StringBasedStruct):
 
     @xforms.setter
     def xforms(self, value):
-        self._xforms = value
+        self._xforms = list(value)
 
         # Update indexes
-        for i, val in enumerate(self._xforms):
+        for i, val in enumerate(self.xforms):
             val['index'] = i
 
     def __getitem__(self, idx):
@@ -182,14 +182,14 @@ class ITKLinearTransformArray(StringBasedStruct):
     def to_filename(self, filename):
         """Store this transform to a file with the appropriate format."""
         if str(filename).endswith('.mat'):
-            raise TransformFileError('Please use the ITK\'s new .h5 format.')
+            raise TransformFileError("Please use the ITK's new .h5 format.")
 
         with open(str(filename), 'w') as f:
             f.write(self.to_string())
 
     def to_ras(self):
         """Return a nitransforms' internal RAS matrix."""
-        return np.stack([xfm.to_ras() for xfm in self._xforms])
+        return np.stack([xfm.to_ras() for xfm in self.xforms])
 
     def to_string(self):
         """Convert to a string directly writeable to file."""
@@ -202,7 +202,7 @@ class ITKLinearTransformArray(StringBasedStruct):
     @classmethod
     def from_binary(cls, byte_stream):
         """Read the struct from a matlab binary file."""
-        raise TransformFileError('Please use the ITK\'s new .h5 format.')
+        raise TransformFileError("Please use the ITK's new .h5 format.")
 
     @classmethod
     def from_fileobj(cls, fileobj, check=True):
