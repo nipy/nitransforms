@@ -45,7 +45,7 @@ def test_LinearTransformArray(tmpdir, data_path):
     xform = lta['xforms'][0]
 
     assert np.allclose(
-        xform['m_L'], np.genfromtxt(test_lta, skip_header=5, skip_footer=20)
+        xform['m_L'], np.genfromtxt(test_lta, skip_header=8, skip_footer=18)
     )
 
     outlta = (tmpdir / 'out.lta').strpath
@@ -55,6 +55,24 @@ def test_LinearTransformArray(tmpdir, data_path):
     with open(outlta) as fp:
         lta2 = LTA.from_fileobj(fp)
     assert np.allclose(lta['xforms'][0]['m_L'], lta2['xforms'][0]['m_L'])
+
+
+def test_LT_conversions(data_path):
+    r = str(data_path / 'r2r.lta')
+    v = str(data_path / 'v2v.lta')
+    with open(r) as fa, open(v) as fb:
+        r2r = LTA.from_fileobj(fa)
+        v2v = LTA.from_fileobj(fb)
+    assert r2r['type'] == 1
+    assert v2v['type'] == 0
+
+    r2r_m = r2r['xforms'][0]['m_L']
+    v2v_m = v2v['xforms'][0]['m_L']
+    assert np.any(r2r_m != v2v_m)
+    # convert vox2vox LTA to ras2ras
+    v2v.set_type('LINEAR_RAS_TO_RAS')
+    assert v2v['type'] == 1
+    assert np.all(r2r_m == v2v_m)
 
 
 def test_ITKLinearTransformArray(tmpdir, data_path):
