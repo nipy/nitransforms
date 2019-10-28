@@ -108,6 +108,11 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
         itk.ITKLinearTransformArray.from_string(
             '\n'.join(text.splitlines()[1:]))
 
+    itklist.to_filename('copy.tfm')
+    with open('copy.tfm') as f:
+        copytext = f.read()
+    assert text == copytext
+
     itklist = itk.ITKLinearTransformArray(
         xforms=[np.random.normal(size=(4, 4))
                 for _ in range(4)])
@@ -127,6 +132,9 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
         xfm2 = itk.ITKLinearTransform.from_fileobj(f)
     assert np.allclose(xfm.structarr['parameters'][:3, ...],
                        xfm2.structarr['parameters'][:3, ...])
+
+    with pytest.raises(TransformFileError):
+        itklist.to_filename('matlablist.mat')
 
 
 @pytest.mark.parametrize('matlab_ver', ['4', '5'])

@@ -83,7 +83,7 @@ class ITKLinearTransform(StringBasedStruct):
         return string % self
 
     @classmethod
-    def from_binary(cls, byte_stream, index=None):
+    def from_binary(cls, byte_stream, index=0):
         """Read the struct from a matlab binary file."""
         mdict = _read_mat(byte_stream)
         return cls.from_matlab_dict(mdict, index=index)
@@ -96,14 +96,12 @@ class ITKLinearTransform(StringBasedStruct):
         return cls.from_string(fileobj.read())
 
     @classmethod
-    def from_matlab_dict(cls, mdict, index=None):
+    def from_matlab_dict(cls, mdict, index=0):
         """Read the struct from a matlab dictionary."""
         tf = cls()
         sa = tf.structarr
-        if index is not None:
-            raise NotImplementedError
 
-        sa['index'] = 0
+        sa['index'] = index
         parameters = np.eye(4, dtype='f4')
         parameters[:3, :3] = mdict['AffineTransform_float_3_3'][:-3].reshape((3, 3))
         parameters[:3, 3] = mdict['AffineTransform_float_3_3'][-3:].flatten()
@@ -184,7 +182,7 @@ class ITKLinearTransformArray(StringBasedStruct):
     def to_filename(self, filename):
         """Store this transform to a file with the appropriate format."""
         if str(filename).endswith('.mat'):
-            raise NotImplementedError
+            raise TransformFileError('Please use the ITK\'s new .h5 format.')
 
         with open(str(filename), 'w') as f:
             f.write(self.to_string())
