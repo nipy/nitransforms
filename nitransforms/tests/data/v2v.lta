@@ -1,4 +1,4 @@
-# transform file out.lta
+# transform file v2v.lta
 # created by mathiasg on Mon Oct 28 10:09:56 2019
 
 type      = 0 # LINEAR_VOX_TO_VOX
