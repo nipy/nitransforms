@@ -36,7 +36,7 @@ def test_LinearTransformArray(tmpdir, data_path):
     assert lta['nxforms'] == 0
     assert len(lta['xforms']) == 0
 
-    test_lta = str(data_path / 'inv.lta')
+    test_lta = str(data_path / 'r2r.lta')
     with open(test_lta) as fp:
         lta = LTA.from_fileobj(fp)
 
