@@ -1,45 +1,45 @@
 #Insight Transform File V1.0
+#Transform 0
+Transform: AffineTransform_float_3_3
+Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
+FixedParameters: 10 10 10
+
 #Transform 1
-Transform: MatrixOffsetTransformBase_double_3_3
+Transform: AffineTransform_float_3_3
 Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
 FixedParameters: 10 10 10
 
 #Transform 2
-Transform: MatrixOffsetTransformBase_double_3_3
+Transform: AffineTransform_float_3_3
 Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
 FixedParameters: 10 10 10
 
 #Transform 3
-Transform: MatrixOffsetTransformBase_double_3_3
+Transform: AffineTransform_float_3_3
 Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
 FixedParameters: 10 10 10
 
 #Transform 4
-Transform: MatrixOffsetTransformBase_double_3_3
-Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
-FixedParameters: 10 10 10
-
-#Transform 5
-Transform: MatrixOffsetTransformBase_double_3_3
+Transform: AffineTransform_float_3_3
 Parameters: -1.53626 0.71973 -0.639856 -0.190759 -1.80082 -0.915885 0.502537 1.12532 0.275748 0.393413 1.13855 0.761131
 FixedParameters: -0.0993171 0.364984 1.99264
 
-#Transform 6
-Transform: MatrixOffsetTransformBase_double_3_3
+#Transform 5
+Transform: AffineTransform_float_3_3
 Parameters: -0.130507 -1.03017 2.08189 -1.51723 1.37849 -0.0890962 -0.656323 0.242694 2.15801 -1.26689 0.367131 1.23616
 FixedParameters: 0.626607 0.15351 1.24982
 
-#Transform 7
-Transform: MatrixOffsetTransformBase_double_3_3
+#Transform 6
+Transform: AffineTransform_float_3_3
 Parameters: -1.55395 -0.36383 -0.17749 1.3387 -0.384534 -0.901462 -1.06598 -0.448228 -1.07535 1.92599 0.454696 0.576697
 FixedParameters: -0.425602 0.333406 -1.14957
 
-#Transform 8
-Transform: MatrixOffsetTransformBase_double_3_3
+#Transform 7
+Transform: AffineTransform_float_3_3
 Parameters: 0.723719 -1.05617 -0.800562 -2.47048 -1.76301 -1.4447 -0.749896 1.29774 -1.48893 1.02789 0.65017 -1.48326
 FixedParameters: 0.800882 -1.20202 1.25495
 
-#Transform 9
-Transform: MatrixOffsetTransformBase_double_3_3
+#Transform 8
+Transform: AffineTransform_float_3_3
 Parameters: 1.24025 -0.77628 0.618013 -0.523829 1.09471 1.66921 0.73753 -1.33588 -0.627659 -0.449913 -0.00124181 0.21433
 FixedParameters: -0.226504 -0.877893 0.2608
