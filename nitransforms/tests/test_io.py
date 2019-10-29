@@ -45,6 +45,12 @@ def test_LinearTransformArray(tmpdir, data_path):
     assert lta['nxforms'] == 0
     assert len(lta['xforms']) == 0
 
+    # read invalid LTA file
+    test_lta = str(data_path / 'affine-RAS.fsl')
+    with pytest.raises(TransformFileError):
+        with open(test_lta) as fp:
+            LTA.from_fileobj(fp)
+
     test_lta = str(data_path / 'affine-RAS.fs.lta')
     with open(test_lta) as fp:
         lta = LTA.from_fileobj(fp)
