@@ -13,7 +13,7 @@ from ..io import (
     LinearTransform as LT,
     LinearTransformArray as LTA,
 )
-from ..io.base import _read_mat, TransformFileError
+from ..io.base import _read_mat, LinearParameters, TransformFileError
 
 LPS = np.diag([-1, -1, 1, 1])
 ITK_MAT = LPS.dot(np.ones((4, 4)).dot(LPS))
@@ -169,6 +169,17 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
             xfm2 = itk.ITKLinearTransformArray.from_fileobj(f)
 
 
+def test_LinearParameters(tmpdir):
+    """Just pushes coverage up."""
+    tmpdir.join('file.txt').write('')
+
+    with pytest.raises(NotImplementedError):
+        LinearParameters.from_string('')
+
+    with pytest.raises(NotImplementedError):
+        LinearParameters.from_fileobj(tmpdir.join('file.txt').open())
+
+
 @pytest.mark.parametrize('matlab_ver', ['4', '5'])
 def test_read_mat1(tmpdir, matlab_ver):
     """Test read from matlab."""
@@ -182,15 +193,16 @@ def test_read_mat1(tmpdir, matlab_ver):
     assert np.all(mdict['val'] == np.ones((3,)))
 
 
-def test_read_mat2(tmpdir, monkeypatch):
+@pytest.mark.parametrize('matlab_ver', [-1] + list(range(2, 7)))
+def test_read_mat2(tmpdir, monkeypatch, matlab_ver):
     """Check read matlab raises adequate errors."""
     from ..io import base
 
-    def _mockreturn(arg):
-        return (2, 0)
-
     tmpdir.chdir()
     savemat('val.mat', {'val': np.ones((3,))})
+
+    def _mockreturn(arg):
+        return (matlab_ver, 0)
 
     with monkeypatch.context() as m:
         m.setattr(base, 'get_matfile_version', _mockreturn)
