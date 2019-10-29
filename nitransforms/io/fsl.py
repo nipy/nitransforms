@@ -3,7 +3,7 @@ from io import StringIO
 import numpy as np
 from nibabel.affines import voxel_sizes
 
-from .base import LinearParameters, StringBasedStruct
+from .base import BaseLinearTransformList, LinearParameters
 
 
 class FSLLinearTransform(LinearParameters):
@@ -48,52 +48,15 @@ class FSLLinearTransform(LinearParameters):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
-        lines = [l.encode() for l in string.splitlines()
-                 if l.strip()]
-
-        if '3dvolreg matrices' in lines[0]:
-            lines = lines[1:]  # Drop header
-
-        parameters = np.eye(4, dtype='f4')
-        parameters = np.genfromtxt(
-            lines, dtype=cls.dtype['parameters'])
+        parameters = np.genfromtxt(string, dtype=cls.dtype['parameters'])
         sa['parameters'] = parameters
         return tf
 
 
-class FSLLinearTransformArray(StringBasedStruct):
-    """A string-based structure for series of ITK linear transforms."""
+class FSLLinearTransformArray(BaseLinearTransformList):
+    """A string-based structure for series of FSL linear transforms."""
 
-    template_dtype = np.dtype([('nxforms', 'i4')])
-    dtype = template_dtype
-    _xforms = None
-
-    def __init__(self,
-                 xforms=None,
-                 binaryblock=None,
-                 endianness=None,
-                 check=True):
-        """Initialize with (optionally) a list of transforms."""
-        super().__init__(binaryblock, endianness, check)
-        self.xforms = [FSLLinearTransform(parameters=mat)
-                       for mat in xforms or []]
-
-    @property
-    def xforms(self):
-        """Get the list of internal ITKLinearTransforms."""
-        return self._xforms
-
-    @xforms.setter
-    def xforms(self, value):
-        self._xforms = list(value)
-
-    def __getitem__(self, idx):
-        """Allow dictionary access to the transforms."""
-        if idx == 'xforms':
-            return self._xforms
-        if idx == 'nxforms':
-            return len(self._xforms)
-        raise KeyError(idx)
+    _inner_type = FSLLinearTransform
 
     def to_filename(self, filename):
         """Store this transform to a file with the appropriate format."""
@@ -123,7 +86,7 @@ class FSLLinearTransformArray(StringBasedStruct):
     def from_ras(cls, ras, moving, reference):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         _self = cls()
-        _self.xforms = [FSLLinearTransform.from_ras(
+        _self.xforms = [cls._inner_type.from_ras(
             ras[i, ...], moving=moving, reference=reference)
             for i in range(ras.shape[0])]
         return _self
@@ -132,7 +95,7 @@ class FSLLinearTransformArray(StringBasedStruct):
     def from_string(cls, string):
         """Read the struct from string."""
         _self = cls()
-        _self.xforms = [FSLLinearTransform.from_string(l.strip())
+        _self.xforms = [cls._inner_type.from_string(l.strip())
                         for l in string.splitlines() if l.strip()]
         return _self
 

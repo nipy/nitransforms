@@ -79,6 +79,70 @@ class LinearParameters(StringBasedStruct):
         raise NotImplementedError
 
 
+class BaseLinearTransformList(StringBasedStruct):
+    """A string-based structure for series of linear transforms."""
+
+    template_dtype = np.dtype([('nxforms', 'i4')])
+    dtype = template_dtype
+    _xforms = None
+    _inner_type = LinearParameters
+
+    def __init__(self,
+                 xforms=None,
+                 binaryblock=None,
+                 endianness=None,
+                 check=True):
+        """Initialize with (optionally) a list of transforms."""
+        super().__init__(binaryblock, endianness, check)
+        self.xforms = [self._inner_type(parameters=mat)
+                       for mat in xforms or []]
+
+    @property
+    def xforms(self):
+        """Get the list of internal transforms."""
+        return self._xforms
+
+    @xforms.setter
+    def xforms(self, value):
+        self._xforms = list(value)
+
+    def __getitem__(self, idx):
+        """Allow dictionary access to the transforms."""
+        if idx == 'xforms':
+            return self._xforms
+        if idx == 'nxforms':
+            return len(self._xforms)
+        raise KeyError(idx)
+
+    def to_filename(self, filename):
+        """Store this transform to a file with the appropriate format."""
+        with open(str(filename), 'w') as f:
+            f.write(self.to_string())
+
+    def to_ras(self, moving, reference):
+        """Return a nitransforms' internal RAS matrix."""
+        raise NotImplementedError
+
+    def to_string(self):
+        """Convert to a string directly writeable to file."""
+        raise NotImplementedError
+
+    @classmethod
+    def from_fileobj(cls, fileobj, check=True):
+        """Read the struct from a file object."""
+        return cls.from_string(fileobj.read())
+
+    @classmethod
+    def from_ras(cls, ras, moving, reference):
+        """Create an ITK affine from a nitransform's RAS+ matrix."""
+        raise NotImplementedError
+
+    @classmethod
+    def from_string(cls, string):
+        """Read the struct from string."""
+        raise NotImplementedError
+
+
 def _read_mat(byte_stream):
     mjv, _ = get_matfile_version(byte_stream)
     if mjv == 0:

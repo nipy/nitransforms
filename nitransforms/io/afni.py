@@ -4,7 +4,7 @@ import numpy as np
 from nibabel.affines import obliquity, voxel_sizes
 
 from ..patched import shape_zoom_affine
-from .base import StringBasedStruct, LinearParameters
+from .base import BaseLinearTransformList, LinearParameters
 
 LPS = np.diag([-1, -1, 1, 1])
 OBLIQUITY_THRESHOLD_DEG = 0.01
@@ -71,44 +71,10 @@ class AFNILinearTransform(LinearParameters):
         return tf
 
 
-class AFNILinearTransformArray(StringBasedStruct):
-    """A string-based structure for series of ITK linear transforms."""
+class AFNILinearTransformArray(BaseLinearTransformList):
+    """A string-based structure for series of AFNI linear transforms."""
 
-    template_dtype = np.dtype([('nxforms', 'i4')])
-    dtype = template_dtype
-    _xforms = None
-
-    def __init__(self,
-                 xforms=None,
-                 binaryblock=None,
-                 endianness=None,
-                 check=True):
-        """Initialize with (optionally) a list of transforms."""
-        super().__init__(binaryblock, endianness, check)
-        self.xforms = [AFNILinearTransform(parameters=mat)
-                       for mat in xforms or []]
-
-    @property
-    def xforms(self):
-        """Get the list of internal ITKLinearTransforms."""
-        return self._xforms
-
-    @xforms.setter
-    def xforms(self, value):
-        self._xforms = list(value)
-
-    def __getitem__(self, idx):
-        """Allow dictionary access to the transforms."""
-        if idx == 'xforms':
-            return self._xforms
-        if idx == 'nxforms':
-            return len(self._xforms)
-        raise KeyError(idx)
-
-    def to_filename(self, filename):
-        """Store this transform to a file with the appropriate format."""
-        with open(str(filename), 'w') as f:
-            f.write(self.to_string())
+    _inner_type = AFNILinearTransform
 
     def to_ras(self, moving, reference):
         """Return a nitransforms' internal RAS matrix."""
@@ -123,15 +89,10 @@ class AFNILinearTransformArray(StringBasedStruct):
         return '\n'.join(strings)
 
     @classmethod
-    def from_fileobj(cls, fileobj, check=True):
-        """Read the struct from a file object."""
-        return cls.from_string(fileobj.read())
-
-    @classmethod
     def from_ras(cls, ras, moving, reference):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         _self = cls()
-        _self.xforms = [AFNILinearTransform.from_ras(
+        _self.xforms = [cls._inner_type.from_ras(
             ras[i, ...], moving=moving, reference=reference)
             for i in range(ras.shape[0])]
         return _self
@@ -140,7 +101,7 @@ class AFNILinearTransformArray(StringBasedStruct):
     def from_string(cls, string):
         """Read the struct from string."""
         _self = cls()
-        _self.xforms = [AFNILinearTransform.from_string(l.strip())
+        _self.xforms = [cls._inner_type.from_string(l.strip())
                         for l in string.splitlines() if l.strip()]
         return _self
 

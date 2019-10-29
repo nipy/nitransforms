@@ -82,9 +82,8 @@ def test_linear_load(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     assert loaded == xfm
 
 
-@pytest.mark.parametrize('image_orientation', [
-    'RAS', 'LAS', 'LPS',  # 'oblique',
-])
+@pytest.mark.xfail(reason="Not fully implemented")
+@pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
 def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
