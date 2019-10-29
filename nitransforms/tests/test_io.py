@@ -72,7 +72,7 @@ def test_LT_conversions(data_path):
     # convert vox2vox LTA to ras2ras
     v2v.set_type('LINEAR_RAS_TO_RAS')
     assert v2v['type'] == 1
-    assert np.all(r2r_m == v2v_m)
+    assert np.allclose(r2r_m, v2v_m)
 
 
 def test_ITKLinearTransformArray(tmpdir, data_path):

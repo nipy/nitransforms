@@ -247,7 +247,7 @@ class LinearTransformArray(StringBasedStruct):
 
         # VOX2VOX -> RAS2RAS
         if current == 0 and target == 1:
-            M = np.linalg.inv(src.as_affine()).dot(xform['m_L']).dot(dst.as_affine())
+            M = dst.as_affine().dot(xform['m_L'].dot(np.linalg.inv(src.as_affine())))
         else:
             raise NotImplementedError(
                 "Converting {0} to {1} is not yet available".format(
