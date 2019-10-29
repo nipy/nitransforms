@@ -190,7 +190,6 @@ class LinearTransformArray(StringBasedStruct):
     def from_string(klass, string):
         lta = klass()
         sa = lta.structarr
-        lines = string.splitlines()
         lines = [l.strip() for l in string.splitlines()
                  if l.strip() and not l.strip().startswith('#')]
         if not lines or not lines[0].startswith('type'):
