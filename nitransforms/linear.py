@@ -247,6 +247,8 @@ def load(filename, fmt='X5', reference=None):
         if lta['nxforms'] > 1:
             raise NotImplementedError("Multiple transforms are not yet supported.")
         if lta['type'] != 1:
+            # To make transforms generalize across use-cases, LTA transforms
+            # are converted to RAS-to-RAS.
             lta.set_type(1)
         matrix = lta['xforms'][0]['m_L']
     elif fmt.lower() in ('x5', 'bids'):

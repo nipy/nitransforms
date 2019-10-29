@@ -45,7 +45,13 @@ def test_LinearTransformArray(tmpdir, data_path):
     assert lta['nxforms'] == 0
     assert len(lta['xforms']) == 0
 
-    test_lta = str(data_path / 'inv.lta')
+    # read invalid LTA file
+    test_lta = str(data_path / 'affine-RAS.fsl')
+    with pytest.raises(TransformFileError):
+        with open(test_lta) as fp:
+            LTA.from_fileobj(fp)
+
+    test_lta = str(data_path / 'affine-RAS.fs.lta')
     with open(test_lta) as fp:
         lta = LTA.from_fileobj(fp)
 
@@ -64,6 +70,24 @@ def test_LinearTransformArray(tmpdir, data_path):
     with open(outlta) as fp:
         lta2 = LTA.from_fileobj(fp)
     assert np.allclose(lta['xforms'][0]['m_L'], lta2['xforms'][0]['m_L'])
+
+
+def test_LT_conversions(data_path):
+    r = str(data_path / 'affine-RAS.fs.lta')
+    v = str(data_path / 'affine-RAS.fs.v2v.lta')
+    with open(r) as fa, open(v) as fb:
+        r2r = LTA.from_fileobj(fa)
+        v2v = LTA.from_fileobj(fb)
+    assert r2r['type'] == 1
+    assert v2v['type'] == 0
+
+    r2r_m = r2r['xforms'][0]['m_L']
+    v2v_m = v2v['xforms'][0]['m_L']
+    assert np.any(r2r_m != v2v_m)
+    # convert vox2vox LTA to ras2ras
+    v2v.set_type('LINEAR_RAS_TO_RAS')
+    assert v2v['type'] == 1
+    assert np.allclose(r2r_m, v2v_m, atol=1e-05)
 
 
 def test_ITKLinearTransform(tmpdir, data_path):

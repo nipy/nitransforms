@@ -3,7 +3,7 @@ import numpy as np
 from nibabel.volumeutils import Recoder
 from nibabel.affines import voxel_sizes
 
-from .base import StringBasedStruct
+from .base import StringBasedStruct, TransformFileError
 
 
 transform_codes = Recoder((
@@ -20,10 +20,10 @@ class VolumeGeometry(StringBasedStruct):
         ('valid', 'i4'),              # Valid values: 0, 1
         ('volume', 'i4', (3, 1)),     # width, height, depth
         ('voxelsize', 'f4', (3, 1)),  # xsize, ysize, zsize
-        ('xras', 'f4', (3, 1)),       # x_r, x_a, x_s
-        ('yras', 'f4', (3, 1)),       # y_r, y_a, y_s
-        ('zras', 'f4', (3, 1)),       # z_r, z_a, z_s
-        ('cras', 'f4', (3, 1)),       # c_r, c_a, c_s
+        ('xras', 'f8', (3, 1)),       # x_r, x_a, x_s
+        ('yras', 'f8', (3, 1)),       # y_r, y_a, y_s
+        ('zras', 'f8', (3, 1)),       # z_r, z_a, z_s
+        ('cras', 'f8', (3, 1)),       # c_r, c_a, c_s
         ('filename', 'U1024')])       # Not conformant (may be >1024 bytes)
     dtype = template_dtype
 
@@ -80,7 +80,7 @@ class VolumeGeometry(StringBasedStruct):
         lines = string.splitlines()
         for key in ('valid', 'filename', 'volume', 'voxelsize',
                     'xras', 'yras', 'zras', 'cras'):
-            label, valstring = lines.pop(0).split(' = ')
+            label, valstring = lines.pop(0).split(' =')
             assert label.strip() == key
 
             val = np.genfromtxt([valstring.encode()],
@@ -92,11 +92,11 @@ class VolumeGeometry(StringBasedStruct):
 
 class LinearTransform(StringBasedStruct):
     template_dtype = np.dtype([
-        ('mean', 'f4', (3, 1)),       # x0, y0, z0
+        ('mean', 'f4', (3, 1)),  # x0, y0, z0
         ('sigma', 'f4'),
-        ('m_L', 'f4', (4, 4)),
-        ('m_dL', 'f4', (4, 4)),
-        ('m_last_dL', 'f4', (4, 4)),
+        ('m_L', 'f8', (4, 4)),
+        ('m_dL', 'f8', (4, 4)),
+        ('m_last_dL', 'f8', (4, 4)),
         ('src', VolumeGeometry),
         ('dst', VolumeGeometry),
         ('label', 'i4')])
@@ -190,7 +190,10 @@ class LinearTransformArray(StringBasedStruct):
     def from_string(klass, string):
         lta = klass()
         sa = lta.structarr
-        lines = string.splitlines()
+        lines = [l.strip() for l in string.splitlines()
+                 if l.strip() and not l.strip().startswith('#')]
+        if not lines or not lines[0].startswith('type'):
+            raise TransformFileError("Invalid LTA format")
         for key in ('type', 'nxforms'):
             label, valstring = lines.pop(0).split(' = ')
             assert label.strip() == key
@@ -207,12 +210,16 @@ class LinearTransformArray(StringBasedStruct):
                 # Optional keys
                 if not lines[0].startswith(key):
                     continue
-                label, valstring = lines.pop(0).split(' ')
-                assert label.strip() == key
+                try:
+                    label, valstring = lines.pop(0).split(' ')
+                except ValueError:
+                    sa[key] = ''
+                else:
+                    assert label.strip() == key
 
-                val = np.genfromtxt([valstring.encode()],
-                                    dtype=klass.dtype[key])
-                sa[key] = val.reshape(sa[key].shape) if val.size else ''
+                    val = np.genfromtxt([valstring.encode()],
+                                        dtype=klass.dtype[key])
+                    sa[key] = val.reshape(sa[key].shape) if val.size else ''
 
         assert len(lta._xforms) == sa['nxforms']
         return lta
@@ -240,7 +247,7 @@ class LinearTransformArray(StringBasedStruct):
 
         # VOX2VOX -> RAS2RAS
         if current == 0 and target == 1:
-            M = np.linalg.inv(src.as_affine()).dot(xform['m_L']).dot(dst.as_affine())
+            M = dst.as_affine().dot(xform['m_L'].dot(np.linalg.inv(src.as_affine())))
         else:
             raise NotImplementedError(
                 "Converting {0} to {1} is not yet available".format(
