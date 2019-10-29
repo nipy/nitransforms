@@ -7,19 +7,11 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Linear transforms."""
-from pathlib import Path
 import warnings
 import numpy as np
 
-from nibabel.loadsave import load as loadimg
-from nibabel.affines import voxel_sizes, obliquity
 from .base import ImageGrid, TransformBase, _as_homogeneous, EQUALITY_TOL
-from .patched import shape_zoom_affine
 from . import io
-
-
-LPS = np.diag([-1, -1, 1, 1])
-OBLIQUITY_THRESHOLD_DEG = 0.01
 
 
 class Affine(TransformBase):

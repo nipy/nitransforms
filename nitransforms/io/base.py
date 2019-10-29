@@ -48,7 +48,7 @@ class LinearParameters(StringBasedStruct):
     """
 
     template_dtype = np.dtype([
-        ('parameters', 'f4', (4, 4)),
+        ('parameters', 'f8', (4, 4)),
     ])
     dtype = template_dtype
 

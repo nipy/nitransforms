@@ -156,8 +156,13 @@ def test_apply_linear_transform(
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
 
 
-def test_Affine(tmpdir):
+def test_Affine_to_x5(tmpdir, data_path):
     """Test affine's operations."""
     tmpdir.chdir()
+    aff = nbl.Affine()
     with h5py.File('xfm.x5', 'w') as f:
-        nbl.Affine()._to_hdf5(f.create_group('Affine'))
+        aff._to_hdf5(f.create_group('Affine'))
+
+    aff.reference = data_path / 'someones_anatomy.nii.gz'
+    with h5py.File('withref-xfm.x5', 'w') as f:
+        aff._to_hdf5(f.create_group('Affine'))
