@@ -92,7 +92,7 @@ class VolumeGeometry(StringBasedStruct):
 
 class LinearTransform(StringBasedStruct):
     template_dtype = np.dtype([
-        ('mean', 'f4', (3, 1)),       # x0, y0, z0
+        ('mean', 'f4', (3, 1)),  # x0, y0, z0
         ('sigma', 'f4'),
         ('m_L', 'f4', (4, 4)),
         ('m_dL', 'f4', (4, 4)),
