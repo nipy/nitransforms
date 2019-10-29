@@ -11,7 +11,6 @@ import h5py
 import nibabel as nb
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
-from nibabel.tmpdirs import InTemporaryDirectory
 from .. import linear as nbl
 from .utils import assert_affines_by_filename
 
@@ -87,8 +86,9 @@ def test_linear_load(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     'RAS', 'LAS', 'LPS',  # 'oblique',
 ])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
-def test_linear_save(data_path, get_testdata, image_orientation, sw_tool):
+def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
+    tmpdir.chdir()
     img = get_testdata[image_orientation]
     # Generate test transform
     T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
@@ -101,13 +101,12 @@ def test_linear_save(data_path, get_testdata, image_orientation, sw_tool):
     elif sw_tool == 'fs':
         ext = '.lta'
 
-    with InTemporaryDirectory():
-        xfm_fname1 = 'M.%s%s' % (sw_tool, ext)
-        xfm.to_filename(xfm_fname1, fmt=sw_tool)
+    xfm_fname1 = 'M.%s%s' % (sw_tool, ext)
+    xfm.to_filename(xfm_fname1, fmt=sw_tool)
 
-        xfm_fname2 = str(data_path / 'affine-%s.%s%s') % (
-            image_orientation, sw_tool, ext)
-        assert_affines_by_filename(xfm_fname1, xfm_fname2)
+    xfm_fname2 = str(data_path / 'affine-%s.%s%s') % (
+        image_orientation, sw_tool, ext)
+    assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 
 @pytest.mark.parametrize('image_orientation', [
@@ -116,7 +115,6 @@ def test_linear_save(data_path, get_testdata, image_orientation, sw_tool):
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
 def test_apply_linear_transform(
         tmpdir,
-        data_path,
         get_testdata,
         image_orientation,
         sw_tool
@@ -160,5 +158,6 @@ def test_apply_linear_transform(
 
 def test_Affine(tmpdir):
     """Test affine's operations."""
+    tmpdir.chdir()
     with h5py.File('xfm.x5', 'w') as f:
         nbl.Affine()._to_hdf5(f.create_group('Affine'))

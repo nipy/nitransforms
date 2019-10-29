@@ -17,8 +17,6 @@ class ITKLinearTransform(StringBasedStruct):
         ('offset', 'f4', 3),  # Center of rotation
     ])
     dtype = template_dtype
-    # files_types = (('string', '.tfm'), ('binary', '.mat'))
-    # valid_exts = ('.tfm', '.mat')
 
     def __init__(self, parameters=None, offset=None):
         """Initialize with default offset and index."""

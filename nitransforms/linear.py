@@ -13,7 +13,7 @@ import numpy as np
 
 from nibabel.loadsave import load as loadimg
 from nibabel.affines import voxel_sizes, obliquity
-from .base import TransformBase, _as_homogeneous, EQUALITY_TOL
+from .base import ImageGrid, TransformBase, _as_homogeneous, EQUALITY_TOL
 from .patched import shape_zoom_affine
 from . import io
 
@@ -144,79 +144,31 @@ class Affine(TransformBase):
             itkobj.to_filename(filename)
             return filename
 
-        if fmt.lower() == 'afni':
-            from math import pi
-
-            if moving and isinstance(moving, (str, bytes, Path)):
-                moving = loadimg(str(moving))
-
-            T = self.matrix.copy()
-            pre = LPS
-            post = LPS
-            if (
-                obliquity(self.reference.affine).min() * 180 / pi
-                > OBLIQUITY_THRESHOLD_DEG
-            ):
-                print('Reference affine axes are oblique.')
-                M = self.reference.affine
-                A = shape_zoom_affine(self.reference.shape,
-                                      voxel_sizes(M), x_flip=False, y_flip=False)
-                pre = M.dot(np.linalg.inv(A)).dot(LPS)
-
-                if not moving:
-                    moving = self.reference
-
-            if (
-                moving
-                and obliquity(moving.affine).min() * 180 / pi
-                > OBLIQUITY_THRESHOLD_DEG
-            ):
-                print('Moving affine axes are oblique.')
-                M2 = moving.affine
-                A2 = shape_zoom_affine(moving.shape,
-                                       voxel_sizes(M2), x_flip=True, y_flip=True)
-                post = A2.dot(np.linalg.inv(M2))
-
-            # swapaxes is necessary, as axis 0 encodes series of transforms
-            parameters = np.swapaxes(post.dot(self.matrix.copy().dot(pre)), 0, 1)
-            parameters = parameters[:, :3, :].reshape((T.shape[0], -1))
-            np.savetxt(filename, parameters, delimiter='\t', header="""\
-3dvolreg matrices (DICOM-to-DICOM, row-by-row):""", fmt='%g')
-            return filename
-
-        # for FSL / FS information
-        if not moving:
+        # Rest of the formats peek into moving and reference image grids
+        if moving is not None:
+            moving = ImageGrid(moving)
+        else:
             moving = self.reference
-        if isinstance(moving, str):
-            moving = loadimg(moving)
+
+        if fmt.lower() == 'afni':
+            afniobj = io.afni.AFNILinearTransformArray.from_ras(
+                self.matrix, moving=moving, reference=self.reference)
+            afniobj.to_filename(filename)
+            return filename
 
         if fmt.lower() == 'fsl':
-            # Adjust for reference image offset and orientation
-            refswp, refspc = _fsl_aff_adapt(self.reference)
-            pre = self.reference.affine.dot(
-                np.linalg.inv(refspc).dot(np.linalg.inv(refswp)))
-
-            # Adjust for moving image offset and orientation
-            movswp, movspc = _fsl_aff_adapt(moving)
-            post = np.linalg.inv(movswp).dot(movspc.dot(np.linalg.inv(
-                moving.affine)))
-
-            # Compose FSL transform
-            mat = np.linalg.inv(
-                np.swapaxes(post.dot(self.matrix.dot(pre)), 0, 1))
-
-            if self.matrix.shape[0] > 1:
-                for i in range(self.matrix.shape[0]):
-                    np.savetxt('%s.%03d' % (filename, i), mat[i],
-                               delimiter=' ', fmt='%g')
-            else:
-                np.savetxt(filename, mat[0], delimiter=' ', fmt='%g')
+            fslobj = io.fsl.FSLLinearTransformArray.from_ras(
+                self.matrix, moving=moving, reference=self.reference
+            )
+            fslobj.to_filename(filename)
             return filename
-        elif fmt.lower() == 'fs':
+
+        if fmt.lower() == 'fs':
             # xform info
             lt = io.LinearTransform()
             lt['sigma'] = 1.
             lt['m_L'] = self.matrix
+            # Just for reference, nitransforms does not write VOX2VOX
             lt['src'] = io.VolumeGeometry.from_image(moving)
             lt['dst'] = io.VolumeGeometry.from_image(self.reference)
             # to make LTA file format
@@ -228,7 +180,7 @@ class Affine(TransformBase):
                 f.write(lta.to_string())
             return filename
 
-        return super(Affine, self).to_filename(filename, fmt=fmt)
+        raise NotImplementedError
 
 
 def load(filename, fmt='X5', reference=None):
@@ -257,18 +209,3 @@ def load(filename, fmt='X5', reference=None):
         raise NotImplementedError
 
     return Affine(matrix, reference=reference)
-
-
-def _fsl_aff_adapt(space):
-    """
-    Adapt FSL affines.
-    Calculates a matrix to convert from the original RAS image
-    coordinates to FSL's internal coordinate system of transforms
-    """
-    aff = space.affine
-    zooms = list(voxel_sizes(aff)) + [1]
-    swp = np.eye(4)
-    if np.linalg.det(aff) > 0:
-        swp[0, 0] = -1.0
-        swp[0, 3] = (space.shape[0] - 1) * zooms[0]
-    return swp, np.diag(zooms)

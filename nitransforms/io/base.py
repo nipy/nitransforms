@@ -1,4 +1,5 @@
 """Read/write linear transforms."""
+import numpy as np
 from scipy.io.matlab.miobase import get_matfile_version
 from scipy.io.matlab.mio4 import MatFile4Reader
 from scipy.io.matlab.mio5 import MatFile5Reader
@@ -27,6 +28,36 @@ class StringBasedStruct(LabeledWrapStruct):
     def __array__(self):
         """Return the internal structure array."""
         return self._structarr
+
+
+class LinearParameters(StringBasedStruct):
+    """A string-based structure for linear transforms."""
+
+    template_dtype = np.dtype([
+        ('parameters', 'f4', (4, 4)),
+    ])
+    dtype = template_dtype
+
+    def __init__(self, parameters=None):
+        """Initialize with default parameters."""
+        super().__init__()
+        self.structarr['parameters'] = np.eye(4)
+        if parameters is not None:
+            self.structarr['parameters'] = parameters
+
+    def to_filename(self, filename):
+        """Store this transform to a file with the appropriate format."""
+        with open(str(filename), 'w') as f:
+            f.write(self.to_string())
+
+    def to_ras(self):
+        """Return a nitransforms internal RAS+ matrix."""
+        raise NotImplementedError
+
+    @classmethod
+    def from_fileobj(cls, fileobj, check=True):
+        """Read the struct from a file object."""
+        return cls.from_string(fileobj.read())
 
 
 def _read_mat(byte_stream):
