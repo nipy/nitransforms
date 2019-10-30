@@ -1,4 +1,5 @@
 """Read/write FSL's transforms."""
+import os
 import numpy as np
 from nibabel.affines import voxel_sizes
 
@@ -93,6 +94,26 @@ class FSLLinearTransformArray(BaseLinearTransformList):
         _self = cls()
         _self.xforms = [cls._inner_type.from_string(l.strip())
                         for l in string.splitlines() if l.strip()]
+        return _self
+
+    @classmethod
+    def from_filename(cls, filename):
+        """Read the struct from a file given its path."""
+        if os.path.exists(str(filename)):
+            return super().from_filename(filename)
+
+        _xforms = []
+        index = 0
+        while os.path.exists('%s.%03d' % (filename, index)):
+            with open('%s.%03d' % (filename, index)) as f:
+                string = f.read()
+            _xforms.append(cls._inner_type.from_string(string))
+            index += 1
+
+        if index == 0:
+            raise FileNotFoundError(str(filename))
+        _self = cls()
+        _self.xforms = _xforms
         return _self
 
 

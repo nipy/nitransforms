@@ -137,6 +137,38 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation,
     assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
 
 
+@pytest.mark.parametrize('image_orientation', [
+    'RAS', 'LAS', 'LPS', 'oblique',
+])
+@pytest.mark.parametrize('sw', ['afni', 'fsl', 'itk'])
+def test_LinearList_common(tmpdir, data_path, sw, image_orientation,
+                       get_testdata):
+    tmpdir.chdir()
+
+    angles = np.random.uniform(low=-3.14, high=3.14, size=(5, 3))
+    translation = np.random.uniform(low=-5., high=5., size=(5, 3))
+    mats = [from_matvec(euler2mat(*a), t)
+            for a, t in zip(angles, translation)]
+
+    ext = ''
+    if sw == 'afni':
+        factory = afni.AFNILinearTransformArray
+    elif sw == 'fsl':
+        factory = fsl.FSLLinearTransformArray
+    elif sw == 'itk':
+        ext = '.tfm'
+        factory = itk.ITKLinearTransformArray
+
+    tflist1 = factory(mats)
+
+    fname = 'affine-%s.%s%s' % (image_orientation, sw, ext)
+    tflist1.to_filename(fname)
+    tflist2 = factory.from_filename(fname)
+
+    assert tflist1['nxforms'] == tflist2['nxforms']
+    assert all([np.allclose(x1['parameters'], x2['parameters'])
+                for x1, x2 in zip(tflist1.xforms, tflist2.xforms)])
+
 def test_ITKLinearTransform(tmpdir, data_path):
     tmpdir.chdir()
 

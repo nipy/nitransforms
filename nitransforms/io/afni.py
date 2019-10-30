@@ -59,11 +59,13 @@ class AFNILinearTransform(LinearParameters):
         tf = cls()
         sa = tf.structarr
         lines = [l for l in string.splitlines()
-                 if l.strip()]
+                 if l.strip() and not l.startswith('#')]
 
         if '3dvolreg matrices' in lines[0]:
             lines = lines[1:]  # Drop header
 
+        if not lines:
+            raise ValueError('String "%s"' % string)
         parameters = np.vstack((
             np.genfromtxt([lines[0].encode()],
                           dtype='f8').reshape((3, 4)),
@@ -86,7 +88,11 @@ class AFNILinearTransformArray(BaseLinearTransformList):
         """Convert to a string directly writeable to file."""
         strings = []
         for i, xfm in enumerate(self.xforms):
-            strings.append(xfm.to_string(banner=(i == 0)))
+            lines = [
+                l.strip()
+                for l in xfm.to_string(banner=(i == 0)).splitlines()
+                if l.strip()]
+            strings += lines
         return '\n'.join(strings)
 
     @classmethod
@@ -103,7 +109,8 @@ class AFNILinearTransformArray(BaseLinearTransformList):
         """Read the struct from string."""
         _self = cls()
         _self.xforms = [cls._inner_type.from_string(l.strip())
-                        for l in string.splitlines() if l.strip()]
+                        for l in string.splitlines()
+                        if l.strip() and not l.startswith('#')]
         return _self
 
 
