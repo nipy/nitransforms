@@ -2,12 +2,12 @@
 import numpy as np
 from scipy.io import savemat as _save_mat
 from nibabel.affines import from_matvec
-from .base import StringBasedStruct, _read_mat, TransformFileError
+from .base import BaseLinearTransformList, LinearParameters, _read_mat, TransformFileError
 
 LPS = np.diag([-1, -1, 1, 1])
 
 
-class ITKLinearTransform(StringBasedStruct):
+class ITKLinearTransform(LinearParameters):
     """A string-based structure for ITK linear transforms."""
 
     template_dtype = np.dtype([
@@ -17,8 +17,6 @@ class ITKLinearTransform(StringBasedStruct):
         ('offset', 'f4', 3),  # Center of rotation
     ])
     dtype = template_dtype
-    # files_types = (('string', '.tfm'), ('binary', '.mat'))
-    # valid_exts = ('.tfm', '.mat')
 
     def __init__(self, parameters=None, offset=None):
         """Initialize with default offset and index."""
@@ -62,7 +60,7 @@ class ITKLinearTransform(StringBasedStruct):
         with open(str(filename), 'w') as f:
             f.write(self.to_string())
 
-    def to_ras(self):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         sa = self.structarr
         matrix = sa['parameters']
@@ -89,6 +87,16 @@ class ITKLinearTransform(StringBasedStruct):
         return cls.from_matlab_dict(mdict, index=index)
 
     @classmethod
+    def from_filename(cls, filename):
+        """Read the struct from a file given its path."""
+        if str(filename).endswith('.mat'):
+            with open(str(filename), 'rb') as fileobj:
+                return cls.from_binary(fileobj)
+
+        with open(str(filename)) as fileobj:
+            return cls.from_string(fileobj.read())
+
+    @classmethod
     def from_fileobj(cls, fileobj, check=True):
         """Read the struct from a file object."""
         if fileobj.name.endswith('.mat'):
@@ -110,7 +118,7 @@ class ITKLinearTransform(StringBasedStruct):
         return tf
 
     @classmethod
-    def from_ras(cls, ras, index=0):
+    def from_ras(cls, ras, index=0, moving=None, reference=None):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         tf = cls()
         sa = tf.structarr
@@ -123,9 +131,11 @@ class ITKLinearTransform(StringBasedStruct):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
-        lines = [l for l in string.splitlines()
+        lines = [l.strip() for l in string.splitlines()
                  if l.strip()]
-        assert lines[0][0] == '#'
+        if not lines or not lines[0].startswith('#'):
+            raise TransformFileError
+
         if lines[1][0] == '#':
             lines = lines[1:]  # Drop banner with version
 
@@ -141,22 +151,10 @@ class ITKLinearTransform(StringBasedStruct):
         return tf
 
 
-class ITKLinearTransformArray(StringBasedStruct):
+class ITKLinearTransformArray(BaseLinearTransformList):
     """A string-based structure for series of ITK linear transforms."""
 
-    template_dtype = np.dtype([('nxforms', 'i4')])
-    dtype = template_dtype
-    _xforms = None
-
-    def __init__(self,
-                 xforms=None,
-                 binaryblock=None,
-                 endianness=None,
-                 check=True):
-        """Initialize with (optionally) a list of transforms."""
-        super().__init__(binaryblock, endianness, check)
-        self.xforms = [ITKLinearTransform(parameters=mat)
-                       for mat in xforms or []]
+    _inner_type = ITKLinearTransform
 
     @property
     def xforms(self):
@@ -166,18 +164,8 @@ class ITKLinearTransformArray(StringBasedStruct):
     @xforms.setter
     def xforms(self, value):
         self._xforms = list(value)
-
-        # Update indexes
         for i, val in enumerate(self.xforms):
             val['index'] = i
-
-    def __getitem__(self, idx):
-        """Allow dictionary access to the transforms."""
-        if idx == 'xforms':
-            return self._xforms
-        if idx == 'nxforms':
-            return len(self._xforms)
-        raise KeyError(idx)
 
     def to_filename(self, filename):
         """Store this transform to a file with the appropriate format."""
@@ -187,7 +175,7 @@ class ITKLinearTransformArray(StringBasedStruct):
         with open(str(filename), 'w') as f:
             f.write(self.to_string())
 
-    def to_ras(self):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
         return np.stack([xfm.to_ras() for xfm in self.xforms])
 
@@ -196,13 +184,24 @@ class ITKLinearTransformArray(StringBasedStruct):
         strings = []
         for i, xfm in enumerate(self.xforms):
             xfm.structarr['index'] = i
-            strings.append(xfm.to_string())
+            strings.append(xfm.to_string(banner=(i == 0)))
         return '\n'.join(strings)
 
     @classmethod
     def from_binary(cls, byte_stream):
         """Read the struct from a matlab binary file."""
         raise TransformFileError("Please use the ITK's new .h5 format.")
+
+    @classmethod
+    def from_filename(cls, filename):
+        """Read the struct from a file given its path."""
+        if str(filename).endswith('.mat'):
+            with open(str(filename), 'rb') as f:
+                return cls.from_binary(f)
+
+        with open(str(filename)) as f:
+            string = f.read()
+        return cls.from_string(string)
 
     @classmethod
     def from_fileobj(cls, fileobj, check=True):
@@ -212,10 +211,18 @@ class ITKLinearTransformArray(StringBasedStruct):
         return cls.from_string(fileobj.read())
 
     @classmethod
-    def from_ras(cls, ras):
-        """Create an ITK affine from a nitransform's RAS+ matrix."""
+    def from_ras(cls, ras, moving=None, reference=None):
+        """
+        Create an ITK affine from a nitransform's RAS+ matrix.
+
+        The moving and reference parameters are included in this
+        method's signature for a consistent API, but they have no
+        effect on this particular method because ITK already uses
+        RAS+ coordinates to describe transfroms internally.
+
+        """
         _self = cls()
-        _self.xforms = [ITKLinearTransform.from_ras(ras[i, ...], i)
+        _self.xforms = [cls._inner_type.from_ras(ras[i, ...], index=i)
                         for i in range(ras.shape[0])]
         return _self
 
@@ -226,11 +233,15 @@ class ITKLinearTransformArray(StringBasedStruct):
         lines = [l.strip() for l in string.splitlines()
                  if l.strip()]
 
-        if lines[0][0] != '#' or 'Insight Transform File V1.0' not in lines[0]:
-            raise ValueError('Unknown Insight Transform File format.')
+        if (
+            not lines or
+            not lines[0].startswith('#') or
+           'Insight Transform File V1.0' not in lines[0]
+           ):
+            raise TransformFileError('Unknown Insight Transform File format.')
 
         string = '\n'.join(lines[1:])
         for xfm in string.split('#')[1:]:
-            _self.xforms.append(ITKLinearTransform.from_string(
+            _self.xforms.append(cls._inner_type.from_string(
                 '#%s' % xfm))
         return _self

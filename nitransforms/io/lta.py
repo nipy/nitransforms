@@ -3,7 +3,7 @@ import numpy as np
 from nibabel.volumeutils import Recoder
 from nibabel.affines import voxel_sizes
 
-from .base import StringBasedStruct, TransformFileError
+from .base import BaseLinearTransformList, StringBasedStruct, TransformFileError
 
 
 transform_codes = Recoder((
@@ -16,6 +16,8 @@ transform_codes = Recoder((
 
 
 class VolumeGeometry(StringBasedStruct):
+    """Data structure for regularly gridded images."""
+
     template_dtype = np.dtype([
         ('valid', 'i4'),              # Valid values: 0, 1
         ('volume', 'i4', (3, 1)),     # width, height, depth
@@ -28,6 +30,7 @@ class VolumeGeometry(StringBasedStruct):
     dtype = template_dtype
 
     def as_affine(self):
+        """Return the internal affine of this regular grid."""
         affine = np.eye(4)
         sa = self.structarr
         A = np.hstack((sa['xras'], sa['yras'], sa['zras'])) * sa['voxelsize']
@@ -36,7 +39,8 @@ class VolumeGeometry(StringBasedStruct):
         affine[:3, [3]] = b
         return affine
 
-    def to_string(self):
+    def __str__(self):
+        """Format the structure as a text file."""
         sa = self.structarr
         lines = [
             'valid = {}  # volume info {:s}valid'.format(
@@ -52,8 +56,13 @@ class VolumeGeometry(StringBasedStruct):
         ]
         return '\n'.join(lines)
 
+    def to_string(self):
+        """Format the structure as a text file."""
+        return self.__str__()
+
     @classmethod
     def from_image(klass, img):
+        """Create struct from an image."""
         volgeom = klass()
         sa = volgeom.structarr
         sa['valid'] = 1
@@ -75,6 +84,7 @@ class VolumeGeometry(StringBasedStruct):
 
     @classmethod
     def from_string(klass, string):
+        """Create a volume structure off of text."""
         volgeom = klass()
         sa = volgeom.structarr
         lines = string.splitlines()
@@ -83,15 +93,21 @@ class VolumeGeometry(StringBasedStruct):
             label, valstring = lines.pop(0).split(' =')
             assert label.strip() == key
 
-            val = np.genfromtxt([valstring.encode()],
-                                dtype=klass.dtype[key])
-            sa[key] = val.reshape(sa[key].shape) if val.size else ''
-
+            val = ''
+            if valstring.strip():
+                parsed = np.genfromtxt([valstring.encode()], autostrip=True,
+                                       dtype=klass.dtype[key])
+                if parsed.size:
+                    val = parsed.reshape(sa[key].shape)
+            sa[key] = val
         return volgeom
 
 
 class LinearTransform(StringBasedStruct):
+    """Represents a single LTA's transform structure."""
+
     template_dtype = np.dtype([
+        ('type', 'i4'),
         ('mean', 'f4', (3, 1)),  # x0, y0, z0
         ('sigma', 'f4'),
         ('m_L', 'f8', (4, 4)),
@@ -103,12 +119,53 @@ class LinearTransform(StringBasedStruct):
     dtype = template_dtype
 
     def __getitem__(self, idx):
+        """Implement dictionary access."""
         val = super(LinearTransform, self).__getitem__(idx)
         if idx in ('src', 'dst'):
             val = VolumeGeometry(val)
         return val
 
+    def set_type(self, new_type):
+        """
+        Convert the internal transformation matrix to a different type inplace.
+
+        Parameters
+        ----------
+        new_type : str, int
+            Tranformation type
+
+        """
+        sa = self.structarr
+        src = VolumeGeometry(sa['src'])
+        dst = VolumeGeometry(sa['dst'])
+        current = sa['type']
+        if isinstance(new_type, str):
+            new_type = transform_codes.code[new_type]
+
+        if current == new_type:
+            return
+
+        # VOX2VOX -> RAS2RAS
+        if (current, new_type) == (0, 1):
+            M = dst.as_affine().dot(sa['m_L'].dot(np.linalg.inv(src.as_affine())))
+            sa['m_L'] = M
+            sa['type'] = new_type
+            return
+
+        raise NotImplementedError(
+            "Converting {0} to {1} is not yet available".format(
+                transform_codes.label[current],
+                transform_codes.label[new_type]
+            )
+        )
+
+    def to_ras(self, moving=None, reference=None):
+        """Return a nitransforms internal RAS+ matrix."""
+        self.set_type(1)
+        return self.structarr['m_L']
+
     def to_string(self):
+        """Convert this transform to text."""
         sa = self.structarr
         lines = [
             'mean      = {:6.4f} {:6.4f} {:6.4f}'.format(
@@ -120,14 +177,15 @@ class LinearTransform(StringBasedStruct):
             ('{:18.15e} ' * 4).format(*sa['m_L'][2]),
             ('{:18.15e} ' * 4).format(*sa['m_L'][3]),
             'src volume info',
-            self['src'].to_string(),
+            str(self['src']),
             'dst volume info',
-            self['dst'].to_string(),
+            str(self['dst']),
         ]
         return '\n'.join(lines)
 
     @classmethod
     def from_string(klass, string):
+        """Read a transform from text."""
         lt = klass()
         sa = lt.structarr
         lines = string.splitlines()
@@ -151,31 +209,32 @@ class LinearTransform(StringBasedStruct):
         return lt
 
 
-class LinearTransformArray(StringBasedStruct):
+class LinearTransformArray(BaseLinearTransformList):
+    """A list of linear transforms generated by FreeSurfer."""
+
     template_dtype = np.dtype([
         ('type', 'i4'),
         ('nxforms', 'i4'),
         ('subject', 'U1024'),
         ('fscale', 'f4')])
     dtype = template_dtype
-    _xforms = None
-
-    def __init__(self,
-                 binaryblock=None,
-                 endianness=None,
-                 check=True):
-        super(LinearTransformArray, self).__init__(binaryblock, endianness, check)
-        self._xforms = [LinearTransform()
-                        for _ in range(self.structarr['nxforms'])]
+    _inner_type = LinearTransform
 
     def __getitem__(self, idx):
+        """Allow dictionary access to the transforms."""
         if idx == 'xforms':
             return self._xforms
         if idx == 'nxforms':
             return len(self._xforms)
-        return super(LinearTransformArray, self).__getitem__(idx)
+        return self.structarr[idx]
+
+    def to_ras(self, moving=None, reference=None):
+        """Set type to RAS2RAS and return the new matrix."""
+        self.structarr['type'] = 1
+        return [xfm.to_ras() for xfm in self.xforms]
 
     def to_string(self):
+        """Convert this LTA into text format."""
         code = int(self['type'])
         header = [
             'type      = {} # {}'.format(code, transform_codes.label[code]),
@@ -188,6 +247,7 @@ class LinearTransformArray(StringBasedStruct):
 
     @classmethod
     def from_string(klass, string):
+        """Read this LTA from a text string."""
         lta = klass()
         sa = lta.structarr
         lines = [l.strip() for l in string.splitlines()
@@ -203,7 +263,8 @@ class LinearTransformArray(StringBasedStruct):
             sa[key] = val.reshape(sa[key].shape) if val.size else ''
         for _ in range(sa['nxforms']):
             lta._xforms.append(
-                LinearTransform.from_string('\n'.join(lines[:25])))
+                klass._inner_type.from_string('\n'.join(lines[:25])))
+            lta._xforms[-1].structarr['type'] = sa['type']
             lines = lines[25:]
         if lines:
             for key in ('subject', 'fscale'):
@@ -223,37 +284,3 @@ class LinearTransformArray(StringBasedStruct):
 
         assert len(lta._xforms) == sa['nxforms']
         return lta
-
-    @classmethod
-    def from_fileobj(klass, fileobj, check=True):
-        return klass.from_string(fileobj.read())
-
-    def set_type(self, target):
-        """
-        Convert the internal transformation matrix to a different type inplace
-
-        Parameters
-        ----------
-        target : str, int
-            Tranformation type
-        """
-        assert self['nxforms'] == 1, "Cannot convert multiple transformations"
-        xform = self['xforms'][0]
-        src = xform['src']
-        dst = xform['dst']
-        current = self['type']
-        if isinstance(target, str):
-            target = transform_codes.code[target]
-
-        # VOX2VOX -> RAS2RAS
-        if current == 0 and target == 1:
-            M = dst.as_affine().dot(xform['m_L'].dot(np.linalg.inv(src.as_affine())))
-        else:
-            raise NotImplementedError(
-                "Converting {0} to {1} is not yet available".format(
-                    transform_codes.label[current],
-                    transform_codes.label[target]
-                )
-            )
-        xform['m_L'] = M
-        self['type'] = target

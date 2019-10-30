@@ -4,16 +4,20 @@
 import numpy as np
 import pytest
 
+import filecmp
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from scipy.io import loadmat, savemat
 from ..io import (
+    afni,
+    fsl,
+    lta as fs,
     itk,
     VolumeGeometry as VG,
     LinearTransform as LT,
     LinearTransformArray as LTA,
 )
-from ..io.base import _read_mat, TransformFileError
+from ..io.base import _read_mat, LinearParameters, TransformFileError
 
 LPS = np.diag([-1, -1, 1, 1])
 ITK_MAT = LPS.dot(np.ones((4, 4)).dot(LPS))
@@ -85,18 +89,115 @@ def test_LT_conversions(data_path):
     v2v_m = v2v['xforms'][0]['m_L']
     assert np.any(r2r_m != v2v_m)
     # convert vox2vox LTA to ras2ras
-    v2v.set_type('LINEAR_RAS_TO_RAS')
-    assert v2v['type'] == 1
+    v2v['xforms'][0].set_type('LINEAR_RAS_TO_RAS')
+    assert v2v['xforms'][0]['type'] == 1
     assert np.allclose(r2r_m, v2v_m, atol=1e-05)
+
+
+@pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
+@pytest.mark.parametrize('image_orientation', [
+    'RAS', 'LAS', 'LPS', 'oblique',
+])
+@pytest.mark.parametrize('sw', ['afni', 'fsl', 'fs', 'itk'])
+def test_Linear_common(tmpdir, data_path, sw, image_orientation,
+                       get_testdata):
+    tmpdir.chdir()
+
+    moving = get_testdata[image_orientation]
+    reference = get_testdata[image_orientation]
+
+    ext = ''
+    if sw == 'afni':
+        factory = afni.AFNILinearTransform
+    elif sw == 'fsl':
+        factory = fsl.FSLLinearTransform
+    elif sw == 'itk':
+        reference = None
+        moving = None
+        ext = '.tfm'
+        factory = itk.ITKLinearTransform
+    elif sw == 'fs':
+        ext = '.lta'
+        factory = fs.LinearTransformArray
+
+    with pytest.raises(TransformFileError):
+        factory.from_string('')
+
+    fname = 'affine-%s.%s%s' % (image_orientation, sw, ext)
+
+    # Test the transform loaders are implemented
+    xfm = factory.from_filename(data_path / fname)
+
+    with open(str(data_path / fname)) as f:
+        text = f.read()
+        f.seek(0)
+        xfm = factory.from_fileobj(f)
+
+    # Test to_string
+    assert text == xfm.to_string()
+
+    xfm.to_filename(fname)
+    assert filecmp.cmp(fname, str((data_path / fname).resolve()))
+
+    # Test from_ras
+    RAS = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+    xfm = factory.from_ras(RAS, reference=reference, moving=moving)
+    assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
+
+
+@pytest.mark.parametrize('image_orientation', [
+    'RAS', 'LAS', 'LPS', 'oblique',
+])
+@pytest.mark.parametrize('sw', ['afni', 'fsl', 'itk'])
+def test_LinearList_common(tmpdir, data_path, sw, image_orientation,
+                           get_testdata):
+    tmpdir.chdir()
+
+    angles = np.random.uniform(low=-3.14, high=3.14, size=(5, 3))
+    translation = np.random.uniform(low=-5., high=5., size=(5, 3))
+    mats = [from_matvec(euler2mat(*a), t)
+            for a, t in zip(angles, translation)]
+
+    ext = ''
+    if sw == 'afni':
+        factory = afni.AFNILinearTransformArray
+    elif sw == 'fsl':
+        factory = fsl.FSLLinearTransformArray
+    elif sw == 'itk':
+        ext = '.tfm'
+        factory = itk.ITKLinearTransformArray
+
+    tflist1 = factory(mats)
+
+    fname = 'affine-%s.%s%s' % (image_orientation, sw, ext)
+
+    with pytest.raises(FileNotFoundError):
+        factory.from_filename(fname)
+
+    tmpdir.join('singlemat.%s' % ext).write('')
+    with pytest.raises(TransformFileError):
+        factory.from_filename('singlemat.%s' % ext)
+
+    tflist1.to_filename(fname)
+    tflist2 = factory.from_filename(fname)
+
+    assert tflist1['nxforms'] == tflist2['nxforms']
+    assert all([np.allclose(x1['parameters'], x2['parameters'])
+                for x1, x2 in zip(tflist1.xforms, tflist2.xforms)])
 
 
 def test_ITKLinearTransform(tmpdir, data_path):
     tmpdir.chdir()
 
-    matlabfile = str(data_path / 'ds-005_sub-01_from-T1_to-OASIS_affine.mat')
-    mat = loadmat(matlabfile)
-    with open(matlabfile, 'rb') as f:
+    matlabfile = data_path / 'ds-005_sub-01_from-T1_to-OASIS_affine.mat'
+    mat = loadmat(str(matlabfile))
+    with open(str(matlabfile), 'rb') as f:
         itkxfm = itk.ITKLinearTransform.from_fileobj(f)
+    assert np.allclose(itkxfm['parameters'][:3, :3].flatten(),
+                       mat['AffineTransform_float_3_3'][:-3].flatten())
+    assert np.allclose(itkxfm['offset'], mat['fixed'].reshape((3, )))
+
+    itkxfm = itk.ITKLinearTransform.from_filename(matlabfile)
     assert np.allclose(itkxfm['parameters'][:3, :3].flatten(),
                        mat['AffineTransform_float_3_3'][:-3].flatten())
     assert np.allclose(itkxfm['offset'], mat['fixed'].reshape((3, )))
@@ -116,6 +217,7 @@ def test_ITKLinearTransform(tmpdir, data_path):
     rasmat = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
     itkxfm = itk.ITKLinearTransform.from_ras(rasmat)
     assert np.allclose(itkxfm['parameters'], ITK_MAT * rasmat)
+    assert np.allclose(itkxfm.to_ras(), rasmat)
 
 
 def test_ITKLinearTransformArray(tmpdir, data_path):
@@ -126,9 +228,19 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
         f.seek(0)
         itklist = itk.ITKLinearTransformArray.from_fileobj(f)
 
+    itklistb = itk.ITKLinearTransformArray.from_filename(
+        data_path / 'itktflist.tfm')
+    assert itklist['nxforms'] == itklistb['nxforms']
+    assert all([np.allclose(x1['parameters'], x2['parameters'])
+                for x1, x2 in zip(itklist.xforms, itklistb.xforms)])
+
+    tmpdir.join('empty.mat').write('')
+    with pytest.raises(TransformFileError):
+        itklistb.from_filename('empty.mat')
+
     assert itklist['nxforms'] == 9
     assert text == itklist.to_string()
-    with pytest.raises(ValueError):
+    with pytest.raises(TransformFileError):
         itk.ITKLinearTransformArray.from_string(
             '\n'.join(text.splitlines()[1:]))
 
@@ -169,6 +281,17 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
             xfm2 = itk.ITKLinearTransformArray.from_fileobj(f)
 
 
+def test_LinearParameters(tmpdir):
+    """Just pushes coverage up."""
+    tmpdir.join('file.txt').write('')
+
+    with pytest.raises(NotImplementedError):
+        LinearParameters.from_string('')
+
+    with pytest.raises(NotImplementedError):
+        LinearParameters.from_fileobj(tmpdir.join('file.txt').open())
+
+
 @pytest.mark.parametrize('matlab_ver', ['4', '5'])
 def test_read_mat1(tmpdir, matlab_ver):
     """Test read from matlab."""
@@ -182,15 +305,16 @@ def test_read_mat1(tmpdir, matlab_ver):
     assert np.all(mdict['val'] == np.ones((3,)))
 
 
-def test_read_mat2(tmpdir, monkeypatch):
+@pytest.mark.parametrize('matlab_ver', [-1] + list(range(2, 7)))
+def test_read_mat2(tmpdir, monkeypatch, matlab_ver):
     """Check read matlab raises adequate errors."""
     from ..io import base
 
-    def _mockreturn(arg):
-        return (2, 0)
-
     tmpdir.chdir()
     savemat('val.mat', {'val': np.ones((3,))})
+
+    def _mockreturn(arg):
+        return (matlab_ver, 0)
 
     with monkeypatch.context() as m:
         m.setattr(base, 'get_matfile_version', _mockreturn)

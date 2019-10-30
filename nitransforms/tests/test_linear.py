@@ -11,8 +11,7 @@ import h5py
 import nibabel as nb
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
-from nibabel.tmpdirs import InTemporaryDirectory
-from .. import linear as nbl
+from .. import linear as ntl
 from .utils import assert_affines_by_filename
 
 TESTS_BORDER_TOLERANCE = 0.05
@@ -33,66 +32,15 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 
 
 @pytest.mark.xfail(reason="Not fully implemented")
-@pytest.mark.parametrize('image_orientation', [
-    'RAS', 'LAS', 'LPS',  # 'oblique',
-])
+@pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
-def test_linear_load(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
-    """Check implementation of loading affines from formats."""
-    tmpdir.chdir()
-
-    img = get_testdata[image_orientation]
-    img.to_filename('img.nii.gz')
-
-    # Generate test transform
-    T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
-    xfm = nbl.Affine(T)
-    xfm.reference = img
-
-    ext = ''
-    if sw_tool == 'itk':
-        ext = '.tfm'
-    elif sw_tool == 'fs':
-        ext = '.lta'
-
-    fname = 'affine-%s.%s%s' % (image_orientation, sw_tool, ext)
-    xfm_fname = str(data_path / fname)
-    fmt = fname.split('.')[-1]
-
-    if sw_tool == 'fsl':
-        with pytest.raises(ValueError):
-            loaded = nbl.load(xfm_fname, fmt=fmt)
-        with pytest.raises(ValueError):
-            loaded = nbl.load(xfm_fname, fmt=fmt, reference='img.nii.gz')
-        with pytest.raises(ValueError):
-            loaded = nbl.load(xfm_fname, fmt=fmt, moving='img.nii.gz')
-
-        loaded = nbl.load(
-            xfm_fname, fmt=fmt, moving='img.nii.gz', reference='img.nii.gz'
-        )
-    elif sw_tool == 'afni':
-        with pytest.raises(ValueError):
-            loaded = nbl.load(xfm_fname, fmt=fmt)
-
-        loaded = nbl.load(xfm_fname, fmt=fmt, reference='img.nii.gz')
-    elif sw_tool == 'itk':
-        loaded = nbl.load(xfm_fname, fmt=fmt)
-    elif sw_tool == 'fs':
-        loaded = nbl.load(xfm_fname, fmt=fmt)
-
-    assert loaded == xfm
-
-
-@pytest.mark.parametrize('image_orientation', [
-    'RAS', 'LAS', 'LPS',  # 'oblique',
-])
-@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
-def test_linear_save(data_path, get_testdata, image_orientation, sw_tool):
+def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
+    tmpdir.chdir()
     img = get_testdata[image_orientation]
     # Generate test transform
     T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
-    xfm = nbl.Affine(T)
+    xfm = ntl.Affine(T)
     xfm.reference = img
 
     ext = ''
@@ -101,13 +49,12 @@ def test_linear_save(data_path, get_testdata, image_orientation, sw_tool):
     elif sw_tool == 'fs':
         ext = '.lta'
 
-    with InTemporaryDirectory():
-        xfm_fname1 = 'M.%s%s' % (sw_tool, ext)
-        xfm.to_filename(xfm_fname1, fmt=sw_tool)
+    xfm_fname1 = 'M.%s%s' % (sw_tool, ext)
+    xfm.to_filename(xfm_fname1, fmt=sw_tool)
 
-        xfm_fname2 = str(data_path / 'affine-%s.%s%s') % (
-            image_orientation, sw_tool, ext)
-        assert_affines_by_filename(xfm_fname1, xfm_fname2)
+    xfm_fname2 = str(data_path / 'affine-%s.%s%s') % (
+        image_orientation, sw_tool, ext)
+    assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 
 @pytest.mark.parametrize('image_orientation', [
@@ -116,7 +63,6 @@ def test_linear_save(data_path, get_testdata, image_orientation, sw_tool):
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
 def test_apply_linear_transform(
         tmpdir,
-        data_path,
         get_testdata,
         image_orientation,
         sw_tool
@@ -127,7 +73,7 @@ def test_apply_linear_transform(
     img = get_testdata[image_orientation]
     # Generate test transform
     T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
-    xfm = nbl.Affine(T)
+    xfm = ntl.Affine(T)
     xfm.reference = img
 
     ext = ''
@@ -158,7 +104,13 @@ def test_apply_linear_transform(
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
 
 
-def test_Affine(tmpdir):
+def test_Affine_to_x5(tmpdir, data_path):
     """Test affine's operations."""
+    tmpdir.chdir()
+    aff = ntl.Affine()
     with h5py.File('xfm.x5', 'w') as f:
-        nbl.Affine()._to_hdf5(f.create_group('Affine'))
+        aff._to_hdf5(f.create_group('Affine'))
+
+    aff.reference = data_path / 'someones_anatomy.nii.gz'
+    with h5py.File('withref-xfm.x5', 'w') as f:
+        aff._to_hdf5(f.create_group('Affine'))
