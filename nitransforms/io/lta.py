@@ -177,9 +177,9 @@ class LinearTransform(StringBasedStruct):
             ('{:18.15e} ' * 4).format(*sa['m_L'][2]),
             ('{:18.15e} ' * 4).format(*sa['m_L'][3]),
             'src volume info',
-            '%s' % self['src'],
+            str(self['src']),
             'dst volume info',
-            '%s' % self['dst'],
+            str(self['dst']),
         ]
         return '\n'.join(lines)
 

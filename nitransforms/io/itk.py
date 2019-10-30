@@ -212,7 +212,15 @@ class ITKLinearTransformArray(BaseLinearTransformList):
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
-        """Create an ITK affine from a nitransform's RAS+ matrix."""
+        """
+        Create an ITK affine from a nitransform's RAS+ matrix.
+
+        The moving and reference parameters are included in this
+        method's signature for a consistent API, but they have no
+        effect on this particular method because ITK already uses
+        RAS+ coordinates to describe transfroms internally.
+
+        """
         _self = cls()
         _self.xforms = [cls._inner_type.from_ras(ras[i, ...], index=i)
                         for i in range(ras.shape[0])]
@@ -225,8 +233,11 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         lines = [l.strip() for l in string.splitlines()
                  if l.strip()]
 
-        if not lines or not lines[0].startswith('#') or \
-           'Insight Transform File V1.0' not in lines[0]:
+        if (
+            not lines or
+            not lines[0].startswith('#') or
+           'Insight Transform File V1.0' not in lines[0]
+           ):
             raise TransformFileError('Unknown Insight Transform File format.')
 
         string = '\n'.join(lines[1:])

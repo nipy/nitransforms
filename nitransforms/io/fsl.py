@@ -103,7 +103,14 @@ class FSLLinearTransformArray(BaseLinearTransformList):
 
     @classmethod
     def from_filename(cls, filename):
-        """Read the struct from a file given its path."""
+        """
+        Read the struct from a file given its path.
+
+        If the file does not exist, then indexed names
+        with the zero-padded suffix ``.NNN`` are
+        attempted, following FSL's MCFLIRT conventions.
+
+        """
         if os.path.exists(str(filename)):
             return super().from_filename(filename)
 
