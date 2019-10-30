@@ -4,10 +4,14 @@
 import numpy as np
 import pytest
 
+import filecmp
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from scipy.io import loadmat, savemat
 from ..io import (
+    afni,
+    fsl,
+    lta as fs,
     itk,
     VolumeGeometry as VG,
     LinearTransform as LT,
@@ -85,9 +89,45 @@ def test_LT_conversions(data_path):
     v2v_m = v2v['xforms'][0]['m_L']
     assert np.any(r2r_m != v2v_m)
     # convert vox2vox LTA to ras2ras
-    v2v.set_type('LINEAR_RAS_TO_RAS')
-    assert v2v['type'] == 1
+    v2v['xforms'][0].set_type('LINEAR_RAS_TO_RAS')
+    assert v2v['xforms'][0]['type'] == 1
     assert np.allclose(r2r_m, v2v_m, atol=1e-05)
+
+
+@pytest.mark.xfail(raises=FileNotFoundError)
+@pytest.mark.parametrize('image_orientation', [
+    'RAS', 'LAS', 'LPS', 'oblique',
+])
+@pytest.mark.parametrize('sw', ['afni', 'fsl', 'fs', 'itk'])
+def test_Linear_common(tmpdir, data_path, sw, image_orientation):
+    tmpdir.chdir()
+
+    ext = ''
+    if sw == 'afni':
+        factory = afni.AFNILinearTransform
+    elif sw == 'fsl':
+        factory = fsl.FSLLinearTransform
+    elif sw == 'itk':
+        ext = '.tfm'
+        factory = itk.ITKLinearTransform
+    elif sw == 'fs':
+        ext = '.lta'
+        factory = fs.LinearTransformArray
+
+    fname = 'affine-%s.%s%s' % (image_orientation, sw, ext)
+
+    # Test the transform loaders are implemented
+    xfm = factory.from_filename(data_path / fname)
+
+    with open(str(data_path / fname)) as f:
+        xfm = factory.from_fileobj(f)
+
+    xfm.to_filename(fname)
+    assert filecmp.cmp(fname, str((data_path / fname).resolve()))
+
+    # Generate test transform
+    # T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+    # Test from_ras
 
 
 def test_ITKLinearTransform(tmpdir, data_path):

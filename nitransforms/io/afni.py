@@ -64,9 +64,10 @@ class AFNILinearTransform(LinearParameters):
         if '3dvolreg matrices' in lines[0]:
             lines = lines[1:]  # Drop header
 
-        parameters = np.eye(4, dtype='f4')
-        parameters[:3, :] = np.genfromtxt(
-            [lines[0].encode()], dtype=cls.dtype['parameters'])
+        parameters = np.vstack((
+            np.genfromtxt([lines[0].encode()],
+                          dtype='f8').reshape((3, 4)),
+            (0., 0., 0., 1.)))
         sa['parameters'] = parameters
         return tf
 

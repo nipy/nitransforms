@@ -174,30 +174,21 @@ class Affine(TransformBase):
 
         raise NotImplementedError
 
+    @classmethod
+    def from_filename(cls, filename, fmt='X5',
+                      reference=None, moving=None):
+        """Create an affine from a transform file."""
+        if fmt.lower() in ('itk', 'ants', 'elastix'):
+            _factory = io.itk.ITKLinearTransformArray
+        elif fmt.lower() in ('lta', 'fs'):
+            _factory = io.LinearTransformArray
+        else:
+            raise NotImplementedError
 
-def load(filename, fmt='X5', reference=None):
-    """Load a linear transform."""
-    if fmt.lower() in ('itk', 'ants', 'elastix'):
-        with open(filename) as itkfile:
-            itkxfm = io.itk.ITKLinearTransformArray.from_fileobj(
-                itkfile)
-        matrix = itkxfm.to_ras()
-    # elif fmt.lower() == 'afni':
-    #     parameters = LPS.dot(self.matrix.dot(LPS))
-    #     parameters = parameters[:3, :].reshape(-1).tolist()
-    elif fmt.lower() == 'fs':
-        with open(filename) as ltafile:
-            lta = io.LinearTransformArray.from_fileobj(ltafile)
-        if lta['nxforms'] > 1:
-            raise NotImplementedError("Multiple transforms are not yet supported.")
-        if lta['type'] != 1:
-            # To make transforms generalize across use-cases, LTA transforms
-            # are converted to RAS-to-RAS.
-            lta.set_type(1)
-        matrix = lta['xforms'][0]['m_L']
-    elif fmt.lower() in ('x5', 'bids'):
-        raise NotImplementedError
-    else:
-        raise NotImplementedError
+        struct = _factory.from_filename(filename)
+        matrix = struct.to_ras(reference=reference, moving=moving)
 
-    return Affine(matrix, reference=reference)
+        return cls(matrix, reference=reference)
+
+
+load = Affine.from_filename

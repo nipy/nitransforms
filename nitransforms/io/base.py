@@ -69,6 +69,13 @@ class LinearParameters(StringBasedStruct):
         raise NotImplementedError
 
     @classmethod
+    def from_filename(cls, filename):
+        """Read the struct from a file given its path."""
+        with open(str(filename)) as f:
+            string = f.read()
+        return cls.from_string(string)
+
+    @classmethod
     def from_fileobj(cls, fileobj, check=True):
         """Read the struct from a file object."""
         return cls.from_string(fileobj.read())
@@ -126,6 +133,13 @@ class BaseLinearTransformList(StringBasedStruct):
     def to_string(self):
         """Convert to a string directly writeable to file."""
         raise NotImplementedError
+
+    @classmethod
+    def from_filename(cls, filename):
+        """Read the struct from a file given its path."""
+        with open(str(filename)) as f:
+            string = f.read()
+        return cls.from_string(string)
 
     @classmethod
     def from_fileobj(cls, fileobj, check=True):

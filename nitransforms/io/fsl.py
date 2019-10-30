@@ -1,5 +1,4 @@
 """Read/write FSL's transforms."""
-from io import StringIO
 import numpy as np
 from nibabel.affines import voxel_sizes
 
@@ -11,16 +10,13 @@ class FSLLinearTransform(LinearParameters):
 
     def __str__(self):
         """Generate a string representation."""
-        param = self.structarr['parameters']
-        return '\t'.join(['%g' % p for p in param[:3, :].reshape(-1)])
+        lines = [' '.join(['%g' % col for col in row])
+                 for row in self.structarr['parameters']]
+        return '\n'.join(lines + [''])
 
     def to_string(self):
         """Convert to a string directly writeable to file."""
-        with StringIO() as f:
-            np.savetxt(f, self.structarr['parameters'],
-                       delimiter=' ', fmt='%g')
-            string = f.getvalue()
-        return string
+        return self.__str__()
 
     @classmethod
     def from_ras(cls, ras, moving, reference):
@@ -48,8 +44,8 @@ class FSLLinearTransform(LinearParameters):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
-        parameters = np.genfromtxt(string, dtype=cls.dtype['parameters'])
-        sa['parameters'] = parameters
+        sa['parameters'] = np.genfromtxt(
+            [string], dtype=cls.dtype['parameters'])
         return tf
 
 

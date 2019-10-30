@@ -181,6 +181,17 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         raise TransformFileError("Please use the ITK's new .h5 format.")
 
     @classmethod
+    def from_filename(cls, filename):
+        """Read the struct from a file given its path."""
+        if str(filename).endswith('.mat'):
+            with open(str(filename), 'b') as f:
+                return cls.from_binary(f)
+
+        with open(str(filename)) as f:
+            string = f.read()
+        return cls.from_string(string)
+
+    @classmethod
     def from_fileobj(cls, fileobj, check=True):
         """Read the struct from a file object."""
         if fileobj.name.endswith('.mat'):
