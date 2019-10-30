@@ -120,13 +120,21 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation,
         ext = '.lta'
         factory = fs.LinearTransformArray
 
+    with pytest.raises(TransformFileError):
+        factory.from_string('')
+
     fname = 'affine-%s.%s%s' % (image_orientation, sw, ext)
 
     # Test the transform loaders are implemented
     xfm = factory.from_filename(data_path / fname)
 
     with open(str(data_path / fname)) as f:
+        text = f.read()
+        f.seek(0)
         xfm = factory.from_fileobj(f)
+
+    # Test to_string
+    assert text == xfm.to_string()
 
     xfm.to_filename(fname)
     assert filecmp.cmp(fname, str((data_path / fname).resolve()))
@@ -142,7 +150,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation,
 ])
 @pytest.mark.parametrize('sw', ['afni', 'fsl', 'itk'])
 def test_LinearList_common(tmpdir, data_path, sw, image_orientation,
-                       get_testdata):
+                           get_testdata):
     tmpdir.chdir()
 
     angles = np.random.uniform(low=-3.14, high=3.14, size=(5, 3))
@@ -162,12 +170,21 @@ def test_LinearList_common(tmpdir, data_path, sw, image_orientation,
     tflist1 = factory(mats)
 
     fname = 'affine-%s.%s%s' % (image_orientation, sw, ext)
+
+    with pytest.raises(FileNotFoundError):
+        factory.from_filename(fname)
+
+    tmpdir.join('singlemat.%s' % ext).write('')
+    with pytest.raises(TransformFileError):
+        factory.from_filename('singlemat.%s' % ext)
+
     tflist1.to_filename(fname)
     tflist2 = factory.from_filename(fname)
 
     assert tflist1['nxforms'] == tflist2['nxforms']
     assert all([np.allclose(x1['parameters'], x2['parameters'])
                 for x1, x2 in zip(tflist1.xforms, tflist2.xforms)])
+
 
 def test_ITKLinearTransform(tmpdir, data_path):
     tmpdir.chdir()
@@ -223,7 +240,7 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
 
     assert itklist['nxforms'] == 9
     assert text == itklist.to_string()
-    with pytest.raises(ValueError):
+    with pytest.raises(TransformFileError):
         itk.ITKLinearTransformArray.from_string(
             '\n'.join(text.splitlines()[1:]))
 

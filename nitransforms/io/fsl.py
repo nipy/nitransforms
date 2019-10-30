@@ -3,7 +3,7 @@ import os
 import numpy as np
 from nibabel.affines import voxel_sizes
 
-from .base import BaseLinearTransformList, LinearParameters
+from .base import BaseLinearTransformList, LinearParameters, TransformFileError
 
 
 class FSLLinearTransform(LinearParameters):
@@ -45,8 +45,14 @@ class FSLLinearTransform(LinearParameters):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
+        lines = [l.strip() for l in string.splitlines()
+                 if l.strip()]
+        if not lines or len(lines) < 4:
+            raise TransformFileError
+
+        print(lines)
         sa['parameters'] = np.genfromtxt(
-            [string], dtype=cls.dtype['parameters'])
+            ['\n'.join(lines)], dtype=cls.dtype['parameters'])
         return tf
 
 
@@ -92,8 +98,7 @@ class FSLLinearTransformArray(BaseLinearTransformList):
     def from_string(cls, string):
         """Read the struct from string."""
         _self = cls()
-        _self.xforms = [cls._inner_type.from_string(l.strip())
-                        for l in string.splitlines() if l.strip()]
+        _self.xforms = [cls._inner_type.from_string(string)]
         return _self
 
     @classmethod

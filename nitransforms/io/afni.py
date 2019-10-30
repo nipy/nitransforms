@@ -4,7 +4,7 @@ import numpy as np
 from nibabel.affines import obliquity, voxel_sizes
 
 from ..patched import shape_zoom_affine
-from .base import BaseLinearTransformList, LinearParameters
+from .base import BaseLinearTransformList, LinearParameters, TransformFileError
 
 LPS = np.diag([-1, -1, 1, 1])
 OBLIQUITY_THRESHOLD_DEG = 0.01
@@ -58,14 +58,14 @@ class AFNILinearTransform(LinearParameters):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
-        lines = [l for l in string.splitlines()
-                 if l.strip() and not l.startswith('#')]
-
-        if '3dvolreg matrices' in lines[0]:
-            lines = lines[1:]  # Drop header
+        lines = [
+            l for l in string.splitlines()
+            if l.strip() and not (l.startswith('#') or '3dvolreg matrices' in l)
+        ]
 
         if not lines:
-            raise ValueError('String "%s"' % string)
+            raise TransformFileError
+
         parameters = np.vstack((
             np.genfromtxt([lines[0].encode()],
                           dtype='f8').reshape((3, 4)),
@@ -108,9 +108,14 @@ class AFNILinearTransformArray(BaseLinearTransformList):
     def from_string(cls, string):
         """Read the struct from string."""
         _self = cls()
-        _self.xforms = [cls._inner_type.from_string(l.strip())
-                        for l in string.splitlines()
-                        if l.strip() and not l.startswith('#')]
+
+        lines = [l.strip() for l in string.splitlines()
+                 if l.strip() and not l.startswith('#')]
+        if not lines:
+            raise TransformFileError('Input string is empty.')
+
+        _self.xforms = [cls._inner_type.from_string(l)
+                        for l in lines]
         return _self
 
 

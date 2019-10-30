@@ -225,13 +225,13 @@ class TransformBase(object):
 
         """
         if reference is not None and isinstance(reference, (str, Path)):
-            reference = load(reference)
+            reference = load(str(reference))
 
         _ref = self.reference if reference is None \
             else SpatialReference.factory(reference)
 
         if isinstance(spatialimage, (str, Path)):
-            spatialimage = load(spatialimage)
+            spatialimage = load(str(spatialimage))
 
         data = np.asanyarray(spatialimage.dataobj)
         output_dtype = output_dtype or data.dtype

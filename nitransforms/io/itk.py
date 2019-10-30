@@ -131,9 +131,11 @@ class ITKLinearTransform(LinearParameters):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
-        lines = [l for l in string.splitlines()
+        lines = [l.strip() for l in string.splitlines()
                  if l.strip()]
-        assert lines[0][0] == '#'
+        if not lines or not lines[0].startswith('#'):
+            raise TransformFileError
+
         if lines[1][0] == '#':
             lines = lines[1:]  # Drop banner with version
 
@@ -182,7 +184,7 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         strings = []
         for i, xfm in enumerate(self.xforms):
             xfm.structarr['index'] = i
-            strings.append(xfm.to_string())
+            strings.append(xfm.to_string(banner=(i == 0)))
         return '\n'.join(strings)
 
     @classmethod
@@ -223,8 +225,9 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         lines = [l.strip() for l in string.splitlines()
                  if l.strip()]
 
-        if lines[0][0] != '#' or 'Insight Transform File V1.0' not in lines[0]:
-            raise ValueError('Unknown Insight Transform File format.')
+        if not lines or not lines[0].startswith('#') or \
+           'Insight Transform File V1.0' not in lines[0]:
+            raise TransformFileError('Unknown Insight Transform File format.')
 
         string = '\n'.join(lines[1:])
         for xfm in string.split('#')[1:]:
