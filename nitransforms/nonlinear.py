@@ -22,19 +22,17 @@ class DisplacementsFieldTransform(TransformBase):
 
     def __init__(self, field, reference=None):
         """Create a dense deformation field transform."""
-        super(DisplacementsFieldTransform, self).__init__()
+        super().__init__()
         self._field = np.asanyarray(field.dataobj)
 
         ndim = self._field.ndim - 1
-        if len(self._field.shape[:-1]) != ndim:
+        if self._field.shape[-1] != ndim:
             raise ValueError(
-                'Number of components of the deformation field does '
-                'not match the number of dimensions')
+                'The number of components of the displacements (%d) does not '
+                'the number of dimensions (%d)' % (self._field.shape[-1], ndim))
 
-        if reference is None:
-            reference = field.__class__(np.zeros(self._field.shape[:-1]),
-                                        field.affine, field.header)
-        self.reference = reference
+        self.reference = field.__class__(np.zeros(self._field.shape[:-1]),
+                                         field.affine, field.header)
 
     def map(self, x, inverse=False, index=0):
         r"""
