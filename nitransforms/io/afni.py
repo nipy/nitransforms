@@ -27,7 +27,7 @@ class AFNILinearTransform(LinearParameters):
         return string % self
 
     @classmethod
-    def from_ras(cls, ras, moving, reference):
+    def from_ras(cls, ras, moving=None, reference=None):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         ras = ras.copy()
         pre = LPS.copy()
@@ -77,7 +77,7 @@ class AFNILinearTransformArray(BaseLinearTransformList):
 
     _inner_type = AFNILinearTransform
 
-    def to_ras(self, moving, reference):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
         return np.stack([xfm.to_ras(moving=moving, reference=reference)
                          for xfm in self.xforms])
@@ -90,7 +90,7 @@ class AFNILinearTransformArray(BaseLinearTransformList):
         return '\n'.join(strings)
 
     @classmethod
-    def from_ras(cls, ras, moving, reference):
+    def from_ras(cls, ras, moving=None, reference=None):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         _self = cls()
         _self.xforms = [cls._inner_type.from_ras(

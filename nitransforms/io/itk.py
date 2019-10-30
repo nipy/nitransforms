@@ -60,7 +60,7 @@ class ITKLinearTransform(LinearParameters):
         with open(str(filename), 'w') as f:
             f.write(self.to_string())
 
-    def to_ras(self):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         sa = self.structarr
         matrix = sa['parameters']
@@ -108,7 +108,7 @@ class ITKLinearTransform(LinearParameters):
         return tf
 
     @classmethod
-    def from_ras(cls, ras, index=0):
+    def from_ras(cls, ras, index=0, moving=None, reference=None):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         tf = cls()
         sa = tf.structarr
@@ -163,7 +163,7 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         with open(str(filename), 'w') as f:
             f.write(self.to_string())
 
-    def to_ras(self):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
         return np.stack([xfm.to_ras() for xfm in self.xforms])
 
@@ -199,10 +199,10 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         return cls.from_string(fileobj.read())
 
     @classmethod
-    def from_ras(cls, ras):
+    def from_ras(cls, ras, moving=None, reference=None):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         _self = cls()
-        _self.xforms = [cls._inner_type.from_ras(ras[i, ...], i)
+        _self.xforms = [cls._inner_type.from_ras(ras[i, ...], index=i)
                         for i in range(ras.shape[0])]
         return _self
 

@@ -159,7 +159,7 @@ class LinearTransform(StringBasedStruct):
             )
         )
 
-    def to_ras(self):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         self.set_type(1)
         return self.structarr['m_L']

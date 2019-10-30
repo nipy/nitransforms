@@ -64,7 +64,7 @@ class LinearParameters(StringBasedStruct):
         with open(str(filename), 'w') as f:
             f.write(self.to_string())
 
-    def to_ras(self):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         raise NotImplementedError
 
@@ -126,7 +126,7 @@ class BaseLinearTransformList(StringBasedStruct):
         with open(str(filename), 'w') as f:
             f.write(self.to_string())
 
-    def to_ras(self, moving, reference):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
         raise NotImplementedError
 
@@ -147,7 +147,7 @@ class BaseLinearTransformList(StringBasedStruct):
         return cls.from_string(fileobj.read())
 
     @classmethod
-    def from_ras(cls, ras, moving, reference):
+    def from_ras(cls, ras, moving=None, reference=None):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         raise NotImplementedError
 

@@ -94,13 +94,17 @@ def test_LT_conversions(data_path):
     assert np.allclose(r2r_m, v2v_m, atol=1e-05)
 
 
-@pytest.mark.xfail(raises=FileNotFoundError)
+@pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
 @pytest.mark.parametrize('image_orientation', [
     'RAS', 'LAS', 'LPS', 'oblique',
 ])
 @pytest.mark.parametrize('sw', ['afni', 'fsl', 'fs', 'itk'])
-def test_Linear_common(tmpdir, data_path, sw, image_orientation):
+def test_Linear_common(tmpdir, data_path, sw, image_orientation,
+                       get_testdata):
     tmpdir.chdir()
+
+    moving = get_testdata[image_orientation]
+    reference = get_testdata[image_orientation]
 
     ext = ''
     if sw == 'afni':
@@ -108,6 +112,8 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation):
     elif sw == 'fsl':
         factory = fsl.FSLLinearTransform
     elif sw == 'itk':
+        reference = None
+        moving = None
         ext = '.tfm'
         factory = itk.ITKLinearTransform
     elif sw == 'fs':
@@ -125,9 +131,10 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation):
     xfm.to_filename(fname)
     assert filecmp.cmp(fname, str((data_path / fname).resolve()))
 
-    # Generate test transform
-    # T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
     # Test from_ras
+    RAS = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+    xfm = factory.from_ras(RAS, reference=reference, moving=moving)
+    assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
 
 
 def test_ITKLinearTransform(tmpdir, data_path):
@@ -156,6 +163,7 @@ def test_ITKLinearTransform(tmpdir, data_path):
     rasmat = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
     itkxfm = itk.ITKLinearTransform.from_ras(rasmat)
     assert np.allclose(itkxfm['parameters'], ITK_MAT * rasmat)
+    assert np.allclose(itkxfm.to_ras(), rasmat)
 
 
 def test_ITKLinearTransformArray(tmpdir, data_path):
