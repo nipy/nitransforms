@@ -87,6 +87,16 @@ class ITKLinearTransform(LinearParameters):
         return cls.from_matlab_dict(mdict, index=index)
 
     @classmethod
+    def from_filename(cls, filename):
+        """Read the struct from a file given its path."""
+        if str(filename).endswith('.mat'):
+            with open(str(filename), 'rb') as fileobj:
+                return cls.from_binary(fileobj)
+
+        with open(str(filename)) as fileobj:
+            return cls.from_string(fileobj.read())
+
+    @classmethod
     def from_fileobj(cls, fileobj, check=True):
         """Read the struct from a file object."""
         if fileobj.name.endswith('.mat'):
@@ -184,7 +194,7 @@ class ITKLinearTransformArray(BaseLinearTransformList):
     def from_filename(cls, filename):
         """Read the struct from a file given its path."""
         if str(filename).endswith('.mat'):
-            with open(str(filename), 'b') as f:
+            with open(str(filename), 'rb') as f:
                 return cls.from_binary(f)
 
         with open(str(filename)) as f:

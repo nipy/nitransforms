@@ -140,10 +140,15 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation,
 def test_ITKLinearTransform(tmpdir, data_path):
     tmpdir.chdir()
 
-    matlabfile = str(data_path / 'ds-005_sub-01_from-T1_to-OASIS_affine.mat')
-    mat = loadmat(matlabfile)
-    with open(matlabfile, 'rb') as f:
+    matlabfile = data_path / 'ds-005_sub-01_from-T1_to-OASIS_affine.mat'
+    mat = loadmat(str(matlabfile))
+    with open(str(matlabfile), 'rb') as f:
         itkxfm = itk.ITKLinearTransform.from_fileobj(f)
+    assert np.allclose(itkxfm['parameters'][:3, :3].flatten(),
+                       mat['AffineTransform_float_3_3'][:-3].flatten())
+    assert np.allclose(itkxfm['offset'], mat['fixed'].reshape((3, )))
+
+    itkxfm = itk.ITKLinearTransform.from_filename(matlabfile)
     assert np.allclose(itkxfm['parameters'][:3, :3].flatten(),
                        mat['AffineTransform_float_3_3'][:-3].flatten())
     assert np.allclose(itkxfm['offset'], mat['fixed'].reshape((3, )))
@@ -173,6 +178,16 @@ def test_ITKLinearTransformArray(tmpdir, data_path):
         text = f.read()
         f.seek(0)
         itklist = itk.ITKLinearTransformArray.from_fileobj(f)
+
+    itklistb = itk.ITKLinearTransformArray.from_filename(
+        data_path / 'itktflist.tfm')
+    assert itklist['nxforms'] == itklistb['nxforms']
+    assert all([np.allclose(x1['parameters'], x2['parameters'])
+                for x1, x2 in zip(itklist.xforms, itklistb.xforms)])
+
+    tmpdir.join('empty.mat').write('')
+    with pytest.raises(TransformFileError):
+        itklistb.from_filename('empty.mat')
 
     assert itklist['nxforms'] == 9
     assert text == itklist.to_string()
