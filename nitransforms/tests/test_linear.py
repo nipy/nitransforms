@@ -114,3 +114,11 @@ def test_Affine_to_x5(tmpdir, data_path):
     aff.reference = data_path / 'someones_anatomy.nii.gz'
     with h5py.File('withref-xfm.x5', 'w') as f:
         aff._to_hdf5(f.create_group('Affine'))
+
+
+def test_concatenation(data_path):
+    """Check concatenation of affines."""
+    aff = ntl.Affine(reference=data_path / 'someones_anatomy.nii.gz')
+    x = [(0., 0., 0.), (1., 1., 1.), (-1., -1., -1.)]
+    assert np.all((aff + ntl.Affine())(x) == x)
+    assert np.all((aff + ntl.Affine())(x, inverse=True) == x)
