@@ -354,7 +354,7 @@ class TransformChain(TransformBase):
         -------
         >>> T1 = TransformBase()
         >>> chain = T1 + TransformBase()
-        >>> chain[0] == T1
+        >>> chain[0] is T1
         True
 
         """
