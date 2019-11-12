@@ -95,7 +95,7 @@ def test_LT_conversions(data_path):
     assert np.allclose(r2r_m, v2v_m, atol=1e-05)
 
 
-@pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
+#@pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
 @pytest.mark.parametrize('image_orientation', [
     'RAS', 'LAS', 'LPS', 'oblique',
 ])

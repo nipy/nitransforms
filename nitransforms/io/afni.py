@@ -1,7 +1,7 @@
 """Read/write AFNI's transforms."""
 from math import pi
 import numpy as np
-from nibabel.affines import obliquity, voxel_sizes
+from nibabel.affines import obliquity, voxel_sizes, from_matvec
 
 from ..patched import shape_zoom_affine
 from .base import (
@@ -40,16 +40,16 @@ class AFNILinearTransform(LinearParameters):
         if _is_oblique(reference.affine):
             print('Reference affine axes are oblique.')
             M = reference.affine
-            A = shape_zoom_affine(reference.shape,
-                                  voxel_sizes(M), x_flip=False, y_flip=False)
-            pre = M.dot(np.linalg.inv(A)).dot(LPS)
+            pre = _afni_deoblique(
+                M, shape_zoom_affine(reference.shape, voxel_sizes(M)))
+            pre = pre.dot(LPS)
 
         if _is_oblique(moving.affine):
             print('Moving affine axes are oblique.')
-            M2 = moving.affine
-            A2 = shape_zoom_affine(moving.shape,
-                                   voxel_sizes(M2), x_flip=True, y_flip=True)
-            post = A2.dot(np.linalg.inv(M2))
+            M = moving.affine
+            post = _afni_deoblique(
+                M, shape_zoom_affine(moving.shape, voxel_sizes(M)))
+            post = LPS.dot(post)
 
         # swapaxes is necessary, as axis 0 encodes series of transforms
         parameters = np.swapaxes(post.dot(ras.dot(pre)), 0, 1)
@@ -150,3 +150,10 @@ class AFNIDisplacementsField(DisplacementsField):
 
 def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
     return (obliquity(affine).min() * 180 / pi) > thres
+
+
+def _afni_deoblique(oblique, plumb):
+    R = oblique[:3, :3].dot(np.linalg.inv(plumb[:3, :3]))
+    origin = oblique[:3, 3] - np.linalg.inv(R).T.dot(oblique[:3, 3])
+    return from_matvec(R, origin)
+
