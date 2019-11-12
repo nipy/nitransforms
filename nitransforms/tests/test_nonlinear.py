@@ -76,7 +76,7 @@ def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool
             ITKDisplacementsField.from_image(field))
     elif sw_tool == 'afni':
         xfm = DisplacementsFieldTransform(
-            AFNIDisplacementField.from_image(field))
+            AFNIDisplacementsField.from_image(field))
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
@@ -105,15 +105,14 @@ def test_displacements_field2(tmp_path, data_path, sw_tool):
     """Check a translation-only field on one or more axes, different image orientations."""
     os.chdir(str(tmp_path))
     img_fname = data_path / 'tpl-OASIS30ANTs_T1w.nii.gz'
+    xfm_fname = data_path / 'ds-005_sub-01_from-OASIS_to-T1_warp_{}.nii.gz'.format(sw_tool)
 
     if sw_tool == 'itk':
-        xfm_fname = data_path / 'ds-005_sub-01_from-OASIS_to-T1_warp.nii.gz'
         xfm = DisplacementsFieldTransform(
-            ITKDisplacementsField.from_image(field))
+            ITKDisplacementsField.from_filename(xfm_fname))
     elif sw_tool == 'afni':
-        xfm_fname = data_path / 'itk_into_afni.nii.gz'
         xfm = DisplacementsFieldTransform(
-            AFNIDisplacementField.from_image(field))
+            AFNIDisplacementsField.from_filename(xfm_fname))
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
