@@ -11,12 +11,17 @@ import nibabel as nb
 from ..io.base import TransformFileError
 from ..nonlinear import DisplacementsFieldTransform
 from ..io.itk import ITKDisplacementsField
+from ..io.afni import AFNIDisplacementsField
 
 TESTS_BORDER_TOLERANCE = 0.05
 APPLY_NONLINEAR_CMD = {
     'itk': """\
 antsApplyTransforms -d 3 -r {reference} -i {moving} \
 -o resampled.nii.gz -n NearestNeighbor -t {transform} --float\
+""".format,
+    'afni': """\
+3dNwarpApply -nwarp {transform} -source {moving} \
+-master {reference} -interp NN -prefix resampled.nii.gz
 """.format,
 }
 
@@ -47,7 +52,7 @@ def test_itk_disp_load_intent():
 
 
 @pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
-@pytest.mark.parametrize('sw_tool', ['itk'])
+@pytest.mark.parametrize('sw_tool', ['itk', 'afni'])
 @pytest.mark.parametrize('axis', [0, 1, 2, (0, 1), (1, 2), (0, 1, 2)])
 def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool, axis):
     """Check a translation-only field on one or more axes, different image orientations."""
@@ -58,15 +63,20 @@ def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool
     fieldmap[..., axis] = -10.0
 
     _hdr = nii.header.copy()
-    _hdr.set_intent('vector')
+    if sw_tool in ('itk', ):
+        _hdr.set_intent('vector')
     _hdr.set_data_dtype('float32')
 
     xfm_fname = 'warp.nii.gz'
     field = nb.Nifti1Image(fieldmap, nii.affine, _hdr)
     field.to_filename(xfm_fname)
 
-    xfm = DisplacementsFieldTransform(
-        ITKDisplacementsField.from_image(field))
+    if sw_tool == 'itk':
+        xfm = DisplacementsFieldTransform(
+            ITKDisplacementsField.from_image(field))
+    elif sw_tool == 'afni':
+        xfm = DisplacementsFieldTransform(
+            AFNIDisplacementField.from_image(field))
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
@@ -90,15 +100,20 @@ def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
 
 
-@pytest.mark.parametrize('sw_tool', ['itk'])
+@pytest.mark.parametrize('sw_tool', ['itk', 'afni'])
 def test_displacements_field2(tmp_path, data_path, sw_tool):
     """Check a translation-only field on one or more axes, different image orientations."""
     os.chdir(str(tmp_path))
     img_fname = data_path / 'tpl-OASIS30ANTs_T1w.nii.gz'
-    xfm_fname = data_path / 'ds-005_sub-01_from-OASIS_to-T1_warp.nii.gz'
 
-    xfm = DisplacementsFieldTransform(
-        ITKDisplacementsField.from_filename(xfm_fname))
+    if sw_tool == 'itk':
+        xfm_fname = data_path / 'ds-005_sub-01_from-OASIS_to-T1_warp.nii.gz'
+        xfm = DisplacementsFieldTransform(
+            ITKDisplacementsField.from_image(field))
+    elif sw_tool == 'afni':
+        xfm_fname = data_path / 'itk_into_afni.nii.gz'
+        xfm = DisplacementsFieldTransform(
+            AFNIDisplacementField.from_image(field))
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
