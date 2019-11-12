@@ -1,5 +1,6 @@
 """Read/write AFNI's transforms."""
 from math import pi
+import warnings
 import numpy as np
 from nibabel.affines import obliquity, voxel_sizes, from_matvec
 
@@ -23,6 +24,39 @@ class AFNILinearTransform(LinearParameters):
         param = self.structarr['parameters']
         return '\t'.join(['%g' % p for p in param[:3, :].reshape(-1)])
 
+    def to_ras(self, moving=None, reference=None):
+        """Convert to RAS+ coordinate system."""
+        pre = LPS.copy()
+        post = LPS.copy()
+
+        if moving is None:
+            moving = reference
+
+        if reference is None:
+            warnings.warn('At least, the reference image should be set.')
+        else:
+            if _is_oblique(reference.affine):
+                warnings.warn('Reference affine axes are oblique.')
+                M = reference.affine
+                pre = _afni_deoblique(
+                    M, shape_zoom_affine(reference.shape, voxel_sizes(M)))
+                pre = pre.dot(LPS)
+
+            if _is_oblique(moving.affine):
+                warnings.warn('Moving affine axes are oblique.')
+                M = moving.affine
+                post = _afni_deoblique(
+                    M, shape_zoom_affine(moving.shape, voxel_sizes(M)))
+                post = LPS.dot(post)
+
+        pre = np.linalg.inv(pre)
+        post = np.linalg.inv(post)
+
+        # swapaxes is necessary, as axis 0 encodes series of transforms
+        ras = self.structarr['parameters'].copy()
+        parameters = np.swapaxes(post.dot(ras.dot(pre)), 0, 1).T
+        return parameters
+
     def to_string(self, banner=True):
         """Convert to a string directly writeable to file."""
         string = '%s\n' % self
@@ -38,14 +72,14 @@ class AFNILinearTransform(LinearParameters):
         pre = LPS.copy()
         post = LPS.copy()
         if _is_oblique(reference.affine):
-            print('Reference affine axes are oblique.')
+            warnings.warn('Reference affine axes are oblique.')
             M = reference.affine
             pre = _afni_deoblique(
                 M, shape_zoom_affine(reference.shape, voxel_sizes(M)))
             pre = pre.dot(LPS)
 
         if _is_oblique(moving.affine):
-            print('Moving affine axes are oblique.')
+            warnings.warn('Moving affine axes are oblique.')
             M = moving.affine
             post = _afni_deoblique(
                 M, shape_zoom_affine(moving.shape, voxel_sizes(M)))
