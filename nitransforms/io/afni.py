@@ -4,7 +4,12 @@ import numpy as np
 from nibabel.affines import obliquity, voxel_sizes
 
 from ..patched import shape_zoom_affine
-from .base import BaseLinearTransformList, LinearParameters, TransformFileError
+from .base import (
+    BaseLinearTransformList,
+    DisplacementsField,
+    LinearParameters,
+    TransformFileError,
+)
 
 LPS = np.diag([-1, -1, 1, 1])
 OBLIQUITY_THRESHOLD_DEG = 0.01
@@ -117,6 +122,30 @@ class AFNILinearTransformArray(BaseLinearTransformList):
         _self.xforms = [cls._inner_type.from_string(l)
                         for l in lines]
         return _self
+
+
+class AFNIDisplacementsField(DisplacementsField):
+    """A data structure representing displacements fields."""
+
+    @classmethod
+    def from_image(cls, imgobj):
+        """Import a displacements field from a NIfTI file."""
+        _hdr = imgobj.header.copy()
+        _shape = _hdr.get_data_shape()
+
+        if (
+            len(_shape) != 5 or
+            _shape[-2] != 1 or
+            not _shape[-1] in (2, 3)
+        ):
+            raise TransformFileError(
+                'Displacements field "%s" does not come from AFNI.' %
+                imgobj.file_map['image'].filename)
+
+        _field = np.squeeze(np.asanyarray(imgobj.dataobj))
+        _field[..., (0, 1)] *= -1.0
+
+        return imgobj.__class__(_field, imgobj.affine, _hdr)
 
 
 def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):

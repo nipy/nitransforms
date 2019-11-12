@@ -4,7 +4,13 @@ import numpy as np
 from scipy.io import savemat as _save_mat
 from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec
-from .base import BaseLinearTransformList, LinearParameters, _read_mat, TransformFileError
+from .base import (
+    BaseLinearTransformList,
+    DisplacementsField,
+    LinearParameters,
+    TransformFileError,
+    _read_mat,
+)
 
 LPS = np.diag([-1, -1, 1, 1])
 
@@ -249,14 +255,8 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         return _self
 
 
-class ITKDisplacementsField:
+class ITKDisplacementsField(DisplacementsField):
     """A data structure representing displacements fields."""
-
-    @classmethod
-    def from_filename(cls, filename):
-        """Import a displacements field from a NIfTI file."""
-        imgobj = loadimg(str(filename))
-        return cls.from_image(imgobj)
 
     @classmethod
     def from_image(cls, imgobj):
