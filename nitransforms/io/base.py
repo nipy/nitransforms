@@ -157,6 +157,21 @@ class BaseLinearTransformList(StringBasedStruct):
         raise NotImplementedError
 
 
+class DisplacementsField:
+    """A data structure representing displacements fields."""
+
+    @classmethod
+    def from_filename(cls, filename):
+        """Import a displacements field from a NIfTI file."""
+        imgobj = loadimg(str(filename))
+        return cls.from_image(imgobj)
+
+    @classmethod
+    def from_image(cls, imgobj):
+        """Import a displacements field from a nibabel image object."""
+        raise NotImplementedError
+
+
 def _read_mat(byte_stream):
     mjv, _ = get_matfile_version(byte_stream)
     if mjv == 0:

@@ -58,15 +58,13 @@ def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool
     fieldmap[..., axis] = -10.0
 
     _hdr = nii.header.copy()
-    _hdr.set_intent('vector')
+    if sw_tool in ('itk', ):
+        _hdr.set_intent('vector')
     _hdr.set_data_dtype('float32')
 
     xfm_fname = 'warp.nii.gz'
     field = nb.Nifti1Image(fieldmap, nii.affine, _hdr)
     field.to_filename(xfm_fname)
-
-    xfm = DisplacementsFieldTransform(
-        ITKDisplacementsField.from_image(field))
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
