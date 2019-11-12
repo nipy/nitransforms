@@ -1,5 +1,6 @@
 """Read/write linear transforms."""
 import numpy as np
+from nibabel import load as loadimg
 from scipy.io.matlab.miobase import get_matfile_version
 from scipy.io.matlab.mio4 import MatFile4Reader
 from scipy.io.matlab.mio5 import MatFile5Reader
