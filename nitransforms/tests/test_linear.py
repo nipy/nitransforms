@@ -31,7 +31,7 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 }
 
 
-@pytest.mark.xfail(reason="Not fully implemented")
+@pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
 @pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
 def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
@@ -58,7 +58,7 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
 
 
 @pytest.mark.parametrize('image_orientation', [
-    'RAS', 'LAS', 'LPS',  # 'oblique',
+    'RAS', 'LAS', 'LPS',  'oblique',
 ])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
 def test_apply_linear_transform(
@@ -73,6 +73,10 @@ def test_apply_linear_transform(
     img = get_testdata[image_orientation]
     # Generate test transform
     T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+
+    # AFNI's implicitly deobliques datasets
+    # if sw_tool == "afni":
+    #     T = _afni_deoblique()
     xfm = ntl.Affine(T)
     xfm.reference = img
 

@@ -14,6 +14,8 @@ from .base import (
 
 LPS = np.diag([-1, -1, 1, 1])
 OBLIQUITY_THRESHOLD_DEG = 0.01
+B = np.ones((2, 2))
+AFNI_SIGNS = np.block([[B, -1.0 * B], [-1.0 * B, B]])
 
 
 class AFNILinearTransform(LinearParameters):
@@ -26,36 +28,10 @@ class AFNILinearTransform(LinearParameters):
 
     def to_ras(self, moving=None, reference=None):
         """Convert to RAS+ coordinate system."""
-        pre = LPS.copy()
-        post = LPS.copy()
-
-        if moving is None:
-            moving = reference
-
-        if reference is None:
-            warnings.warn('At least, the reference image should be set.')
-        else:
-            if _is_oblique(reference.affine):
-                warnings.warn('Reference affine axes are oblique.')
-                M = reference.affine
-                pre = _afni_deoblique(
-                    M, shape_zoom_affine(reference.shape, voxel_sizes(M)))
-                pre = pre.dot(LPS)
-
-            if _is_oblique(moving.affine):
-                warnings.warn('Moving affine axes are oblique.')
-                M = moving.affine
-                post = _afni_deoblique(
-                    M, shape_zoom_affine(moving.shape, voxel_sizes(M)))
-                post = LPS.dot(post)
-
-        pre = np.linalg.inv(pre)
-        post = np.linalg.inv(post)
-
+        afni = self.structarr['parameters'].copy()
         # swapaxes is necessary, as axis 0 encodes series of transforms
-        ras = self.structarr['parameters'].copy()
-        parameters = np.swapaxes(post.dot(ras.dot(pre)), 0, 1).T
-        return parameters
+        return _ras2afni(afni, moving=moving, reference=reference,
+                         inverse=True)
 
     def to_string(self, banner=True):
         """Convert to a string directly writeable to file."""
@@ -67,29 +43,9 @@ class AFNILinearTransform(LinearParameters):
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
-        """Create an ITK affine from a nitransform's RAS+ matrix."""
-        ras = ras.copy()
-        pre = LPS.copy()
-        post = LPS.copy()
-        if _is_oblique(reference.affine):
-            warnings.warn('Reference affine axes are oblique.')
-            M = reference.affine
-            pre = _afni_deoblique(
-                M, shape_zoom_affine(reference.shape, voxel_sizes(M)))
-            pre = pre.dot(LPS)
-
-        if _is_oblique(moving.affine):
-            warnings.warn('Moving affine axes are oblique.')
-            M = moving.affine
-            post = _afni_deoblique(
-                M, shape_zoom_affine(moving.shape, voxel_sizes(M)))
-            post = LPS.dot(post)
-
-        # swapaxes is necessary, as axis 0 encodes series of transforms
-        parameters = np.swapaxes(post.dot(ras.dot(pre)), 0, 1)
-
+        """Create an AFNI affine from a nitransform's RAS+ matrix."""
         tf = cls()
-        tf.structarr['parameters'] = parameters.T
+        tf.structarr['parameters'] = _ras2afni(ras, moving, reference)
         return tf
 
     @classmethod
@@ -131,7 +87,7 @@ class AFNILinearTransformArray(BaseLinearTransformList):
                 l.strip()
                 for l in xfm.to_string(banner=(i == 0)).splitlines()
                 if l.strip()]
-            strings += lines
+            strings += lines + ['']
         return '\n'.join(strings)
 
     @classmethod
@@ -186,8 +142,58 @@ def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
     return (obliquity(affine).min() * 180 / pi) > thres
 
 
-def _afni_deoblique(oblique, plumb):
-    R = oblique[:3, :3].dot(np.linalg.inv(plumb[:3, :3]))
-    origin = oblique[:3, 3] - np.linalg.inv(R).T.dot(oblique[:3, 3])
-    return from_matvec(R, origin)
+def _afni_to_oblique(oblique, plumb, inverse=False):
+    """
+    Calculate AFNI's matrices to (de)oblique affines.
 
+    Parameters
+    ----------
+    oblique : 4x4 numpy.array
+        affine that is not aligned to the cardinal axes.
+    plumb : 4x4 numpy.array
+        corresponding affine that is aligned to the cardinal axes.
+
+
+    Returns
+    -------
+    plumb_to_oblique : 4x4 numpy.array
+        the matrix that pre-pended to the plumb affine rotates it
+        to be oblique.
+
+    """
+    R = np.linalg.inv(plumb[:3, :3]).dot(oblique[:3, :3])
+    origin = oblique[:3, 3] - R.dot(oblique[:3, 3])
+    return from_matvec(R, origin) * AFNI_SIGNS
+
+
+def _ras2afni(ras, moving=None, reference=None, inverse=False):
+    """
+    Convert from AFNI to RAS+.
+
+    inverse : bool
+        if ``False`` (default), return the matrix to rotate plumb
+        onto oblique (AFNI's ``WARPDRIVE_MATVEC_INV_000000``);
+        if ``True``, return the matrix to rotate oblique onto
+        plumb (AFNI's ``WARPDRIVE_MATVEC_FOR_000000``).
+    """
+    ras = ras.copy()
+    pre = LPS.copy()
+    post = LPS.copy()
+    if reference is not None and _is_oblique(reference.affine):
+        warnings.warn('Reference affine axes are oblique.')
+        M = reference.affine
+        plumb = shape_zoom_affine(reference.shape, voxel_sizes(M))
+        pre = pre.dot(_afni_to_oblique(M, plumb))
+        if inverse is True:
+            pre = np.linalg.inv(pre)
+
+    if moving is not None and _is_oblique(moving.affine):
+        warnings.warn('Moving affine axes are oblique.')
+        M = moving.affine
+        plumb = shape_zoom_affine(moving.shape, voxel_sizes(M))
+        post = post.dot(_afni_to_oblique(M, plumb))
+        if inverse is False:
+            post = np.linalg.inv(post)
+
+    # Combine oblique/deoblique matrices into RAS+ matrix
+    return np.swapaxes(post.dot(ras.dot(pre)), 0, 1).T
