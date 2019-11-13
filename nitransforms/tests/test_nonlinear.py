@@ -51,6 +51,7 @@ def test_itk_disp_load_intent():
     assert field.header.get_intent()[0] == 'vector'
 
 
+@pytest.mark.xfail(reason="Oblique datasets not fully implemented")
 @pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
 @pytest.mark.parametrize('sw_tool', ['itk', 'afni'])
 @pytest.mark.parametrize('axis', [0, 1, 2, (0, 1), (1, 2), (0, 1, 2)])
