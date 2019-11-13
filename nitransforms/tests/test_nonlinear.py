@@ -12,6 +12,7 @@ from ..io.base import TransformFileError
 from ..nonlinear import DisplacementsFieldTransform, load as nlload
 from ..io.itk import ITKDisplacementsField
 
+
 TESTS_BORDER_TOLERANCE = 0.05
 APPLY_NONLINEAR_CMD = {
     "itk": """\
@@ -22,6 +23,9 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 3dNwarpApply -nwarp {transform} -source {moving} \
 -master {reference} -interp NN -prefix resampled.nii.gz
 """.format,
+    'fsl': """\
+applywarp -i {moving} -r {reference} -o resampled.nii.gz \
+-w {transform} --interp=nn""".format,
 }
 
 

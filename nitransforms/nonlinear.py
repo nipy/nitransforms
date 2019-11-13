@@ -77,14 +77,15 @@ class DisplacementsFieldTransform(TransformBase):
 
     @classmethod
     def from_filename(cls, filename, fmt="X5"):
-        if fmt == "afni":
-            _factory = io.afni.AFNIDisplacementsField
-        elif fmt == "itk":
-            _factory = io.itk.ITKDisplacementsField
-        else:
-            raise NotImplementedError
+        _factory = {
+            "afni": io.afni.AFNIDisplacementsField,
+            "itk": io.itk.ITKDisplacementsField,
+            "fsl": io.fsl.FSLDisplacementsField,
+        }
+        if fmt not in _factory:
+            raise NotImplementedError(f"Unsupported format <{fmt}>")
 
-        return cls(_factory.from_filename(filename))
+        return cls(_factory[fmt].from_filename(filename))
 
 
 load = DisplacementsFieldTransform.from_filename
