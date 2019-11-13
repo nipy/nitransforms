@@ -130,22 +130,22 @@ class AFNIDisplacementsField(DisplacementsField):
     @classmethod
     def from_image(cls, imgobj):
         """Import a displacements field from a NIfTI file."""
-        _hdr = imgobj.header.copy()
-        _shape = _hdr.get_data_shape()
+        hdr = imgobj.header.copy()
+        shape = hdr.get_data_shape()
 
         if (
-            len(_shape) != 5 or
-            _shape[-2] != 1 or
-            not _shape[-1] in (2, 3)
+            len(shape) != 5 or
+            shape[-2] != 1 or
+            not shape[-1] in (2, 3)
         ):
             raise TransformFileError(
                 'Displacements field "%s" does not come from AFNI.' %
                 imgobj.file_map['image'].filename)
 
-        _field = np.squeeze(np.asanyarray(imgobj.dataobj))
-        _field[..., (0, 1)] *= -1.0
+        field = np.squeeze(np.asanyarray(imgobj.dataobj))
+        field[..., (0, 1)] *= -1.0
 
-        return imgobj.__class__(_field, imgobj.affine, _hdr)
+        return imgobj.__class__(field, imgobj.affine, hdr)
 
 
 def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
