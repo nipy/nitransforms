@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import filecmp
+import nibabel as nb
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from scipy.io import loadmat, savemat
@@ -321,3 +322,20 @@ def test_read_mat2(tmpdir, monkeypatch, matlab_ver):
         with pytest.raises(TransformFileError):
             with open('val.mat', 'rb') as f:
                 _read_mat(f)
+
+@pytest.mark.parametrize('sw_tool', ['afni'])
+def test_Displacements(sw_tool):
+    """Test displacements fields."""
+
+    if sw_tool == 'afni':
+        field = nb.Nifti1Image(np.zeros((10, 10, 10)), None, None)
+        with pytest.raises(TransformFileError):
+            afni.AFNIDisplacementsField.from_image(field)
+
+        field = nb.Nifti1Image(np.zeros((10, 10, 10, 2, 3)), None, None)
+        with pytest.raises(TransformFileError):
+            afni.AFNIDisplacementsField.from_image(field)
+
+        field = nb.Nifti1Image(np.zeros((10, 10, 10, 1, 4)), None, None)
+        with pytest.raises(TransformFileError):
+            afni.AFNIDisplacementsField.from_image(field)
