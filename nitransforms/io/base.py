@@ -1,5 +1,6 @@
 """Read/write linear transforms."""
 import numpy as np
+from nibabel import load as loadimg
 from scipy.io.matlab.miobase import get_matfile_version
 from scipy.io.matlab.mio4 import MatFile4Reader
 from scipy.io.matlab.mio5 import MatFile5Reader
@@ -154,6 +155,21 @@ class BaseLinearTransformList(StringBasedStruct):
     @classmethod
     def from_string(cls, string):
         """Read the struct from string."""
+        raise NotImplementedError
+
+
+class DisplacementsField:
+    """A data structure representing displacements fields."""
+
+    @classmethod
+    def from_filename(cls, filename):
+        """Import a displacements field from a NIfTI file."""
+        imgobj = loadimg(str(filename))
+        return cls.from_image(imgobj)
+
+    @classmethod
+    def from_image(cls, imgobj):
+        """Import a displacements field from a nibabel image object."""
         raise NotImplementedError
 
 

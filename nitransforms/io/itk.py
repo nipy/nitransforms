@@ -4,7 +4,13 @@ import numpy as np
 from scipy.io import savemat as _save_mat
 from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec
-from .base import BaseLinearTransformList, LinearParameters, _read_mat, TransformFileError
+from .base import (
+    BaseLinearTransformList,
+    DisplacementsField,
+    LinearParameters,
+    TransformFileError,
+    _read_mat,
+)
 
 LPS = np.diag([-1, -1, 1, 1])
 
@@ -249,35 +255,29 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         return _self
 
 
-class ITKDisplacementsField:
+class ITKDisplacementsField(DisplacementsField):
     """A data structure representing displacements fields."""
-
-    @classmethod
-    def from_filename(cls, filename):
-        """Import a displacements field from a NIfTI file."""
-        imgobj = loadimg(str(filename))
-        return cls.from_image(imgobj)
 
     @classmethod
     def from_image(cls, imgobj):
         """Import a displacements field from a NIfTI file."""
-        _hdr = imgobj.header.copy()
-        _shape = _hdr.get_data_shape()
+        hdr = imgobj.header.copy()
+        shape = hdr.get_data_shape()
 
         if (
-            len(_shape) != 5 or
-            _shape[-2] != 1 or
-            not _shape[-1] in (2, 3)
+            len(shape) != 5 or
+            shape[-2] != 1 or
+            not shape[-1] in (2, 3)
         ):
             raise TransformFileError(
                 'Displacements field "%s" does not come from ITK.' %
                 imgobj.file_map['image'].filename)
 
-        if _hdr.get_intent()[0] != 'vector':
+        if hdr.get_intent()[0] != 'vector':
             warnings.warn('Incorrect intent identified.')
-            _hdr.set_intent('vector')
+            hdr.set_intent('vector')
 
-        _field = np.squeeze(np.asanyarray(imgobj.dataobj))
-        _field[..., (0, 1)] *= -1.0
+        field = np.squeeze(np.asanyarray(imgobj.dataobj))
+        field[..., (0, 1)] *= -1.0
 
-        return imgobj.__class__(_field, imgobj.affine, _hdr)
+        return imgobj.__class__(field, imgobj.affine, hdr)
