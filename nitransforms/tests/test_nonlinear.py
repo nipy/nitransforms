@@ -63,7 +63,10 @@ def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool
     os.chdir(str(tmp_path))
     nii = get_testdata[image_orientation]
     nii.to_filename("reference.nii.gz")
-    fieldmap = np.zeros((*nii.shape[:3], 1, 3), dtype="float32")
+    fieldmap = np.zeros(
+        (*nii.shape[:3], 1, 3) if sw_tool != "fsl" else (*nii.shape[:3], 3),
+        dtype="float32",
+    )
     fieldmap[..., axis] = -10.0
 
     _hdr = nii.header.copy()

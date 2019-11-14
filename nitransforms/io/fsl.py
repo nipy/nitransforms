@@ -187,7 +187,7 @@ class FSLDisplacementsField(DisplacementsField):
                 imgobj.file_map['image'].filename)
 
         field = np.squeeze(np.asanyarray(imgobj.dataobj))
-        field[..., (0, 1)] *= -1.0
+        field[..., 0] *= -1.0
 
         return imgobj.__class__(field, imgobj.affine, hdr)
 
