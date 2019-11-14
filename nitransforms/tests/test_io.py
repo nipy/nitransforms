@@ -323,6 +323,7 @@ def test_read_mat2(tmpdir, monkeypatch, matlab_ver):
             with open('val.mat', 'rb') as f:
                 _read_mat(f)
 
+
 @pytest.mark.parametrize('sw_tool', ['afni'])
 def test_Displacements(sw_tool):
     """Test displacements fields."""

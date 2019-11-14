@@ -2,7 +2,6 @@
 import warnings
 import numpy as np
 from scipy.io import savemat as _save_mat
-from nibabel.loadsave import load as loadimg
 from nibabel.affines import from_matvec
 from .base import (
     BaseLinearTransformList,
