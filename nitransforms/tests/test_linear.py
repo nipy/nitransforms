@@ -57,9 +57,7 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 
-@pytest.mark.parametrize('image_orientation', [
-    'RAS', 'LAS', 'LPS',  'oblique',
-])
+@pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
 def test_apply_linear_transform(
         tmpdir,

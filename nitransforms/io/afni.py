@@ -162,8 +162,9 @@ def _afni_to_oblique(oblique, plumb, inverse=False):
 
     """
     R = np.linalg.inv(plumb[:3, :3]).dot(oblique[:3, :3])
-    origin = oblique[:3, 3] - R.dot(oblique[:3, 3])
-    return from_matvec(R, origin) * AFNI_SIGNS
+    # origin = oblique[:3, 3] - R.dot(oblique[:3, 3])
+    origin = np.zeros(3)
+    return from_matvec(R, origin)  # * AFNI_SIGNS
 
 
 def _ras2afni(ras, moving=None, reference=None, inverse=False):
@@ -175,6 +176,7 @@ def _ras2afni(ras, moving=None, reference=None, inverse=False):
         onto oblique (AFNI's ``WARPDRIVE_MATVEC_INV_000000``);
         if ``True``, return the matrix to rotate oblique onto
         plumb (AFNI's ``WARPDRIVE_MATVEC_FOR_000000``).
+
     """
     ras = ras.copy()
     pre = LPS.copy()
@@ -183,17 +185,18 @@ def _ras2afni(ras, moving=None, reference=None, inverse=False):
         warnings.warn('Reference affine axes are oblique.')
         M = reference.affine
         plumb = shape_zoom_affine(reference.shape, voxel_sizes(M))
-        pre = pre.dot(_afni_to_oblique(M, plumb))
-        if inverse is True:
-            pre = np.linalg.inv(pre)
+        pre = _afni_to_oblique(M, plumb)
+        pre = pre.dot(LPS)
 
     if moving is not None and _is_oblique(moving.affine):
         warnings.warn('Moving affine axes are oblique.')
         M = moving.affine
         plumb = shape_zoom_affine(moving.shape, voxel_sizes(M))
         post = post.dot(_afni_to_oblique(M, plumb))
-        if inverse is False:
-            post = np.linalg.inv(post)
+
+    if inverse:
+        ras = np.swapaxes(
+            pre.dot(np.linalg.inv(ras).dot(post)), 0, 1).T
 
     # Combine oblique/deoblique matrices into RAS+ matrix
     return np.swapaxes(post.dot(ras.dot(pre)), 0, 1).T
