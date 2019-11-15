@@ -59,22 +59,26 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
 
 @pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
+@pytest.mark.parametrize('parameters', [
+    ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+    ((0.0, 0.0, 0.0), (4.0, 2.0, -1.0)),
+    ((0.9, 0.001, 0.001), (0.0, 0.0, 0.0)),
+    ((0.9, 0.001, 0.001), (4.0, 2.0, -1.0)),
+])
 def test_apply_linear_transform(
         tmpdir,
         get_testdata,
         image_orientation,
-        sw_tool
+        sw_tool,
+        parameters
 ):
     """Check implementation of exporting affines to formats."""
     tmpdir.chdir()
 
     img = get_testdata[image_orientation]
     # Generate test transform
-    T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+    T = from_matvec(euler2mat(*parameters[0]), parameters[1])
 
-    # AFNI's implicitly deobliques datasets
-    # if sw_tool == "afni":
-    #     T = _afni_deoblique()
     xfm = ntl.Affine(T)
     xfm.reference = img
 
@@ -101,6 +105,50 @@ def test_apply_linear_transform(
     sw_moved = nb.load('resampled.nii.gz')
 
     nt_moved = xfm.apply(img, order=0)
+    diff = sw_moved.get_fdata() - nt_moved.get_fdata()
+    # A certain tolerance is necessary because of resampling at borders
+    assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
+
+@pytest.mark.parametrize('cat', ['catmatvec', 'catmatvec2'])
+def test_afni_oblique(
+        tmpdir,
+        data_path,
+        get_testdata,
+        cat,
+):
+    """Check implementation of exporting affines to formats."""
+    tmpdir.chdir()
+
+    xfm_file0 = str(data_path / 'affine-RAS.afni')
+    xfm_file1 = str(data_path / 'affine-oblique-{}.afni'.format(cat))
+
+    get_testdata['RAS'].to_filename('RAS.nii.gz')
+    get_testdata['oblique'].to_filename('oblique.nii.gz')
+
+    cmd = """\
+3dAllineate -base {reference} -input {moving} -master {master} \
+-prefix resampled.nii.gz -1Dmatrix_apply {transform} -final NN""".format(
+        transform=os.path.abspath(xfm_file0),
+        reference=os.path.abspath('oblique.nii.gz'),
+        moving=os.path.abspath('oblique.nii.gz'),
+        master=os.path.abspath('RAS.nii.gz'))
+
+    # skip test if command is not available on host
+    exe = cmd.split(" ", 1)[0]
+    if not shutil.which(exe):
+        pytest.skip("Command {} not found on host".format(exe))
+
+    exit_code = check_call([cmd], shell=True)
+    assert exit_code == 0
+    shutil.move('resampled.nii.gz', 'resampled0.nii.gz')
+    sw_moved = nb.load('resampled0.nii.gz')
+
+    cmd = APPLY_LINEAR_CMD['afni'](
+        transform=os.path.abspath(xfm_file1),
+        reference=os.path.abspath('RAS.nii.gz'),
+        moving=os.path.abspath('RAS.nii.gz'))
+    check_call([cmd], shell=True)
+    nt_moved = nb.load('resampled.nii.gz')
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE

@@ -189,14 +189,14 @@ def _ras2afni(ras, moving=None, reference=None):
         M = reference.affine
         plumb = shape_zoom_affine(reference.shape, voxel_sizes(M))
         # Prepend the MATVEC_INV - AFNI will append MATVEC_FOR
-        pre = _afni_warpdrive_for(M, plumb, offset=False, inv=True)
+        pre = _afni_warpdrive_for(M, plumb, offset=False, inv=False)
 
     if moving is not None and _is_oblique(moving.affine):
         warnings.warn('Moving affine axes are oblique.')
         M = moving.affine
         plumb = shape_zoom_affine(moving.shape, voxel_sizes(M))
         # Append the MATVEC_FOR - AFNI will append MATVEC_INV
-        post = _afni_warpdrive_for(M, plumb, offset=False)
+        post = _afni_warpdrive_for(M, plumb, offset=False, inv=True)
 
     afni_ras = np.swapaxes(post.dot(ras.dot(pre)), 0, 1).T
 
@@ -206,7 +206,7 @@ def _ras2afni(ras, moving=None, reference=None):
 
 def _afni2ras(afni, moving=None, reference=None):
     """
-    Convert from RAS+ to AFNI matrix.
+    Convert from AFNI to RAS+.
 
     inverse : bool
         if ``False`` (default), return the matrix to rotate plumb
