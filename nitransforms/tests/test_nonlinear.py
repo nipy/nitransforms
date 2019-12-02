@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 import nibabel as nb
 from ..io.base import TransformFileError
-from ..nonlinear import DisplacementsFieldTransform
+from ..nonlinear import DisplacementsFieldTransform, load as nlload
 from ..io.itk import ITKDisplacementsField
 from ..io.afni import AFNIDisplacementsField
 
@@ -72,12 +72,7 @@ def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool
     field = nb.Nifti1Image(fieldmap, nii.affine, _hdr)
     field.to_filename(xfm_fname)
 
-    if sw_tool == 'itk':
-        xfm = DisplacementsFieldTransform(
-            ITKDisplacementsField.from_image(field))
-    elif sw_tool == 'afni':
-        xfm = DisplacementsFieldTransform(
-            AFNIDisplacementsField.from_image(field))
+    xfm = nlload(xfm_fname, fmt=sw_tool)
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
@@ -108,12 +103,7 @@ def test_displacements_field2(tmp_path, data_path, sw_tool):
     img_fname = data_path / 'tpl-OASIS30ANTs_T1w.nii.gz'
     xfm_fname = data_path / 'ds-005_sub-01_from-OASIS_to-T1_warp_{}.nii.gz'.format(sw_tool)
 
-    if sw_tool == 'itk':
-        xfm = DisplacementsFieldTransform(
-            ITKDisplacementsField.from_filename(xfm_fname))
-    elif sw_tool == 'afni':
-        xfm = DisplacementsFieldTransform(
-            AFNIDisplacementsField.from_filename(xfm_fname))
+    xfm = nlload(xfm_fname, fmt=sw_tool)
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](

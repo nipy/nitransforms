@@ -10,6 +10,7 @@
 import warnings
 import numpy as np
 from .base import TransformBase
+from . import io
 
 # from .base import ImageGrid
 # from nibabel.funcs import four_to_three
@@ -75,6 +76,19 @@ class DisplacementsFieldTransform(TransformBase):
         indexes = tuple(tuple(i) for i in indexes.T)
         return x + self._field[indexes]
 
+    @classmethod
+    def from_filename(cls, filename, fmt='X5'):
+        if fmt == 'afni':
+            _factory = io.afni.AFNIDisplacementsField
+        elif fmt == 'itk':
+            _factory = io.itk.ITKDisplacementsField
+        else:
+            raise NotImplementedError
+
+        return cls(_factory.from_filename(filename))
+
+
+load = DisplacementsFieldTransform.from_filename
 
 # class BSplineFieldTransform(TransformBase):
 #     """Represent a nonlinear transform parameterized by BSpline basis."""
