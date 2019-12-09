@@ -126,9 +126,6 @@ def get_parser():
 def main(pargs=None):
     parser, subparsers = get_parser()
     pargs = parser.parse_args(pargs)
-    if not pargs.command or 'func' not in pargs:
-        parser.print_help()
-        sys.exit(1)
 
     try:
         pargs.func(pargs)
