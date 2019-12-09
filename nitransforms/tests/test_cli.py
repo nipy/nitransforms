@@ -5,7 +5,7 @@ import pytest
 from ..cli import cli_apply, main as ntcli
 
 
-def test_cli():
+def test_cli(capsys):
     # empty command
     with pytest.raises(SystemExit):
         ntcli()
@@ -13,8 +13,6 @@ def test_cli():
     with pytest.raises(SystemExit):
         ntcli(['idk'])
 
-
-def test_help(capsys):
     with pytest.raises(SystemExit) as sysexit:
         ntcli(['-h'])
     console = capsys.readouterr()
@@ -26,6 +24,7 @@ def test_help(capsys):
         ntcli(['apply', '-h'])
     console = capsys.readouterr()
     assert dedent(cli_apply.__doc__) in console.out
+    assert sysexit.value.code == 0
 
 
 def test_apply_linear(tmpdir, data_path, get_testdata):
@@ -33,16 +32,19 @@ def test_apply_linear(tmpdir, data_path, get_testdata):
     img = 'img.nii.gz'
     get_testdata['RAS'].to_filename(img)
     lin_xform = str(data_path / 'affine-RAS.itk.tfm')
+    lin_xform2 = str(data_path / 'affine-RAS.fs.lta')
 
     # unknown transformation format
     with pytest.raises(ValueError):
         ntcli(['apply', 'unsupported.xform', 'img.nii.gz'])
 
     # linear transform arguments
-    largs = ['apply', lin_xform, img, '--ref', img]
-    ntcli(largs)
-    output = 'nt_img.nii.gz'
-    assert (tmpdir / output).check()
+    output = tmpdir / 'nt_img.nii.gz'
+    ntcli(['apply', lin_xform, img, '--ref', img])
+    assert output.check()
+    output.remove()
+    ntcli(['apply', lin_xform2, img, '--ref', img])
+    assert output.check()
 
 
 def test_apply_nl(tmpdir, data_path):
