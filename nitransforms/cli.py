@@ -1,6 +1,8 @@
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from textwrap import dedent
+import os
 import sys
+from textwrap import dedent
+
 
 from .linear import load as linload
 from .nonlinear import load as nlinload
@@ -12,7 +14,7 @@ def cli_apply(pargs):
 
     Sample usage:
 
-        $ nt apply xform.fsl moving.nii.gz --ref reference.nii.gz
+        $ nt apply xform.fsl moving.nii.gz --ref reference.nii.gz --out moved.nii.gz
 
         $ nt apply warp.nii.gz moving.nii.gz --fmt afni --nonlinear
 
@@ -24,21 +26,27 @@ def cli_apply(pargs):
         fmt = 'fs'
 
     if fmt not in ('fs', 'itk', 'fsl', 'afni'):
-        raise RuntimeError(
+        raise ValueError(
             "Cannot determine transformation format, manually set format with the `--fmt` flag"
         )
 
     if pargs.nonlinear:
-        xfm = nlinload(pargs.transform, fmt=fmt, reference=pargs.ref)
+        xfm = nlinload(pargs.transform, fmt=fmt)
     else:
         xfm = linload(pargs.transform, fmt=fmt)
 
-    xfm.apply(
+    # ensure a reference is set
+    xfm.reference = pargs.ref or pargs.moving
+
+    moved = xfm.apply(
         pargs.moving,
         order=pargs.order,
         mode=pargs.mode,
         cval=pargs.cval,
         prefilter=pargs.prefilter
+    )
+    moved.to_filename(
+        pargs.out or "nt_{}".format(os.path.basename(pargs.moving))
     )
 
 
@@ -67,6 +75,7 @@ def get_parser():
         return subp
 
     applyp = _add_subparser('apply', cli_apply.__doc__)
+    applyp.set_defaults(func=cli_apply)
     applyp.add_argument('transform', help='The transform file')
     applyp.add_argument(
         'moving', help='The image containing the data to be resampled'
@@ -77,6 +86,9 @@ def get_parser():
         choices=('itk', 'fsl', 'afni', 'fs'),
         help='Format of transformation. If no option is passed, nitransforms will '
         'estimate based on the transformation file extension.'
+    )
+    applyp.add_argument(
+        '--out', help="The transformed image. If not set, will be set to `nt_{moving}`"
     )
     applyp.add_argument(
         '--nonlinear', action='store_true', help='Transformation is nonlinear (default: False)'
@@ -108,15 +120,19 @@ def get_parser():
         help="Determines if the image's data array is prefiltered with a spline filter before "
         "interpolation (default: True)"
     )
-    return parser
+    return parser, subparsers
 
 
 def main(pargs=None):
-    parser = get_parser()
+    parser, subparsers = get_parser()
     pargs = parser.parse_args(pargs)
-    if pargs.command is None:
+    if not pargs.command or 'func' not in pargs:
         parser.print_help()
         sys.exit(1)
 
-    if pargs.command == 'apply':
-        cli_apply(pargs)
+    try:
+        pargs.func(pargs)
+    except Exception as e:
+        subparser = subparsers.choices[pargs.command]
+        subparser.print_help()
+        raise(e)
