@@ -1,6 +1,5 @@
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import os
-import sys
 from textwrap import dedent
 
 
