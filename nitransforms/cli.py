@@ -10,7 +10,7 @@ from .nonlinear import load as nlinload
 
 def cli_apply(pargs):
     """
-    Apply a transformation to an image, resampling on the reference
+    Apply a transformation to an image, resampling on the reference.
 
     Sample usage:
 
@@ -20,12 +20,12 @@ def cli_apply(pargs):
 
     """
     fmt = pargs.fmt or pargs.transform.split('.')[-1]
-    if fmt == 'tfm':
+    if fmt in ('tfm', 'mat', 'h5', 'x5'):
         fmt = 'itk'
     elif fmt == 'lta':
         fmt = 'fs'
 
-    if fmt not in ('fs', 'itk', 'fsl', 'afni'):
+    if fmt not in ('fs', 'itk', 'fsl', 'afni', 'x5'):
         raise ValueError(
             "Cannot determine transformation format, manually set format with the `--fmt` flag"
         )
@@ -83,7 +83,7 @@ def get_parser():
     applyp.add_argument('--ref', help='The reference space to resample onto')
     applyp.add_argument(
         '--fmt',
-        choices=('itk', 'fsl', 'afni', 'fs'),
+        choices=('itk', 'fsl', 'afni', 'fs', 'x5'),
         help='Format of transformation. If no option is passed, nitransforms will '
         'estimate based on the transformation file extension.'
     )
