@@ -225,7 +225,7 @@ class TransformBase(object):
         order : int, optional
             The order of the spline interpolation, default is 3.
             The order has to be in the range 0-5.
-        mode : {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional
+        mode : {'constant', 'reflect', 'nearest', 'mirror', 'wrap'}, optional
             Determines how the input image is extended when the resamplings overflows
             a border. Default is 'constant'.
         cval : float, optional
