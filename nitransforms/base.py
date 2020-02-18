@@ -12,7 +12,8 @@ from collections.abc import Iterable
 import numpy as np
 import h5py
 import warnings
-from nibabel.loadsave import load
+from nibabel.loadsave import load as _nbload
+from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
 from nibabel.cifti2 import Cifti2Image
 from scipy import ndimage as ndi
@@ -20,7 +21,7 @@ from scipy import ndimage as ndi
 EQUALITY_TOL = 1e-5
 
 
-class TransformError(ValueError):
+class TransformError(TypeError):
     """A custom exception for transforms."""
 
 
@@ -51,7 +52,7 @@ class SampledSpatialData:
             return
 
         if isinstance(dataset, (str, Path)):
-            dataset = load(str(dataset))
+            dataset = _nbload(str(dataset))
 
         if hasattr(dataset, 'numDA'):  # Looks like a Gifti file
             _das = dataset.get_arrays_from_intent(INTENT_CODES['pointset'])
@@ -96,11 +97,15 @@ class ImageGrid(SampledSpatialData):
     def __init__(self, image):
         """Create a gridded sampling reference."""
         if isinstance(image, (str, Path)):
-            image = load(str(image))
+            image = _nbfuncs.squeeze_image(_nbload(str(image)))
 
         self._affine = image.affine
         self._shape = image.shape
+
         self._ndim = getattr(image, 'ndim', len(image.shape))
+        if self._ndim == 4:
+            self._shape = image.shape[:3]
+            self._ndim = 3
 
         self._npoints = getattr(image, 'npoints',
                                 np.prod(image.shape))
@@ -172,9 +177,9 @@ class TransformBase(object):
         """Instantiate a transform."""
         self._reference = None
 
-    def __call__(self, x, inverse=False, index=0):
+    def __call__(self, x, inverse=False):
         """Apply y = f(x)."""
-        return self.map(x, inverse=inverse, index=index)
+        return self.map(x, inverse=inverse)
 
     def __add__(self, b):
         """
@@ -246,13 +251,13 @@ class TransformBase(object):
 
         """
         if reference is not None and isinstance(reference, (str, Path)):
-            reference = load(str(reference))
+            reference = _nbload(str(reference))
 
         _ref = self.reference if reference is None \
             else SpatialReference.factory(reference)
 
         if isinstance(spatialimage, (str, Path)):
-            spatialimage = load(str(spatialimage))
+            spatialimage = _nbload(str(spatialimage))
 
         data = np.asanyarray(spatialimage.dataobj)
         output_dtype = output_dtype or data.dtype
@@ -279,7 +284,7 @@ class TransformBase(object):
 
         return resampled
 
-    def map(self, x, inverse=False, index=0):
+    def map(self, x, inverse=False):
         r"""
         Apply :math:`y = f(x)`.
 
@@ -291,8 +296,6 @@ class TransformBase(object):
             Input RAS+ coordinates (i.e., physical coordinates).
         inverse : bool
             If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
-        index : int, optional
-            Transformation index
 
         Returns
         -------
@@ -407,7 +410,7 @@ class TransformChain(TransformBase):
         """
         self.transforms = self.transforms[:i] + _as_chain(x) + self.transforms[i:]
 
-    def map(self, x, inverse=False, index=0):
+    def map(self, x, inverse=False):
         """
         Apply a succession of transforms, e.g., :math:`y = f_3(f_2(f_1(f_0(x))))`.
 
@@ -436,6 +439,80 @@ class TransformChain(TransformBase):
             x = xfm(x, inverse=inverse)
 
         return x
+
+
+class TransformMapping(TransformBase):
+    """Implements a four-dimensional series of transforms."""
+
+    __slots__ = ('_transforms', )
+
+    def __init__(self, transforms=None):
+        """Initialize a chain of transforms."""
+        self._transforms = None
+        if transforms is not None:
+            self.transforms = transforms
+
+    def __getitem__(self, i):
+        """
+        Enable indexed access of transform chains.
+
+        Example
+        -------
+        >>> T1 = TransformBase()
+        >>> xfm4d = TransformMapping([T1, TransformBase(), TransformBase()])
+        >>> xfm4d[0] is T1
+        True
+
+        """
+        return self.transforms[i]
+
+    def __len__(self):
+        """Enable using len()."""
+        return len(self.transforms)
+
+    @property
+    def transforms(self):
+        """Get the internal list of transforms."""
+        return self._transforms
+
+    @transforms.setter
+    def transforms(self, value):
+        self._transforms = value
+
+    def append(self, x):
+        """
+        Concatenate one element to the chain.
+
+        Example
+        -------
+        >>> xfm4d = TransformMapping([TransformBase(), TransformBase()])
+        >>> xfm4d.append(TransformBase())
+        >>> len(xfm4d)
+        3
+
+        """
+        self.transforms.append(x)
+
+    def insert(self, i, x):
+        """
+        Insert an item at a given position.
+
+        Example
+        -------
+        >>> xfm4d = TransformMapping([TransformBase(), TransformBase()])
+        >>> xfm4d.insert(1, TransformBase())
+        >>> len(xfm4d)
+        3
+
+        """
+        self.transforms.insert(i, x)
+
+    def map(self, x, inverse=False):
+        """Apply a map of transforms, e.g., :math:`y_t = f_t(x_t)`."""
+        if not self.transforms:
+            raise TransformError('Cannot apply an empty transforms mapping.')
+
+        return [xfm(x, inverse=inverse) for xfm in self.transforms]
 
 
 def _as_homogeneous(xyz, dtype='float32', dim=3):

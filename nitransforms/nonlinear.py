@@ -35,7 +35,7 @@ class DisplacementsFieldTransform(TransformBase):
         self.reference = field.__class__(np.zeros(self._field.shape[:-1]),
                                          field.affine, field.header)
 
-    def map(self, x, inverse=False, index=0):
+    def map(self, x, inverse=False):
         r"""
         Apply :math:`y = f(x)`.
 
@@ -45,8 +45,6 @@ class DisplacementsFieldTransform(TransformBase):
             Input RAS+ coordinates (i.e., physical coordinates).
         inverse : bool
             If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
-        index : int, optional
-            Transformation index
 
         Returns
         -------
