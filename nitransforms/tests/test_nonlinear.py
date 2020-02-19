@@ -11,7 +11,6 @@ import nibabel as nb
 from ..io.base import TransformFileError
 from ..nonlinear import DisplacementsFieldTransform, load as nlload
 from ..io.itk import ITKDisplacementsField
-# from ..io.afni import AFNIDisplacementsField
 
 TESTS_BORDER_TOLERANCE = 0.05
 APPLY_NONLINEAR_CMD = {
