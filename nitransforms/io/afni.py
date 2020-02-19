@@ -134,9 +134,9 @@ class AFNIDisplacementsField(DisplacementsField):
         shape = hdr.get_data_shape()
 
         if (
-            len(shape) != 5 or
-            shape[-2] != 1 or
-            not shape[-1] in (2, 3)
+            len(shape) != 5
+            or shape[-2] != 1
+            or not shape[-1] in (2, 3)
         ):
             raise TransformFileError(
                 'Displacements field "%s" does not come from AFNI.' %

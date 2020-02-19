@@ -155,8 +155,8 @@ class ImageGrid(SampledSpatialData):
 
     def __eq__(self, other):
         """Overload equals operator."""
-        return (np.allclose(self.affine, other.affine, rtol=EQUALITY_TOL) and
-                self.shape == other.shape)
+        return (np.allclose(self.affine, other.affine, rtol=EQUALITY_TOL)
+                and self.shape == other.shape)
 
     def __ne__(self, other):
         """Overload not equal operator."""

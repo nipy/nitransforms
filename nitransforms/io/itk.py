@@ -42,8 +42,8 @@ class ITKLinearTransform(LinearParameters):
             'Transform: AffineTransform_float_3_3',
             'Parameters: {}'.format(' '.join(
                 ['%g' % p
-                 for p in sa['parameters'][:3, :3].reshape(-1).tolist() +
-                 sa['parameters'][:3, 3].tolist()])),
+                 for p in sa['parameters'][:3, :3].reshape(-1).tolist()
+                 + sa['parameters'][:3, 3].tolist()])),
             'FixedParameters: {:g} {:g} {:g}'.format(*sa['offset']),
             '',
         ]
@@ -241,10 +241,10 @@ class ITKLinearTransformArray(BaseLinearTransformList):
                  if l.strip()]
 
         if (
-            not lines or
-            not lines[0].startswith('#') or
-           'Insight Transform File V1.0' not in lines[0]
-           ):
+            not lines
+            or not lines[0].startswith('#')
+            or 'Insight Transform File V1.0' not in lines[0]
+        ):
             raise TransformFileError('Unknown Insight Transform File format.')
 
         string = '\n'.join(lines[1:])
@@ -264,9 +264,9 @@ class ITKDisplacementsField(DisplacementsField):
         shape = hdr.get_data_shape()
 
         if (
-            len(shape) != 5 or
-            shape[-2] != 1 or
-            not shape[-1] in (2, 3)
+            len(shape) != 5
+            or shape[-2] != 1
+            or not shape[-1] in (2, 3)
         ):
             raise TransformFileError(
                 'Displacements field "%s" does not come from ITK.' %
