@@ -31,6 +31,30 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 }
 
 
+def test_linear_typeerrors(data_path):
+    """Exercise errors in Affine creation."""
+    with pytest.raises(TypeError):
+        ntl.Affine([0.0])
+
+    with pytest.raises(TypeError):
+        ntl.Affine(np.arange((3, 3, 3)))
+
+    with pytest.raises(TypeError):
+        ntl.Affine(np.arange((3, 4)))
+
+    with pytest.raises(TypeError):
+        ntl.Affine.from_filename(data_path / 'itktflist.tfm', fmt='itk')
+
+
+def test_loadsave(tmp_path, data_path):
+    """Test idempotency."""
+    xfm = ntl.load(data_path / 'itktflist2.tfm', fmt='itk')
+    xfm.to_filename(tmp_path / 'writtenout.tfm', fmt='itk')
+
+    assert (data_path / 'itktflist2.tfm').read_text() \
+        == (tmp_path / 'writtenout.tfm').read_text()
+
+
 @pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])

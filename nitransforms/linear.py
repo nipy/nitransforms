@@ -227,13 +227,6 @@ class LinearTransformsMapping(Affine):
 
         """
         super().__init__(reference=reference)
-        if (
-            transforms is None
-            or np.shape(transforms)[0] < 1
-        ):
-            raise TypeError(
-                "Transforms should be a list of Affines or linear "
-                "transforms matrix with at least two elements.")
 
         self._matrix = np.stack([
             (
