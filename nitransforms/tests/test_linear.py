@@ -76,12 +76,16 @@ def test_loadsave(tmp_path, data_path, fmt):
     fname = tmp_path / '.'.join(('transform-mapping', fmt))
     xfm.to_filename(fname, fmt=fmt)
     xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
+    xfm.to_filename(fname, fmt=fmt, moving=ref_file)
+    xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
 
     ref_file = data_path / 'someones_anatomy.nii.gz'
     xfm = ntl.load(data_path / 'affine-LAS.itk.tfm', fmt='itk')
     xfm.reference = ref_file
     fname = tmp_path / '.'.join(('single-transform', fmt))
     xfm.to_filename(fname, fmt=fmt)
+    xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
+    xfm.to_filename(fname, fmt=fmt, moving=ref_file)
     xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
 
 
@@ -185,7 +189,8 @@ def test_LinearTransformsMapping_apply(tmp_path, data_path):
     assert isinstance(hmc, ntl.LinearTransformsMapping)
 
     # Test-case: realing functional data on to sbref
-    nii = hmc.apply(data_path / 'func.nii.gz', order=1)
+    nii = hmc.apply(data_path / 'func.nii.gz', order=1,
+                    reference=data_path / 'sbref.nii.gz')
     assert nii.dataobj.shape[-1] == len(hmc)
 
     # Test-case: write out a fieldmap moved with head
@@ -194,3 +199,9 @@ def test_LinearTransformsMapping_apply(tmp_path, data_path):
         reference=data_path / 'func.nii.gz')
     nii = hmcinv.apply(data_path / 'fmap.nii.gz', order=1)
     assert nii.dataobj.shape[-1] == len(hmc)
+
+    # Ensure a ValueError is issued when trying to do weird stuff
+    hmc = ntl.LinearTransformsMapping(hmc.matrix[:1, ...])
+    with pytest.raises(ValueError):
+        hmc.apply(data_path / 'func.nii.gz', order=1,
+                  reference=data_path / 'sbref.nii.gz')
