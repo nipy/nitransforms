@@ -11,6 +11,7 @@ def test_SpatialReference(data_path):
     """Ensure the reference factory is working properly."""
     obj1 = data_path / 'someones_anatomy.nii.gz'
     obj2 = data_path / 'sub-200148_hemi-R_pial.surf.gii'
+    obj3 = data_path / 'func.nii.gz'
 
     assert isinstance(SpatialReference.factory(obj1), ImageGrid)
     assert isinstance(SpatialReference.factory(str(obj1)), ImageGrid)
@@ -18,6 +19,14 @@ def test_SpatialReference(data_path):
     assert isinstance(SpatialReference.factory(obj2), SampledSpatialData)
     assert isinstance(SpatialReference.factory(str(obj2)), SampledSpatialData)
     assert isinstance(SpatialReference.factory(nb.load(str(obj2))), SampledSpatialData)
+    assert isinstance(SpatialReference.factory(obj3), ImageGrid)
+    assert isinstance(SpatialReference.factory(str(obj3)), ImageGrid)
+    assert isinstance(SpatialReference.factory(nb.load(str(obj3))), ImageGrid)
+
+    func_ref = SpatialReference.factory(obj3)
+    assert func_ref.ndim == 3
+    assert func_ref.shape == (96, 96, 56)
+    assert func_ref.npoints == np.prod(func_ref.shape)
 
 
 @pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])

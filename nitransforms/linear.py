@@ -55,19 +55,16 @@ class Affine(TransformBase):
                [0, 0, 0, 1]])
 
         """
-        super().__init__()
-        if matrix is None:
-            matrix = np.eye(4)
+        super().__init__(reference=reference)
+        self._matrix = np.eye(4)
 
-        self._matrix = np.array(matrix)
-        if self._matrix.ndim != 2:
-            raise TypeError('Affine should be 2D.')
-
-        if self._matrix.shape[0] != self._matrix.shape[1]:
-            raise TypeError('Matrix is not square.')
-
-        if reference:
-            self.reference = reference
+        if matrix is not None:
+            matrix = np.array(matrix)
+            if matrix.ndim != 2:
+                raise TypeError('Affine should be 2D.')
+            elif matrix.shape[0] != matrix.shape[1]:
+                raise TypeError('Matrix is not square.')
+            self._matrix = matrix
 
     def __eq__(self, other):
         """
@@ -162,7 +159,7 @@ class Affine(TransformBase):
             # xform info
             lt = io.LinearTransform()
             lt['sigma'] = 1.
-            lt['m_L'] = [self.matrix]
+            lt['m_L'] = self.matrix
             # Just for reference, nitransforms does not write VOX2VOX
             lt['src'] = io.VolumeGeometry.from_image(moving)
             lt['dst'] = io.VolumeGeometry.from_image(self.reference)
@@ -299,7 +296,7 @@ class LinearTransformsMapping(Affine):
 
     def to_filename(self, filename, fmt='X5', moving=None):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-        if fmt.lower() in ['itk', 'ants', 'elastix']:
+        if fmt.lower() in ('itk', 'ants', 'elastix'):
             itkobj = io.itk.ITKLinearTransformArray.from_ras(self.matrix)
             itkobj.to_filename(filename)
             return filename
@@ -323,18 +320,19 @@ class LinearTransformsMapping(Affine):
             fslobj.to_filename(filename)
             return filename
 
-        if fmt.lower() == 'fs':
+        if fmt.lower() in ('fs', 'lta'):
             # xform info
-            lt = io.LinearTransform()
-            lt['sigma'] = 1.
-            lt['m_L'] = self.matrix
-            # Just for reference, nitransforms does not write VOX2VOX
-            lt['src'] = io.VolumeGeometry.from_image(moving)
-            lt['dst'] = io.VolumeGeometry.from_image(self.reference)
             # to make LTA file format
             lta = io.LinearTransformArray()
             lta['type'] = 1  # RAS2RAS
-            lta['xforms'].append(lt)
+            for m in self.matrix:
+                lt = io.LinearTransform()
+                lt['sigma'] = 1.
+                lt['m_L'] = m
+                # Just for reference, nitransforms does not write VOX2VOX
+                lt['src'] = io.VolumeGeometry.from_image(moving)
+                lt['dst'] = io.VolumeGeometry.from_image(self.reference)
+                lta['xforms'].append(lt)
 
             with open(filename, 'w') as f:
                 f.write(lta.to_string())

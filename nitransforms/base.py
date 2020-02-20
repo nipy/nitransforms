@@ -108,7 +108,7 @@ class ImageGrid(SampledSpatialData):
             self._ndim = 3
 
         self._npoints = getattr(image, 'npoints',
-                                np.prod(image.shape))
+                                np.prod(self._shape))
         self._ndindex = None
         self._coords = None
         self._inverse = getattr(image, 'inverse',
@@ -173,9 +173,11 @@ class TransformBase(object):
 
     __slots__ = ['_reference']
 
-    def __init__(self):
+    def __init__(self, reference=None):
         """Instantiate a transform."""
         self._reference = None
+        if reference:
+            self.reference = reference
 
     def __call__(self, x, inverse=False):
         """Apply y = f(x)."""
