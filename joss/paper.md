@@ -13,6 +13,9 @@ authors:
   - name: Christopher J. Markiewicz
     orcid: 0000-0002-6533-164X
     affiliation: "1, 2"
+  - name: Stefano Moia
+    orcid: 0000-0002-2553-3327
+    affiliation: "4"
   - name: Satrajit S. Ghosh
     orcid: 0000-0002-5312-6729
     affiliation: "2, 3"
@@ -29,6 +32,8 @@ affiliations:
    index: 2
  - name: Department of Otolaryngology, Harvard Medical School, Boston, MA, USA
    index: 3
+ - name: Basque Center on Cognition Brain and Language, San Sebastian, Spain
+   index: 4
 date: 04 November 2019
 bibliography: nt.bib
 ---
@@ -62,6 +67,8 @@ An example of image fusion application would be the alignment of functional data
 Therefore, "applying a transform" entails two operations: first, transforming the coordinates of the samples in the reference image $R$ to find their mapping $\vec{x}'$ on $M$ via $T\{\cdot\}$, and second an interpolation step as $\vec{x}'$ will likely fall off-the-grid of the moving image $M$.
 These two operations are confusing because, while the spatial transformation projects from $R$ to $M$, the data flows in reversed way after the interpolation of the values of $M$ at the mapped coordinates $\vec{x}'$.
 
+![figure1](https://github.com/poldracklab/nitransforms/raw/master/docs/_static/figure1-joss.png "Figure 1")
+
 # Software Architecture
 
 There are four main components within the tool: an `io` submodule to handle the structure of the various file formats, a `base` submodule where abstract classes are defined, a `linear` submodule implementing $n$-dimensional linear transforms, and a `nonlinear` submodule for both parametric and non-parametric nonlinear transforms.
@@ -78,7 +85,5 @@ Two categories of tests were used: unit tests and cross-tool comparison tests.
 Unit tests evaluate the formal correctness of the implementation, while cross-tool
 comparison tests assess the correct implementation of third-party software.
 The testing suite is incorporated into a continuous integration framework, which assesses the continuity of the implementation along the development life and ensures that code changes and additions do not break existing functionalities.
-
-# Examples
 
 # References
