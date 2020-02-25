@@ -31,6 +31,70 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 }
 
 
+@pytest.mark.parametrize('matrix', [
+    [0.0],
+    np.ones((3, 3, 3)),
+    np.ones((3, 4)),
+])
+def test_linear_typeerrors1(matrix):
+    """Exercise errors in Affine creation."""
+    with pytest.raises(TypeError):
+        ntl.Affine(matrix)
+
+
+def test_linear_typeerrors2(data_path):
+    """Exercise errors in Affine creation."""
+    with pytest.raises(TypeError):
+        ntl.Affine.from_filename(data_path / 'itktflist.tfm', fmt='itk')
+
+
+def test_linear_valueerror():
+    """Exercise errors in Affine creation."""
+    with pytest.raises(ValueError):
+        ntl.Affine(np.ones((4, 4)))
+
+
+def test_loadsave_itk(tmp_path, data_path):
+    """Test idempotency."""
+    ref_file = data_path / 'someones_anatomy.nii.gz'
+    xfm = ntl.load(data_path / 'itktflist2.tfm', fmt='itk')
+    assert isinstance(xfm, ntl.LinearTransformsMapping)
+    xfm.reference = ref_file
+    xfm.to_filename(tmp_path / 'transform-mapping.tfm', fmt='itk')
+
+    assert (data_path / 'itktflist2.tfm').read_text() \
+        == (tmp_path / 'transform-mapping.tfm').read_text()
+
+    single_xfm = ntl.load(data_path / 'affine-LAS.itk.tfm', fmt='itk')
+    assert isinstance(single_xfm, ntl.Affine)
+    assert single_xfm == ntl.Affine.from_filename(
+        data_path / 'affine-LAS.itk.tfm', fmt='itk')
+
+
+@pytest.mark.xfail(reason="Not fully implemented")
+@pytest.mark.parametrize('fmt', ['itk', 'fsl', 'afni', 'lta'])
+def test_loadsave(tmp_path, data_path, fmt):
+    """Test idempotency."""
+    ref_file = data_path / 'someones_anatomy.nii.gz'
+    xfm = ntl.load(data_path / 'itktflist2.tfm', fmt='itk')
+    xfm.reference = ref_file
+
+    fname = tmp_path / '.'.join(('transform-mapping', fmt))
+    xfm.to_filename(fname, fmt=fmt)
+    xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
+    xfm.to_filename(fname, fmt=fmt, moving=ref_file)
+    xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
+
+    ref_file = data_path / 'someones_anatomy.nii.gz'
+    xfm = ntl.load(data_path / 'affine-LAS.itk.tfm', fmt='itk')
+    xfm.reference = ref_file
+    fname = tmp_path / '.'.join(('single-transform', fmt))
+    xfm.to_filename(fname, fmt=fmt)
+    xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
+    xfm.to_filename(fname, fmt=fmt, moving=ref_file)
+    xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
+
+
 @pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize('image_orientation', ['RAS', 'LAS', 'LPS', 'oblique'])
 @pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
@@ -122,3 +186,28 @@ def test_concatenation(data_path):
     x = [(0., 0., 0.), (1., 1., 1.), (-1., -1., -1.)]
     assert np.all((aff + ntl.Affine())(x) == x)
     assert np.all((aff + ntl.Affine())(x, inverse=True) == x)
+
+
+def test_LinearTransformsMapping_apply(tmp_path, data_path):
+    """Apply transform mappings."""
+    hmc = ntl.load(data_path / 'hmc-itk.tfm', fmt='itk',
+                   reference=data_path / 'sbref.nii.gz')
+    assert isinstance(hmc, ntl.LinearTransformsMapping)
+
+    # Test-case: realing functional data on to sbref
+    nii = hmc.apply(data_path / 'func.nii.gz', order=1,
+                    reference=data_path / 'sbref.nii.gz')
+    assert nii.dataobj.shape[-1] == len(hmc)
+
+    # Test-case: write out a fieldmap moved with head
+    hmcinv = ntl.LinearTransformsMapping(
+        np.linalg.inv(hmc.matrix),
+        reference=data_path / 'func.nii.gz')
+    nii = hmcinv.apply(data_path / 'fmap.nii.gz', order=1)
+    assert nii.dataobj.shape[-1] == len(hmc)
+
+    # Ensure a ValueError is issued when trying to do weird stuff
+    hmc = ntl.LinearTransformsMapping(hmc.matrix[:1, ...])
+    with pytest.raises(ValueError):
+        hmc.apply(data_path / 'func.nii.gz', order=1,
+                  reference=data_path / 'sbref.nii.gz')

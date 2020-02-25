@@ -1,0 +1,45 @@
+#Insight Transform File V1.0
+#Transform 0
+Transform: AffineTransform_float_3_3
+Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
+FixedParameters: 0 0 0
+
+#Transform 1
+Transform: AffineTransform_float_3_3
+Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
+FixedParameters: 0 0 0
+
+#Transform 2
+Transform: AffineTransform_float_3_3
+Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
+FixedParameters: 0 0 0
+
+#Transform 3
+Transform: AffineTransform_float_3_3
+Parameters: 1 0 0 0 1 0 0 0 1 0 0 0
+FixedParameters: 0 0 0
+
+#Transform 4
+Transform: AffineTransform_float_3_3
+Parameters: -1.53626 0.71973 -0.639856 -0.190759 -1.80082 -0.915885 0.502537 1.12532 0.275748 1.15383 3.96689 1.84349
+FixedParameters: 0 0 0
+
+#Transform 5
+Transform: AffineTransform_float_3_3
+Parameters: -0.130507 -1.03017 2.08189 -1.51723 1.37849 -0.0890962 -0.656323 0.242694 2.15801 -3.00235 1.37109 0.162857
+FixedParameters: 0 0 0
+
+#Transform 6
+Transform: AffineTransform_float_3_3
+Parameters: -1.55395 -0.36383 -0.17749 1.3387 -0.384534 -0.901462 -1.06598 -0.448228 -1.07535 0.75629 0.449768 -2.1133
+FixedParameters: 0 0 0
+
+#Transform 7
+Transform: AffineTransform_float_3_3
+Parameters: 0.723719 -1.05617 -0.800562 -2.47048 -1.76301 -1.4447 -0.749896 1.29774 -1.48893 0.984286 1.12057 3.80071
+FixedParameters: 0 0 0
+
+#Transform 8
+Transform: AffineTransform_float_3_3
+Parameters: 1.24025 -0.77628 0.618013 -0.523829 1.09471 1.66921 0.73753 -1.33588 -0.627659 -1.23816 -0.472076 -0.366883
+FixedParameters: 0 0 0

@@ -1,6 +1,7 @@
 """Read/write FSL's transforms."""
 import os
 import numpy as np
+from pathlib import Path
 from nibabel.affines import voxel_sizes
 
 from .base import BaseLinearTransformList, LinearParameters, TransformFileError
@@ -63,13 +64,11 @@ class FSLLinearTransformArray(BaseLinearTransformList):
 
     def to_filename(self, filename):
         """Store this transform to a file with the appropriate format."""
-        if len(self.xforms) == 1:
-            self.xforms[0].to_filename(filename)
-            return
-
+        output_dir = Path(filename).parent
+        output_dir.mkdir(exist_ok=True, parents=True)
         for i, xfm in enumerate(self.xforms):
-            with open('%s.%03d' % (filename, i), 'w') as f:
-                f.write(xfm.to_string())
+            (output_dir / '.'.join((str(filename), '%03d' % i))).write_text(
+                xfm.to_string())
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
