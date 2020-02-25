@@ -66,6 +66,9 @@ class Affine(TransformBase):
                 raise TypeError('Matrix is not square.')
             self._matrix = matrix
 
+            if np.any(self._matrix[3, :] != (0, 0, 0, 1)):
+                raise ValueError("Matrix does not represent a valid transform.")
+
     def __eq__(self, other):
         """
         Overload equals operator.

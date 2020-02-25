@@ -48,6 +48,12 @@ def test_linear_typeerrors2(data_path):
         ntl.Affine.from_filename(data_path / 'itktflist.tfm', fmt='itk')
 
 
+def test_linear_valueerror():
+    """Exercise errors in Affine creation."""
+    with pytest.raises(ValueError):
+        ntl.Affine(np.ones((4, 4)))
+
+
 def test_loadsave_itk(tmp_path, data_path):
     """Test idempotency."""
     ref_file = data_path / 'someones_anatomy.nii.gz'
