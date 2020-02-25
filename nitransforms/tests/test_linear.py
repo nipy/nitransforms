@@ -42,13 +42,13 @@ def test_linear_typeerrors1(matrix):
         ntl.Affine(matrix)
 
 
-def test_linear_typeerrors2(data_path):
+def test_linear_valueerror0(data_path):
     """Exercise errors in Affine creation."""
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError):
         ntl.Affine.from_filename(data_path / 'itktflist.tfm', fmt='itk')
 
 
-def test_linear_valueerror():
+def test_linear_valueerror1():
     """Exercise errors in Affine creation."""
     with pytest.raises(ValueError):
         ntl.Affine(np.ones((4, 4)))

@@ -192,7 +192,7 @@ class Affine(TransformBase):
         matrix = struct.to_ras(reference=reference, moving=moving)
         if cls == Affine:
             if np.shape(matrix)[0] != 1:
-                raise TypeError(
+                raise ValueError(
                     'Cannot load transform array "%s"' % filename)
             matrix = matrix[0]
         return cls(matrix, reference=reference)

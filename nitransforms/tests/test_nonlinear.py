@@ -36,7 +36,7 @@ def test_itk_disp_load(size):
 @pytest.mark.parametrize('size', [(20, 20, 20), (20, 20, 20, 1, 3)])
 def test_displacements_bad_sizes(size):
     """Checks field sizes."""
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         DisplacementsFieldTransform(
             nb.Nifti1Image(np.zeros(size), None, None))
 

@@ -28,7 +28,7 @@ class DisplacementsFieldTransform(TransformBase):
 
         ndim = self._field.ndim - 1
         if self._field.shape[-1] != ndim:
-            raise ValueError(
+            raise TypeError(
                 'The number of components of the displacements (%d) does not '
                 'the number of dimensions (%d)' % (self._field.shape[-1], ndim))
 
