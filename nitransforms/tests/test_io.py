@@ -340,3 +340,8 @@ def test_Displacements(sw_tool):
         field = nb.Nifti1Image(np.zeros((10, 10, 10, 1, 4)), None, None)
         with pytest.raises(TransformFileError):
             afni.AFNIDisplacementsField.from_image(field)
+
+
+@pytest.mark.parametrize('file_type, test_file', [(LTA, 'robust_register.lta')])
+def test_regressions(file_type, test_file, data_path):
+    file_type.from_filename(data_path / 'regressions' / test_file)
