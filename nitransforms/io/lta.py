@@ -266,21 +266,20 @@ class LinearTransformArray(BaseLinearTransformList):
                 klass._inner_type.from_string('\n'.join(lines[:25])))
             lta._xforms[-1].structarr['type'] = sa['type']
             lines = lines[25:]
-        if lines:
-            for key in ('subject', 'fscale'):
-                # Optional keys
-                if not lines[0].startswith(key):
-                    continue
-                try:
-                    label, valstring = lines.pop(0).split(' ')
-                except ValueError:
-                    sa[key] = ''
-                else:
-                    assert label.strip() == key
+        for key in ('subject', 'fscale'):
+            # Optional keys
+            if not (lines and lines[0].startswith(key)):
+                continue
+            try:
+                label, valstring = lines.pop(0).split(' ')
+            except ValueError:
+                sa[key] = ''
+            else:
+                assert label.strip() == key
 
-                    val = np.genfromtxt([valstring.encode()],
-                                        dtype=klass.dtype[key])
-                    sa[key] = val.reshape(sa[key].shape) if val.size else ''
+                val = np.genfromtxt([valstring.encode()],
+                                    dtype=klass.dtype[key])
+                sa[key] = val.reshape(sa[key].shape) if val.size else ''
 
         assert len(lta._xforms) == sa['nxforms']
         return lta
