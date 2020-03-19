@@ -160,9 +160,38 @@ class LinearTransform(StringBasedStruct):
         )
 
     def to_ras(self, moving=None, reference=None):
-        """Return a nitransforms internal RAS+ matrix."""
+        """
+        Return a nitransforms' internal RAS+ array.
+
+        Seemingly, the matrix of an LTA is defined such that it
+        maps coordinates from the ``dest volume`` to the ``src volume``.
+        Therefore, without inversion, the LTA matrix is appropiate
+        to move the information from ``src volume`` into the
+        ``dest volume``'s grid.
+
+        .. important ::
+
+            The ``moving`` and ``reference`` parameters are dismissed
+            because ``VOX2VOX`` LTAs are converted to ``RAS2RAS`` type
+            before returning the RAS+ matrix, using the ``dest`` and
+            ``src`` contained in the LTA. Both arguments are kept for
+            API compatibility.
+
+        Parameters
+        ----------
+        moving : dismissed
+            The spatial reference of moving images.
+        reference : dismissed
+            The spatial reference of moving images.
+
+        Returns
+        -------
+        matrix : :obj:`numpy.ndarray`
+            The RAS+ affine matrix corresponding to the LTA.
+
+        """
         self.set_type(1)
-        return self.structarr['m_L']
+        return np.linalg.inv(self.structarr['m_L'])
 
     def to_string(self):
         """Convert this transform to text."""

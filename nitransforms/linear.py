@@ -24,7 +24,7 @@ from . import io
 class Affine(TransformBase):
     """Represents linear transforms on image data."""
 
-    __slots__ = ('_matrix', )
+    __slots__ = ("_matrix", )
 
     def __init__(self, matrix=None, reference=None):
         """
@@ -40,7 +40,7 @@ class Affine(TransformBase):
 
         Examples
         --------
-        >>> xfm = Affine(reference=datadir / 'someones_anatomy.nii.gz')
+        >>> xfm = Affine(reference=datadir / "someones_anatomy.nii.gz")
         >>> xfm.matrix  # doctest: +NORMALIZE_WHITESPACE
         array([[1., 0., 0., 0.],
                [0., 1., 0., 0.],
@@ -61,13 +61,17 @@ class Affine(TransformBase):
         if matrix is not None:
             matrix = np.array(matrix)
             if matrix.ndim != 2:
-                raise TypeError('Affine should be 2D.')
+                raise TypeError("Affine should be 2D.")
             elif matrix.shape[0] != matrix.shape[1]:
-                raise TypeError('Matrix is not square.')
+                raise TypeError("Matrix is not square.")
             self._matrix = matrix
 
-            if np.any(self._matrix[3, :] != (0, 0, 0, 1)):
-                raise ValueError("Matrix does not represent a valid transform.")
+            if not np.allclose(self._matrix[3, :], (0, 0, 0, 1)):
+                raise ValueError("""The last row of a homogeneus matrix \
+should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
+
+            # Normalize last row
+            self._matrix[3, :] = (0, 0, 0, 1)
 
     def __eq__(self, other):
         """
@@ -83,7 +87,7 @@ class Affine(TransformBase):
         """
         _eq = np.allclose(self.matrix, other.matrix, rtol=EQUALITY_TOL)
         if _eq and self._reference != other._reference:
-            warnings.warn('Affines are equal, but references do not match.')
+            warnings.warn("Affines are equal, but references do not match.")
         return _eq
 
     @property
@@ -125,16 +129,16 @@ class Affine(TransformBase):
 
     def _to_hdf5(self, x5_root):
         """Serialize this object into the x5 file format."""
-        xform = x5_root.create_dataset('Transform', data=[self._matrix])
-        xform.attrs['Type'] = 'affine'
-        x5_root.create_dataset('Inverse', data=[np.linalg.inv(self._matrix)])
+        xform = x5_root.create_dataset("Transform", data=[self._matrix])
+        xform.attrs["Type"] = "affine"
+        x5_root.create_dataset("Inverse", data=[np.linalg.inv(self._matrix)])
 
         if self._reference:
-            self.reference._to_hdf5(x5_root.create_group('Reference'))
+            self.reference._to_hdf5(x5_root.create_group("Reference"))
 
-    def to_filename(self, filename, fmt='X5', moving=None):
+    def to_filename(self, filename, fmt="X5", moving=None):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-        if fmt.lower() in ['itk', 'ants', 'elastix']:
+        if fmt.lower() in ["itk", "ants", "elastix"]:
             itkobj = io.itk.ITKLinearTransform.from_ras(self.matrix)
             itkobj.to_filename(filename)
             return filename
@@ -145,45 +149,45 @@ class Affine(TransformBase):
         else:
             moving = self.reference
 
-        if fmt.lower() == 'afni':
+        if fmt.lower() == "afni":
             afniobj = io.afni.AFNILinearTransform.from_ras(
                 self.matrix, moving=moving, reference=self.reference)
             afniobj.to_filename(filename)
             return filename
 
-        if fmt.lower() == 'fsl':
+        if fmt.lower() == "fsl":
             fslobj = io.fsl.FSLLinearTransform.from_ras(
                 self.matrix, moving=moving, reference=self.reference
             )
             fslobj.to_filename(filename)
             return filename
 
-        if fmt.lower() == 'fs':
+        if fmt.lower() == "fs":
             # xform info
             lt = io.LinearTransform()
-            lt['sigma'] = 1.
-            lt['m_L'] = self.matrix
+            lt["sigma"] = 1.
+            lt["m_L"] = self.matrix
             # Just for reference, nitransforms does not write VOX2VOX
-            lt['src'] = io.VolumeGeometry.from_image(moving)
-            lt['dst'] = io.VolumeGeometry.from_image(self.reference)
+            lt["src"] = io.VolumeGeometry.from_image(moving)
+            lt["dst"] = io.VolumeGeometry.from_image(self.reference)
             # to make LTA file format
             lta = io.LinearTransformArray()
-            lta['type'] = 1  # RAS2RAS
-            lta['xforms'].append(lt)
+            lta["type"] = 1  # RAS2RAS
+            lta["xforms"].append(lt)
 
-            with open(filename, 'w') as f:
+            with open(filename, "w") as f:
                 f.write(lta.to_string())
             return filename
 
         raise NotImplementedError
 
     @classmethod
-    def from_filename(cls, filename, fmt='X5',
+    def from_filename(cls, filename, fmt="X5",
                       reference=None, moving=None):
         """Create an affine from a transform file."""
-        if fmt.lower() in ('itk', 'ants', 'elastix'):
+        if fmt.lower() in ("itk", "ants", "elastix"):
             _factory = io.itk.ITKLinearTransformArray
-        elif fmt.lower() in ('lta', 'fs'):
+        elif fmt.lower() in ("lta", "fs"):
             _factory = io.LinearTransformArray
         else:
             raise NotImplementedError
@@ -193,7 +197,7 @@ class Affine(TransformBase):
         if cls == Affine:
             if np.shape(matrix)[0] != 1:
                 raise TypeError(
-                    'Cannot load transform array "%s"' % filename)
+                    "Cannot load transform array '%s'" % filename)
             matrix = matrix[0]
         return cls(matrix, reference=reference)
 
@@ -297,9 +301,9 @@ class LinearTransformsMapping(Affine):
             affine = np.linalg.inv(affine)
         return np.swapaxes(affine.dot(coords), 1, 2)
 
-    def to_filename(self, filename, fmt='X5', moving=None):
+    def to_filename(self, filename, fmt="X5", moving=None):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-        if fmt.lower() in ('itk', 'ants', 'elastix'):
+        if fmt.lower() in ("itk", "ants", "elastix"):
             itkobj = io.itk.ITKLinearTransformArray.from_ras(self.matrix)
             itkobj.to_filename(filename)
             return filename
@@ -310,41 +314,41 @@ class LinearTransformsMapping(Affine):
         else:
             moving = self.reference
 
-        if fmt.lower() == 'afni':
+        if fmt.lower() == "afni":
             afniobj = io.afni.AFNILinearTransformArray.from_ras(
                 self.matrix, moving=moving, reference=self.reference)
             afniobj.to_filename(filename)
             return filename
 
-        if fmt.lower() == 'fsl':
+        if fmt.lower() == "fsl":
             fslobj = io.fsl.FSLLinearTransformArray.from_ras(
                 self.matrix, moving=moving, reference=self.reference
             )
             fslobj.to_filename(filename)
             return filename
 
-        if fmt.lower() in ('fs', 'lta'):
+        if fmt.lower() in ("fs", "lta"):
             # xform info
             # to make LTA file format
             lta = io.LinearTransformArray()
-            lta['type'] = 1  # RAS2RAS
+            lta["type"] = 1  # RAS2RAS
             for m in self.matrix:
                 lt = io.LinearTransform()
-                lt['sigma'] = 1.
-                lt['m_L'] = m
+                lt["sigma"] = 1.
+                lt["m_L"] = m
                 # Just for reference, nitransforms does not write VOX2VOX
-                lt['src'] = io.VolumeGeometry.from_image(moving)
-                lt['dst'] = io.VolumeGeometry.from_image(self.reference)
-                lta['xforms'].append(lt)
+                lt["src"] = io.VolumeGeometry.from_image(moving)
+                lt["dst"] = io.VolumeGeometry.from_image(self.reference)
+                lta["xforms"].append(lt)
 
-            with open(filename, 'w') as f:
+            with open(filename, "w") as f:
                 f.write(lta.to_string())
             return filename
 
         raise NotImplementedError
 
     def apply(self, spatialimage, reference=None,
-              order=3, mode='constant', cval=0.0, prefilter=True, output_dtype=None):
+              order=3, mode="constant", cval=0.0, prefilter=True, output_dtype=None):
         """
         Apply a transformation to an image, resampling on the reference spatial object.
 
@@ -359,11 +363,11 @@ class LinearTransformsMapping(Affine):
         order : int, optional
             The order of the spline interpolation, default is 3.
             The order has to be in the range 0-5.
-        mode : {'constant', 'reflect', 'nearest', 'mirror', 'wrap'}, optional
+        mode : {"constant", "reflect", "nearest", "mirror", "wrap"}, optional
             Determines how the input image is extended when the resamplings overflows
-            a border. Default is 'constant'.
+            a border. Default is "constant".
         cval : float, optional
-            Constant value for ``mode='constant'``. Default is 0.0.
+            Constant value for ``mode="constant"``. Default is 0.0.
         prefilter: bool, optional
             Determines if the image's data array is prefiltered with
             a spline filter before interpolation. The default is ``True``,
@@ -436,17 +440,17 @@ class LinearTransformsMapping(Affine):
         return resampled
 
 
-def load(filename, fmt='X5', reference=None, moving=None):
+def load(filename, fmt="X5", reference=None, moving=None):
     """
     Load a linear transform file.
 
     Examples
     --------
-    >>> xfm = load(datadir / 'affine-LAS.itk.tfm', fmt='itk')
+    >>> xfm = load(datadir / "affine-LAS.itk.tfm", fmt="itk")
     >>> isinstance(xfm, Affine)
     True
 
-    >>> xfm = load(datadir / 'itktflist.tfm', fmt='itk')
+    >>> xfm = load(datadir / "itktflist.tfm", fmt="itk")
     >>> isinstance(xfm, LinearTransformsMapping)
     True
 
