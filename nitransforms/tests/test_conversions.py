@@ -5,9 +5,17 @@ import numpy as np
 from .. import linear as _l
 
 
-def test_conversions(data_path):
+def test_conversions0(data_path):
     """Check conversions between formats."""
     lta = _l.load(data_path / "regressions" / "robust_register.lta", fmt="lta")
     itk = _l.load(data_path / "regressions" / "robust_register.tfm", fmt="itk")
+
+    assert np.allclose(lta.matrix, itk.matrix)
+
+
+def test_conversions1(data_path):
+    """Check conversions between formats."""
+    lta = _l.load(data_path / "regressions" / "bbregister.lta", fmt="lta")
+    itk = _l.load(data_path / "regressions" / "bbregister.tfm", fmt="itk")
 
     assert np.allclose(lta.matrix, itk.matrix)
