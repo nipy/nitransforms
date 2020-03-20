@@ -28,6 +28,9 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 3dAllineate -base {reference} -input {moving} \
 -prefix resampled.nii.gz -1Dmatrix_apply {transform} -final NN\
 """.format,
+    'fs': """\
+mri_vol2vol --mov {moving} --targ {reference} --lta {transform} \
+--o resampled.nii.gz --nearest --inv""".format,
 }
 
 
@@ -124,7 +127,7 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
 @pytest.mark.parametrize('image_orientation', [
     'RAS', 'LAS', 'LPS',  # 'oblique',
 ])
-@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni'])
+@pytest.mark.parametrize('sw_tool', ['itk', 'fsl', 'afni', 'fs'])
 def test_apply_linear_transform(
         tmpdir,
         get_testdata,
@@ -143,6 +146,8 @@ def test_apply_linear_transform(
     ext = ''
     if sw_tool == 'itk':
         ext = '.tfm'
+    elif sw_tool == 'fs':
+        ext = '.lta'
 
     img.to_filename('img.nii.gz')
     xfm_fname = 'M.%s%s' % (sw_tool, ext)

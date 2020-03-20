@@ -24,6 +24,7 @@ before_install:
       CI_ENV=`bash <(curl -s https://codecov.io/env)`
       docker pull ${DOCKER_IMAGE}  # pull latest release
       docker run $CI_ENV -itd --name fmriprep --entrypoint=/bin/bash -v `pwd`:/opt/nt -w /opt/nt ${DOCKER_IMAGE}
+      docker exec fmriprep sh -c 'echo "cHJpbnRmICJrcnp5c3p0b2YuZ29yZ29sZXdza2lAZ21haWwuY29tXG41MTcyXG4gKkN2dW12RVYzelRmZ1xuRlM1Si8yYzFhZ2c0RVxuIiA+IC9vcHQvZnJlZXN1cmZlci9saWNlbnNlLnR4dAo=" | base64 -d | sh'
     fi
 
 install:
