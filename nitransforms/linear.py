@@ -166,10 +166,16 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
             # xform info
             lt = io.LinearTransform()
             lt["sigma"] = 1.
-            lt["m_L"] = self.matrix
             # Just for reference, nitransforms does not write VOX2VOX
-            lt["src"] = io.VolumeGeometry.from_image(moving)
-            lt["dst"] = io.VolumeGeometry.from_image(self.reference)
+            # PLEASE NOTE THAT LTA USES THE "POINTS" CONVENTION, therefore
+            # the source is the reference (coordinates for which we need
+            # to find a projection) and destination is the moving image
+            # (from which data is pulled-back).
+            lt["src"] = io.VolumeGeometry.from_image(self.reference)
+            lt["dst"] = io.VolumeGeometry.from_image(moving)
+            # However, the affine needs to be inverted
+            # (i.e., it is not a pure "points" convention).
+            lt["m_L"] = np.linalg.inv(self.matrix)
             # to make LTA file format
             lta = io.LinearTransformArray()
             lta["type"] = 1  # RAS2RAS
