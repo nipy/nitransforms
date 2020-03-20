@@ -4,6 +4,7 @@
 import numpy as np
 import pytest
 from .. import linear as _l
+from ..io import LinearTransformArray as LTA
 
 
 @pytest.mark.parametrize('filename', [
@@ -19,6 +20,30 @@ def test_lta2itk_conversions(data_path, filename):
     itk = _l.load(data_path / "regressions" / ".".join((filename, "tfm")),
                   fmt="itk")
     assert np.allclose(lta.matrix, itk.matrix)
+
+
+@pytest.mark.parametrize('filename,moving,reference', [
+    ("from-fsnative_to-bold_mode-image", "T1w_fsnative.nii.gz", "bold.nii.gz"),
+    ("from-fsnative_to-scanner_mode-image", "T1w_fsnative.nii.gz", "T1w_scanner.nii.gz"),
+    ("from-scanner_to-bold_mode-image", "T1w_scanner.nii.gz", "bold.nii.gz"),
+    ("from-scanner_to-fsnative_mode-image", "T1w_scanner.nii.gz", "T1w_fsnative.nii.gz"),
+])
+def test_itk2lta_conversions(data_path, tmp_path, filename, moving, reference):
+    """Check conversions between formats."""
+    itk = _l.load(data_path / "regressions" / "".join((filename, ".tfm")),
+                  fmt="itk")
+    itk.reference = data_path / "regressions" / reference
+    itk.to_filename(tmp_path / "test.lta", fmt="fs",
+                    moving=data_path / "regressions" / moving)
+
+    converted_lta = LTA.from_filename(tmp_path / "test.lta")
+    expected_fname = data_path / "regressions" / "".join((filename, "_type-ras2ras.lta"))
+    if not expected_fname.exists():
+        expected_fname = data_path / "regressions" / "".join((filename, ".lta"))
+
+    exp_lta = LTA.from_filename(expected_fname)
+    assert np.allclose(converted_lta['xforms'][0]['m_L'],
+                       exp_lta['xforms'][0]['m_L'])
 
 
 def test_concatenation(data_path):
