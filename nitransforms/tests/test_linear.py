@@ -30,7 +30,7 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 """.format,
     'fs': """\
 mri_vol2vol --mov {moving} --targ {reference} --lta {transform} \
---o resampled.nii.gz --nearest --inv""".format,
+--o resampled.nii.gz --nearest""".format,
 }
 
 
