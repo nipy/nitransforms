@@ -342,6 +342,8 @@ def test_Displacements(sw_tool):
             afni.AFNIDisplacementsField.from_image(field)
 
 
-@pytest.mark.parametrize('file_type, test_file', [(LTA, 'robust_register.lta')])
+@pytest.mark.parametrize('file_type, test_file', [
+    (LTA, 'from-fsnative_to-scanner_mode-image.lta')
+])
 def test_regressions(file_type, test_file, data_path):
     file_type.from_filename(data_path / 'regressions' / test_file)
