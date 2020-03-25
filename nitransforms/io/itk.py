@@ -30,7 +30,9 @@ class ITKLinearTransform(LinearParameters):
         """Initialize with default offset and index."""
         super().__init__()
         self.structarr['index'] = 0
-        self.structarr['offset'] = offset or [0, 0, 0]
+        if offset is None:
+            offset = np.zeros((3,), dtype='float')
+        self.structarr['offset'] = offset
         self.structarr['parameters'] = np.eye(4)
         if parameters is not None:
             self.structarr['parameters'] = parameters
@@ -307,24 +309,25 @@ class ITKCompositeH5:
         except KeyError:
             typo_fallback = "Tranform"
 
-        for xfm in reversed(h5group.keys())[:-1]:
-            if h5group[xfm]["TransformType"][0].startswith(b"AffineTransform"):
+        for xfm in reversed(list(h5group.values())[1:]):
+            if xfm["TransformType"][0].startswith(b"AffineTransform"):
+                _params = np.asanyarray(xfm[f"{typo_fallback}Parameters"])
                 xfm_list.append(
                     ITKLinearTransform(
-                        parameters=np.asanyarray(h5group[xfm][f"{typo_fallback}Parameters"]),
-                        offset=np.asanyarray(h5group[xfm][f"{typo_fallback}FixedParameters"])
+                        parameters=from_matvec(_params[:-3].reshape(3, 3), _params[-3:]),
+                        offset=np.asanyarray(xfm[f"{typo_fallback}FixedParameters"])
                     )
                 )
                 continue
-            if h5group[xfm]["TransformType"][0].startswith(b"DisplacementFieldTransform"):
-                _fixed = np.asanyarray(h5group[xfm][f"{typo_fallback}FixedParameters"])
+            if xfm["TransformType"][0].startswith(b"DisplacementFieldTransform"):
+                _fixed = np.asanyarray(xfm[f"{typo_fallback}FixedParameters"])
                 shape = _fixed[:3].astype('uint16').tolist()
                 offset = _fixed[3:6].astype('uint16')
                 zooms = _fixed[6:9].astype('float')
                 directions = _fixed[9:].astype('float').reshape((3, 3))
                 affine = from_matvec(directions * zooms, offset)
-                field = np.asanyarray(h5group[xfm][f"{typo_fallback}Parameters"]).reshape(
-                    tuple(shape + [-1])
+                field = np.asanyarray(xfm[f"{typo_fallback}Parameters"]).reshape(
+                    tuple(shape + [1, -1])
                 )
                 hdr = Nifti1Header()
                 hdr.set_intent("vector")
@@ -338,7 +341,7 @@ class ITKCompositeH5:
                 continue
 
             raise NotImplementedError(
-                f"Unsupported transform type {h5group[xfm]['TransformType'][0]}"
+                f"Unsupported transform type {xfm['TransformType'][0]}"
             )
 
         return xfm_list
