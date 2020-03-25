@@ -77,7 +77,6 @@ jobs:
   test_pytest:
     machine:
       image: circleci/classic:201808-01
-    working_directory: /tmp/src/nitransforms
     environment:
       FS_LICENSE: "/tmp/fslicense/license.txt"
     working_directory: /tmp/tests
