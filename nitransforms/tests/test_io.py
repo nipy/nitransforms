@@ -345,6 +345,11 @@ def test_itk_h5(data_path):
         data_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5'
     )
 
+    with pytest.raises(RuntimeError):
+        itk.ITKCompositeH5.from_filename(
+            data_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.x5'
+        )
+
 
 @pytest.mark.parametrize('file_type, test_file', [
     (LTA, 'from-fsnative_to-scanner_mode-image.lta')
