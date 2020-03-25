@@ -8,7 +8,6 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
 from pathlib import Path
-from collections.abc import Iterable
 import numpy as np
 import h5py
 import warnings
@@ -168,10 +167,10 @@ class ImageGrid(SampledSpatialData):
         return not self == other
 
 
-class TransformBase(object):
+class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ['_reference']
+    __slots__ = ('_reference', )
 
     def __init__(self, reference=None):
         """Instantiate a transform."""
@@ -191,13 +190,11 @@ class TransformBase(object):
         -------
         >>> T1 = TransformBase()
         >>> added = T1 + TransformBase()
-        >>> isinstance(added, TransformChain)
-        True
-
         >>> len(added.transforms)
         2
 
         """
+        from .manip import TransformChain
         return TransformChain(transforms=[self, b])
 
     @property
@@ -322,127 +319,6 @@ class TransformBase(object):
         raise NotImplementedError
 
 
-class TransformChain(TransformBase):
-    """Implements the concatenation of transforms."""
-
-    __slots__ = ['_transforms']
-
-    def __init__(self, transforms=None):
-        """Initialize a chain of transforms."""
-        self._transforms = None
-        if transforms is not None:
-            self.transforms = transforms
-
-    def __add__(self, b):
-        """
-        Compose this and other transforms.
-
-        Example
-        -------
-        >>> T1 = TransformBase()
-        >>> added = T1 + TransformBase() + TransformBase()
-        >>> isinstance(added, TransformChain)
-        True
-
-        >>> len(added.transforms)
-        3
-
-        """
-        self.append(b)
-        return self
-
-    def __getitem__(self, i):
-        """
-        Enable indexed access of transform chains.
-
-        Example
-        -------
-        >>> T1 = TransformBase()
-        >>> chain = T1 + TransformBase()
-        >>> chain[0] is T1
-        True
-
-        """
-        return self.transforms[i]
-
-    def __len__(self):
-        """Enable using len()."""
-        return len(self.transforms)
-
-    @property
-    def transforms(self):
-        """Get the internal list of transforms."""
-        return self._transforms
-
-    @transforms.setter
-    def transforms(self, value):
-        self._transforms = _as_chain(value)
-        if self.transforms[0].reference:
-            self.reference = self.transforms[0].reference
-
-    def append(self, x):
-        """
-        Concatenate one element to the chain.
-
-        Example
-        -------
-        >>> chain = TransformChain(transforms=TransformBase())
-        >>> chain.append((TransformBase(), TransformBase()))
-        >>> len(chain)
-        3
-
-        """
-        self.transforms += _as_chain(x)
-
-    def insert(self, i, x):
-        """
-        Insert an item at a given position.
-
-        Example
-        -------
-        >>> chain = TransformChain(transforms=[TransformBase(), TransformBase()])
-        >>> chain.insert(1, TransformBase())
-        >>> len(chain)
-        3
-
-        >>> chain.insert(1, TransformChain(chain))
-        >>> len(chain)
-        6
-
-        """
-        self.transforms = self.transforms[:i] + _as_chain(x) + self.transforms[i:]
-
-    def map(self, x, inverse=False):
-        """
-        Apply a succession of transforms, e.g., :math:`y = f_3(f_2(f_1(f_0(x))))`.
-
-        Example
-        -------
-        >>> chain = TransformChain(transforms=[TransformBase(), TransformBase()])
-        >>> chain([(0., 0., 0.), (1., 1., 1.), (-1., -1., -1.)])
-        [(0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (-1.0, -1.0, -1.0)]
-
-        >>> chain([(0., 0., 0.), (1., 1., 1.), (-1., -1., -1.)], inverse=True)
-        [(0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (-1.0, -1.0, -1.0)]
-
-        >>> TransformChain()((0., 0., 0.))  # doctest: +IGNORE_EXCEPTION_DETAIL
-        Traceback (most recent call last):
-        TransformError:
-
-        """
-        if not self.transforms:
-            raise TransformError('Cannot apply an empty transforms chain.')
-
-        transforms = self.transforms
-        if inverse:
-            transforms = reversed(self.transforms)
-
-        for xfm in transforms:
-            x = xfm(x, inverse=inverse)
-
-        return x
-
-
 def _as_homogeneous(xyz, dtype='float32', dim=3):
     """
     Convert 2D and 3D coordinates into homogeneous coordinates.
@@ -473,12 +349,3 @@ def _as_homogeneous(xyz, dtype='float32', dim=3):
 def _apply_affine(x, affine, dim):
     """Get the image array's indexes corresponding to coordinates."""
     return affine.dot(_as_homogeneous(x, dim=dim).T)[:dim, ...].T
-
-
-def _as_chain(x):
-    """Convert a value into a transform chain."""
-    if isinstance(x, TransformChain):
-        return x.transforms
-    if isinstance(x, Iterable):
-        return list(x)
-    return [x]

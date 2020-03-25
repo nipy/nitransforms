@@ -341,14 +341,14 @@ def test_afni_Displacements():
 
 def test_itk_h5(data_path):
     """Test displacements fields."""
-    itk.ITKCompositeH5.from_filename(
+    assert len(list(itk.ITKCompositeH5.from_filename(
         data_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5'
-    )
+    ))) == 2
 
     with pytest.raises(RuntimeError):
-        itk.ITKCompositeH5.from_filename(
+        list(itk.ITKCompositeH5.from_filename(
             data_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.x5'
-        )
+        ))
 
 
 @pytest.mark.parametrize('file_type, test_file', [
