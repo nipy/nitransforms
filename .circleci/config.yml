@@ -123,6 +123,7 @@ jobs:
                 --flags unittests -e CIRCLE_JOB
       - run:
           name: Clean up tests directory
+          when: on_success
           command: |
             rm -rf /tmp/tests/pytest-of-root
       - store_artifacts:
