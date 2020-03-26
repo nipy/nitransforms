@@ -324,22 +324,31 @@ def test_read_mat2(tmpdir, monkeypatch, matlab_ver):
                 _read_mat(f)
 
 
-@pytest.mark.parametrize('sw_tool', ['afni'])
-def test_Displacements(sw_tool):
+def test_afni_Displacements():
     """Test displacements fields."""
+    field = nb.Nifti1Image(np.zeros((10, 10, 10)), None, None)
+    with pytest.raises(TransformFileError):
+        afni.AFNIDisplacementsField.from_image(field)
 
-    if sw_tool == 'afni':
-        field = nb.Nifti1Image(np.zeros((10, 10, 10)), None, None)
-        with pytest.raises(TransformFileError):
-            afni.AFNIDisplacementsField.from_image(field)
+    field = nb.Nifti1Image(np.zeros((10, 10, 10, 2, 3)), None, None)
+    with pytest.raises(TransformFileError):
+        afni.AFNIDisplacementsField.from_image(field)
 
-        field = nb.Nifti1Image(np.zeros((10, 10, 10, 2, 3)), None, None)
-        with pytest.raises(TransformFileError):
-            afni.AFNIDisplacementsField.from_image(field)
+    field = nb.Nifti1Image(np.zeros((10, 10, 10, 1, 4)), None, None)
+    with pytest.raises(TransformFileError):
+        afni.AFNIDisplacementsField.from_image(field)
 
-        field = nb.Nifti1Image(np.zeros((10, 10, 10, 1, 4)), None, None)
-        with pytest.raises(TransformFileError):
-            afni.AFNIDisplacementsField.from_image(field)
+
+def test_itk_h5(data_path):
+    """Test displacements fields."""
+    assert len(list(itk.ITKCompositeH5.from_filename(
+        data_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5'
+    ))) == 2
+
+    with pytest.raises(RuntimeError):
+        list(itk.ITKCompositeH5.from_filename(
+            data_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.x5'
+        ))
 
 
 @pytest.mark.parametrize('file_type, test_file', [

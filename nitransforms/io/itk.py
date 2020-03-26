@@ -2,6 +2,7 @@
 import warnings
 import numpy as np
 from scipy.io import savemat as _save_mat
+from nibabel import Nifti1Header, Nifti1Image
 from nibabel.affines import from_matvec
 from .base import (
     BaseLinearTransformList,
@@ -29,7 +30,9 @@ class ITKLinearTransform(LinearParameters):
         """Initialize with default offset and index."""
         super().__init__()
         self.structarr['index'] = 0
-        self.structarr['offset'] = offset or [0, 0, 0]
+        if offset is None:
+            offset = np.zeros((3,), dtype='float')
+        self.structarr['offset'] = offset
         self.structarr['parameters'] = np.eye(4)
         if parameters is not None:
             self.structarr['parameters'] = parameters
@@ -280,3 +283,65 @@ class ITKDisplacementsField(DisplacementsField):
         field[..., (0, 1)] *= -1.0
 
         return imgobj.__class__(field, imgobj.affine, hdr)
+
+
+class ITKCompositeH5:
+    """A data structure for ITK's HDF5 files."""
+
+    @classmethod
+    def from_filename(cls, filename):
+        """Read the struct from a file given its path."""
+        from h5py import File as H5File
+        if not str(filename).endswith('.h5'):
+            raise RuntimeError("Extension is not .h5")
+
+        with H5File(str(filename)) as f:
+            return cls.from_h5obj(f)
+
+    @classmethod
+    def from_h5obj(cls, fileobj, check=True):
+        """Read the struct from a file object."""
+        xfm_list = []
+        h5group = fileobj["TransformGroup"]
+        typo_fallback = "Transform"
+        try:
+            h5group['1'][f"{typo_fallback}Parameters"]
+        except KeyError:
+            typo_fallback = "Tranform"
+
+        for xfm in list(h5group.values())[1:]:
+            if xfm["TransformType"][0].startswith(b"AffineTransform"):
+                _params = np.asanyarray(xfm[f"{typo_fallback}Parameters"])
+                xfm_list.append(
+                    ITKLinearTransform(
+                        parameters=from_matvec(_params[:-3].reshape(3, 3), _params[-3:]),
+                        offset=np.asanyarray(xfm[f"{typo_fallback}FixedParameters"])
+                    )
+                )
+                continue
+            if xfm["TransformType"][0].startswith(b"DisplacementFieldTransform"):
+                _fixed = np.asanyarray(xfm[f"{typo_fallback}FixedParameters"])
+                shape = _fixed[:3].astype('uint16').tolist()
+                offset = _fixed[3:6].astype('uint16')
+                zooms = _fixed[6:9].astype('float')
+                directions = _fixed[9:].astype('float').reshape((3, 3))
+                affine = from_matvec(directions * zooms, offset)
+                field = np.asanyarray(xfm[f"{typo_fallback}Parameters"]).reshape(
+                    tuple(shape + [1, -1])
+                )
+                hdr = Nifti1Header()
+                hdr.set_intent("vector")
+                hdr.set_data_dtype("float")
+
+                xfm_list.append(
+                    ITKDisplacementsField.from_image(
+                        Nifti1Image(field.astype("float"), affine, hdr)
+                    )
+                )
+                continue
+
+            raise NotImplementedError(
+                f"Unsupported transform type {xfm['TransformType'][0]}"
+            )
+
+        return xfm_list
