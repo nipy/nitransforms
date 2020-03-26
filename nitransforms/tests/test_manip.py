@@ -29,7 +29,6 @@ def test_itk_h5(tmp_path, data_path):
     nb.Nifti1Image(
         np.zeros(xfm.reference.shape, dtype='uint16'),
         xfm.reference.affine,
-        None
     ).to_filename(str(ref_fname))
 
     # Then apply the transform and cross-check with software
