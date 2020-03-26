@@ -1,0 +1,196 @@
+version: 2
+jobs:
+  build:
+    machine:
+      image: circleci/classic:201808-01
+    working_directory: /tmp/src/nitransforms
+    environment:
+      TZ: "/usr/share/zoneinfo/America/Los_Angeles"
+      SCRATCH: "/scratch"
+
+    steps:
+    - restore_cache:
+        keys:
+          - build-v1-{{ .Branch }}-{{ epoch }}
+          - build-v1-{{ .Branch }}-
+          - build-v1-master-
+          - build-v1-
+        paths:
+          - /tmp/docker
+    - run:
+        name: Set-up a Docker registry
+        command: |
+            docker run -d -p 5000:5000 --restart=always --name=registry \
+                -v /tmp/docker:/var/lib/registry registry:2
+    - run:
+        name: Pull existing images
+        command: |
+            set +e
+            docker pull localhost:5000/ubuntu
+            success=$?
+            set -e
+            if [[ "$success" = "0" ]]; then
+                echo "Pulling from local registry"
+                docker tag localhost:5000/ubuntu ubuntu:xenial-20200114
+                docker pull localhost:5000/nitransforms
+                docker tag localhost:5000/nitransforms nitransforms:latest
+            else
+                echo "Pulling from Docker Hub"
+                docker pull ubuntu:xenial-20200114
+                docker tag ubuntu:xenial-20200114 localhost:5000/ubuntu
+                docker push localhost:5000/ubuntu
+            fi
+    - checkout
+    - run:
+        name: Build Docker image & push to registry
+        no_output_timeout: 60m
+        command: |
+            e=1 && for i in {1..5}; do
+                docker build --rm --cache-from=nitransforms:latest \
+                -t nitransforms:latest \
+                --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
+                --build-arg VCS_REF=`git rev-parse --short HEAD` . \
+                && e=0 && break || sleep 15
+            done && [ "$e" -eq "0" ]
+            docker tag nitransforms:latest localhost:5000/nitransforms
+            docker push localhost:5000/nitransforms
+    - run:
+        name: Docker registry garbage collection
+        command: |
+            docker exec -it registry /bin/registry garbage-collect --delete-untagged \
+                /etc/docker/registry/config.yml
+    - save_cache:
+        key: build-v1-{{ .Branch }}-{{ epoch }}
+        paths:
+          - /tmp/docker
+    - run:
+        name: Store FreeSurfer license file
+        command: |
+            mkdir -p /tmp/fslicense
+            cd /tmp/fslicense
+            echo "cHJpbnRmICJrcnp5c3p0b2YuZ29yZ29sZXdza2lAZ21haWwuY29tXG41MTcyXG4gKkN2dW12RVYzelRmZ1xuRlM1Si8yYzFhZ2c0RVxuIiA+IGxpY2Vuc2UudHh0Cg==" | base64 -d | sh
+    - persist_to_workspace:
+        root: /tmp
+        paths:
+          - fslicense
+
+  test_pytest:
+    machine:
+      image: circleci/classic:201808-01
+    environment:
+      FS_LICENSE: "/tmp/fslicense/license.txt"
+    working_directory: /tmp/tests
+    steps:
+      - attach_workspace:
+          at: /tmp
+      - checkout:
+          path: /tmp/src/nitransforms
+      - run:
+          name: Get codecov
+          command: python -m pip install codecov
+      - restore_cache:
+          keys:
+            - build-v1-{{ .Branch }}-{{ epoch }}
+            - build-v1-{{ .Branch }}-
+            - build-v1-master-
+            - build-v1-
+      - run:
+          name: Set-up a Docker registry & pull
+          command: |
+            docker run -d -p 5000:5000 --restart=always --name=registry \
+                -v /tmp/docker:/var/lib/registry registry:2
+            docker pull localhost:5000/nitransforms
+            docker tag localhost:5000/nitransforms nitransforms:latest
+      - run:
+          name: Run unit tests
+          no_output_timeout: 2h
+          command: |
+            mkdir -p $PWD/artifacts $PWD/summaries
+            sudo setfacl -d -m group:ubuntu:rwx $PWD
+            sudo setfacl -m group:ubuntu:rwx $PWD
+            docker run -u $( id -u ) -it --rm=false -w /src/nitransforms \
+              -e COVERAGE_FILE=/tmp/summaries/.pytest.coverage \
+              -v /tmp/fslicense/license.txt:/opt/freesurfer/license.txt:ro \
+              -v ${PWD}:/tmp nitransforms:latest \
+              pytest --junit-xml=/tmp/summaries/pytest.xml \
+                     --cov nitransforms --cov-report xml:/tmp/summaries/unittests.xml \
+                     nitransforms/
+      - run:
+          name: Submit unit test coverage
+          command: |
+            cd /tmp/src/nitransforms
+            python -m codecov --file /tmp/tests/summaries/unittests.xml \
+                --flags unittests -e CIRCLE_JOB
+      - run:
+          name: Clean up tests directory
+          when: on_success
+          command: |
+            rm -rf /tmp/tests/pytest-of-root
+      - store_artifacts:
+          path: /tmp/tests/artifacts
+
+      - store_test_results:
+          path: /tmp/tests/summaries/
+
+  test_packaging_and_deploy:
+    machine:
+      image: circleci/classic:201808-01
+    working_directory: /tmp/src/nitransforms
+    steps:
+      - checkout
+      - run: pyenv local 3.7.0
+      - run:
+          name: Install build depends
+          command: python3 -m pip install "setuptools>=30.4.0" "pip>=10.0.1" "twine<2.0" docutils
+      - run:
+          name: Build and check
+          command: |
+            python3 setup.py check -r -s
+            python3 setup.py sdist
+            python3 -m twine check dist/*
+      - run:
+          name: Validate version
+          command: |
+            THISVERSION=$( python3 get_version.py )
+            python3 -m pip install dist/*.tar.gz
+            mkdir empty
+            cd empty
+            INSTALLED=$( python3 -c 'import nitransforms; print(nitransforms.__version__)' )
+            test "${CIRCLE_TAG:-$THISVERSION}" == "$INSTALLED"
+      - run:
+          name: Upload to PyPi
+          command: |
+            python3 -m twine upload dist/*
+
+
+workflows:
+  version: 2
+  build_test_deploy:
+    jobs:
+      - build:
+          filters:
+            branches:
+              ignore:
+                - /docs?\/.*/
+            tags:
+              only: /.*/
+
+      - test_pytest:
+          requires:
+            - build
+          filters:
+            branches:
+              ignore:
+                - /docs?\/.*/
+                - /docker\/.*/
+            tags:
+              only: /.*/
+
+      - test_packaging_and_deploy:
+          requires:
+            - test_pytest
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /.*/
