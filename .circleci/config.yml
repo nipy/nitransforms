@@ -64,6 +64,19 @@ jobs:
           paths:
             - /tmp/docker
       - run:
+          name: Check version packaged in Docker image
+          command: |
+              THISVERSION=$(python3 setup.py --version)
+              THISVERSION=${CIRCLE_TAG:-$THISVERSION}
+              INSTALLED_VERSION=$(\
+                docker run -it --rm --entrypoint=python nitransforms \
+                    -c 'import nitransforms as nit; print(nit.__version__)')
+              INSTALLED_VERSION=${INSTALLED_VERSION%$'\r'}
+              echo "VERSION: \"$THISVERSION\""
+              echo "INSTALLED: \"$INSTALLED_VERSION\""
+              test "$INSTALLED_VERSION" = "$THISVERSION"
+
+      - run:
           name: Store FreeSurfer license file
           command: |
               mkdir -p /tmp/fslicense
@@ -125,16 +138,81 @@ jobs:
       - store_test_results:
           path: /tmp/tests/summaries/
 
-  test_packaging_and_deploy:
-    machine:
-      image: circleci/classic:201808-01
+  test_package:
+    docker:
+      - image: circleci/python:3.7.4
     working_directory: /tmp/src/nitransforms
     steps:
       - checkout
-      - run: pyenv local 3.7.0
+      - run:
+          name: Setup Python environment with virtualenvs
+          command: |
+            python -m pip install --user --upgrade virtualenv pip
+      - run:
+          name: Prepare build environment
+          command: |
+            virtualenv --python=python3 /tmp/build
+            source /tmp/build/bin/activate
+            python3 -m pip install "setuptools ~= 42.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1" \
+                twine docutils
+      - run:
+          name: Build NiTransforms in build environment
+          command: |
+            source /tmp/build/bin/activate
+            python setup.py sdist bdist_wheel
+      - run:
+          name: Check sdist package in build environment
+          command: |
+            source /tmp/build/bin/activate
+            twine check dist/nitransforms*
+      - store_artifacts:
+          path: /tmp/src/nitransforms/dist
+      - run:
+          name: Prepare sdist install environment
+          command: |
+            virtualenv --python=python3 /tmp/install_sdist
+            source /tmp/install_sdist/bin/activate
+            python3 -m pip install "setuptools ~= 42.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1"
+      - run:
+          name: Install sdist package into install environment and check version
+          command: |
+            source /tmp/install_sdist/bin/activate
+            THISVERSION=$( python setup.py --version )
+            THISVERSION=${CIRCLE_TAG:-$THISVERSION}
+            pip install dist/nitransforms*.tar.gz
+            INSTALLED_VERSION=$(python -c 'import nitransforms as nit; print(nit.__version__)')
+            INSTALLED_VERSION=${INSTALLED_VERSION%$'\r'}
+            echo "VERSION: \"$THISVERSION\""
+            echo "INSTALLED: \"$INSTALLED_VERSION\""
+            test "$INSTALLED_VERSION" = "$THISVERSION"
+      - run:
+          name: Prepare wheel install environment
+          command: |
+            virtualenv --python=python3 /tmp/install_wheel
+            source /tmp/install_wheel/bin/activate
+            python3 -m pip install "setuptools ~= 42.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1"
+      - run:
+          name: Install wheel into install environment and check version
+          command: |
+            source /tmp/install_wheel/bin/activate
+            THISVERSION=$( python setup.py --version )
+            THISVERSION=${CIRCLE_TAG:-$THISVERSION}
+            pip install dist/nitransforms*.whl
+            INSTALLED_VERSION=$(python -c 'import nitransforms as nit; print(nit.__version__)')
+            INSTALLED_VERSION=${INSTALLED_VERSION%$'\r'}
+            echo "VERSION: \"$THISVERSION\""
+            echo "INSTALLED: \"$INSTALLED_VERSION\""
+            test "$INSTALLED_VERSION" = "$THISVERSION"
+
+  deploy_pypi:
+    docker:
+      - image: circleci/python:3.7.4
+    working_directory: /tmp/src/nitransforms
+    steps:
+      - checkout
       - run:
           name: Install build depends
-          command: python3 -m pip install "setuptools>=30.4.0" "pip>=10.0.1" "twine<2.0" docutils
+          command: python3 -m pip install "setuptools ~= 42.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1" "twine<2.0" docutils
       - run:
           name: Build and check
           command: |
@@ -144,7 +222,7 @@ jobs:
       - run:
           name: Validate version
           command: |
-            THISVERSION=$( python3 get_version.py )
+            THISVERSION=$( python setup.py --version )
             python3 -m pip install dist/*.tar.gz
             mkdir empty
             cd empty
@@ -167,9 +245,18 @@ workflows:
             tags:
               only: /.*/
 
-      - test_packaging_and_deploy:
+      - test_package:
+          filters:
+            branches:
+              ignore:
+                - /docs?\/.*/
+            tags:
+              only: /.*/
+
+      - deploy_pypi:
           requires:
             - build_pytest
+            - test_package
           filters:
             branches:
               ignore: /.*/
