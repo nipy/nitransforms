@@ -114,9 +114,6 @@ jobs:
               -v ${PWD}:/tmp nitransforms:latest \
               pytest --junit-xml=/tmp/summaries/pytest.xml \
                      --cov nitransforms --cov-report xml:/tmp/summaries/unittests.xml \
-                     --ignore=nitransforms/tests/ \
-                     --ignore=nitransforms/joss/ \
-                     --ignore=nitransforms/docker/ \
                      nitransforms/
       - run:
           name: Submit unit test coverage
