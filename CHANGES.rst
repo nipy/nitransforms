@@ -32,6 +32,8 @@ This release accompanies the `ISBI2020 preprint <https://doi.org/10.31219/osf.io
   * ENH: Revise doctests and get them ready for more thorough testing. (#10)
   * DOC: Add figure to JOSS draft / Add @smoia to author list (#61)
   * DOC: Initial JOSS draft (#47)
+  * MAINT: Use setuptools_scm to manage versioning (#83)
+  * MAINT: Split binary test-data out from gh repo (#84)
   * MAINT: Add docker image/circle build (#80)
   * MAINT: Drop Python 3.5 (#77)
   * MAINT: Better config on setup.py (binary operator starting line) (#60)
