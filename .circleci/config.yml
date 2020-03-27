@@ -42,14 +42,21 @@ jobs:
               fi
       - checkout
       - run:
+          name: Prepare a Python environment
+          command: |
+              pyenv local 3.7.0
+              python3 -m pip install "setuptools ~= 42.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1"
+      - run:
           name: Build Docker image & push to registry
           no_output_timeout: 60m
           command: |
+              pyenv local 3.7.0
               e=1 && for i in {1..5}; do
                   docker build --rm --cache-from=nitransforms:latest \
                   -t nitransforms:latest \
                   --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
-                  --build-arg VCS_REF=`git rev-parse --short HEAD` . \
+                  --build-arg VCS_REF=`git rev-parse --short HEAD` \
+                  --build-arg VERSION=$( python3 setup.py --version ) . \
                   && e=0 && break || sleep 15
               done && [ "$e" -eq "0" ]
               docker tag nitransforms:latest localhost:5000/nitransforms
@@ -67,7 +74,6 @@ jobs:
           name: Check version packaged in Docker image
           command: |
               pyenv local 3.7.0
-              python3 -m pip install "setuptools ~= 42.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1"
               THISVERSION=${CIRCLE_TAG:-$(python3 setup.py --version)}
               INSTALLED_VERSION=$(\
                 docker run -it --rm --entrypoint=python nitransforms \

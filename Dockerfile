@@ -131,12 +131,10 @@ WORKDIR /home/neuro
 ENV HOME="/home/neuro"
 
 # Install package
+# CRITICAL: Make sure python setup.py --version has been run at least once
+#           outside the container, with access to the git history.
 COPY . /src/nitransforms
-ARG VERSION
-# Force static versioning within container
-RUN echo "${VERSION}" > /src/nitransforms/nitransforms/VERSION && \
-    echo "include nitransforms/VERSION" >> /src/nitransforms/MANIFEST.in && \
-    pip install --no-cache-dir "/src/nitransforms[all]"
+RUN pip install --no-cache-dir "/src/nitransforms[all]"
 
 RUN find $HOME -type d -exec chmod go=u {} + && \
     find $HOME -type f -exec chmod go=u {} +
