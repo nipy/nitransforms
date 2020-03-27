@@ -200,7 +200,7 @@ jobs:
     working_directory: /tmp/src/nitransforms
     steps:
       - attach_workspace:
-        at: /tmp/src/nitransforms
+          at: /tmp/src/nitransforms
       - run:
           name: Upload to Pypi
           command: |
