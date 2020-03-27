@@ -18,7 +18,21 @@ Geometric transforms.
 """
 from .linear import Affine
 from .nonlinear import DisplacementsFieldTransform
-from .io import afni, fsl, itk
+
+try:
+    from ._version import __version__
+except ModuleNotFoundError:
+    from pkg_resources import get_distribution, DistributionNotFound
+    try:
+        __version__ = get_distribution('nitransforms').version
+    except DistributionNotFound:
+        __version__ = 'unknown'
+    del get_distribution
+    del DistributionNotFound
 
 
-__all__ = ['afni', 'fsl', 'itk', 'Affine', 'DisplacementsFieldTransform']
+__all__ = [
+    'Affine',
+    'DisplacementsFieldTransform',
+    '__version__',
+]
