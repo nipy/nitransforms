@@ -66,16 +66,15 @@ jobs:
       - run:
           name: Check version packaged in Docker image
           command: |
-              THISVERSION=$(python3 setup.py --version)
-              THISVERSION=${CIRCLE_TAG:-$THISVERSION}
+              pyenv local 3.7.0
+              python3 -m pip install "setuptools ~= 42.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1"
+              THISVERSION=${CIRCLE_TAG:-$(python3 setup.py --version)}
               INSTALLED_VERSION=$(\
                 docker run -it --rm --entrypoint=python nitransforms \
-                    -c 'import nitransforms as nit; print(nit.__version__)')
-              INSTALLED_VERSION=${INSTALLED_VERSION%$'\r'}
-              echo "VERSION: \"$THISVERSION\""
-              echo "INSTALLED: \"$INSTALLED_VERSION\""
-              test "$INSTALLED_VERSION" = "$THISVERSION"
-
+                    -c 'import nitransforms as nit; print(nit.__version__, end="")' )
+              echo "VERSION: \"${THISVERSION}\""
+              echo "INSTALLED: \"${INSTALLED_VERSION}\""
+              # test "${INSTALLED_VERSION}" = "${THISVERSION}"
       - run:
           name: Store FreeSurfer license file
           command: |
@@ -180,11 +179,10 @@ jobs:
             THISVERSION=$( python setup.py --version )
             THISVERSION=${CIRCLE_TAG:-$THISVERSION}
             pip install dist/nitransforms*.tar.gz
-            INSTALLED_VERSION=$(python -c 'import nitransforms as nit; print(nit.__version__)')
-            INSTALLED_VERSION=${INSTALLED_VERSION%$'\r'}
-            echo "VERSION: \"$THISVERSION\""
-            echo "INSTALLED: \"$INSTALLED_VERSION\""
-            test "$INSTALLED_VERSION" = "$THISVERSION"
+            INSTALLED_VERSION=$(python -c 'import nitransforms as nit; print(nit.__version__, end="")')
+            echo "VERSION: \"${THISVERSION}\""
+            echo "INSTALLED: \"${INSTALLED_VERSION}\""
+            test "${INSTALLED_VERSION}" = "${THISVERSION}"
       - run:
           name: Prepare wheel install environment
           command: |
@@ -198,11 +196,10 @@ jobs:
             THISVERSION=$( python setup.py --version )
             THISVERSION=${CIRCLE_TAG:-$THISVERSION}
             pip install dist/nitransforms*.whl
-            INSTALLED_VERSION=$(python -c 'import nitransforms as nit; print(nit.__version__)')
-            INSTALLED_VERSION=${INSTALLED_VERSION%$'\r'}
-            echo "VERSION: \"$THISVERSION\""
-            echo "INSTALLED: \"$INSTALLED_VERSION\""
-            test "$INSTALLED_VERSION" = "$THISVERSION"
+            INSTALLED_VERSION=$(python -c 'import nitransforms as nit; print(nit.__version__, end="")')
+            echo "VERSION: \"${THISVERSION}\""
+            echo "INSTALLED: \"${INSTALLED_VERSION}\""
+            test "${INSTALLED_VERSION}" = "${THISVERSION}"
 
   deploy_pypi:
     docker:
