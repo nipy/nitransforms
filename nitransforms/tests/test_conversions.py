@@ -28,13 +28,13 @@ def test_lta2itk_conversions(data_path, filename):
     ("from-scanner_to-bold_mode-image", "T1w_scanner.nii.gz", "bold.nii.gz"),
     ("from-scanner_to-fsnative_mode-image", "T1w_scanner.nii.gz", "T1w_fsnative.nii.gz"),
 ])
-def test_itk2lta_conversions(data_path, tmp_path, filename, moving, reference):
+def test_itk2lta_conversions(data_path, testdata_path, tmp_path, filename, moving, reference):
     """Check conversions between formats."""
     itk = _l.load(data_path / "regressions" / "".join((filename, ".tfm")),
                   fmt="itk")
-    itk.reference = data_path / "regressions" / reference
+    itk.reference = testdata_path / reference
     itk.to_filename(tmp_path / "test.lta", fmt="fs",
-                    moving=data_path / "regressions" / moving)
+                    moving=testdata_path / moving)
 
     converted_lta = LTA.from_filename(tmp_path / "test.lta")
     expected_fname = data_path / "regressions" / "".join((filename, "_type-ras2ras.lta"))

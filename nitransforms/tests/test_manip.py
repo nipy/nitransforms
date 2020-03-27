@@ -15,11 +15,11 @@ from .test_nonlinear import (
 )
 
 
-def test_itk_h5(tmp_path, data_path):
+def test_itk_h5(tmp_path, testdata_path):
     """Check a translation-only field on one or more axes, different image orientations."""
     os.chdir(str(tmp_path))
-    img_fname = data_path / "regressions" / "T1w_scanner.nii.gz"
-    xfm_fname = data_path / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"
+    img_fname = testdata_path / "T1w_scanner.nii.gz"
+    xfm_fname = testdata_path / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"
 
     xfm = _load(xfm_fname)
 
