@@ -158,7 +158,6 @@ jobs:
           name: Build NiTransforms in build environment and check
           command: |
             source /tmp/buildenv/bin/activate
-            python3 setup.py check -r -s
             python setup.py sdist bdist_wheel
             twine check dist/nitransforms*
       - store_artifacts:
