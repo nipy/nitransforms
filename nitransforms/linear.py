@@ -40,7 +40,7 @@ class Affine(TransformBase):
 
         Examples
         --------
-        >>> xfm = Affine(reference=datadir / "someones_anatomy.nii.gz")
+        >>> xfm = Affine(reference=test_dir / "someones_anatomy.nii.gz")
         >>> xfm.matrix  # doctest: +NORMALIZE_WHITESPACE
         array([[1., 0., 0., 0.],
                [0., 1., 0., 0.],
@@ -452,11 +452,11 @@ def load(filename, fmt="X5", reference=None, moving=None):
 
     Examples
     --------
-    >>> xfm = load(datadir / "affine-LAS.itk.tfm", fmt="itk")
+    >>> xfm = load(regress_dir / "affine-LAS.itk.tfm", fmt="itk")
     >>> isinstance(xfm, Affine)
     True
 
-    >>> xfm = load(datadir / "itktflist.tfm", fmt="itk")
+    >>> xfm = load(regress_dir / "itktflist.tfm", fmt="itk")
     >>> isinstance(xfm, LinearTransformsMapping)
     True
 

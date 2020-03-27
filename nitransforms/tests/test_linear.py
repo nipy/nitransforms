@@ -57,9 +57,9 @@ def test_linear_valueerror():
         ntl.Affine(np.ones((4, 4)))
 
 
-def test_loadsave_itk(tmp_path, data_path):
+def test_loadsave_itk(tmp_path, data_path, testdata_path):
     """Test idempotency."""
-    ref_file = data_path / 'someones_anatomy.nii.gz'
+    ref_file = testdata_path / 'someones_anatomy.nii.gz'
     xfm = ntl.load(data_path / 'itktflist2.tfm', fmt='itk')
     assert isinstance(xfm, ntl.LinearTransformsMapping)
     xfm.reference = ref_file
@@ -76,9 +76,9 @@ def test_loadsave_itk(tmp_path, data_path):
 
 @pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize('fmt', ['itk', 'fsl', 'afni', 'lta'])
-def test_loadsave(tmp_path, data_path, fmt):
+def test_loadsave(tmp_path, data_path, testdata_path, fmt):
     """Test idempotency."""
-    ref_file = data_path / 'someones_anatomy.nii.gz'
+    ref_file = testdata_path / 'someones_anatomy.nii.gz'
     xfm = ntl.load(data_path / 'itktflist2.tfm', fmt='itk')
     xfm.reference = ref_file
 
@@ -88,7 +88,7 @@ def test_loadsave(tmp_path, data_path, fmt):
     xfm.to_filename(fname, fmt=fmt, moving=ref_file)
     xfm == ntl.load(fname, fmt=fmt, reference=ref_file)
 
-    ref_file = data_path / 'someones_anatomy.nii.gz'
+    ref_file = testdata_path / 'someones_anatomy.nii.gz'
     xfm = ntl.load(data_path / 'affine-LAS.itk.tfm', fmt='itk')
     xfm.reference = ref_file
     fname = tmp_path / '.'.join(('single-transform', fmt))
@@ -173,46 +173,46 @@ def test_apply_linear_transform(
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
 
 
-def test_Affine_to_x5(tmpdir, data_path):
+def test_Affine_to_x5(tmpdir, testdata_path):
     """Test affine's operations."""
     tmpdir.chdir()
     aff = ntl.Affine()
     with h5py.File('xfm.x5', 'w') as f:
         aff._to_hdf5(f.create_group('Affine'))
 
-    aff.reference = data_path / 'someones_anatomy.nii.gz'
+    aff.reference = testdata_path / 'someones_anatomy.nii.gz'
     with h5py.File('withref-xfm.x5', 'w') as f:
         aff._to_hdf5(f.create_group('Affine'))
 
 
-def test_concatenation(data_path):
+def test_concatenation(testdata_path):
     """Check concatenation of affines."""
-    aff = ntl.Affine(reference=data_path / 'someones_anatomy.nii.gz')
+    aff = ntl.Affine(reference=testdata_path / 'someones_anatomy.nii.gz')
     x = [(0., 0., 0.), (1., 1., 1.), (-1., -1., -1.)]
     assert np.all((aff + ntl.Affine())(x) == x)
     assert np.all((aff + ntl.Affine())(x, inverse=True) == x)
 
 
-def test_LinearTransformsMapping_apply(tmp_path, data_path):
+def test_LinearTransformsMapping_apply(tmp_path, data_path, testdata_path):
     """Apply transform mappings."""
     hmc = ntl.load(data_path / 'hmc-itk.tfm', fmt='itk',
-                   reference=data_path / 'sbref.nii.gz')
+                   reference=testdata_path / 'sbref.nii.gz')
     assert isinstance(hmc, ntl.LinearTransformsMapping)
 
     # Test-case: realing functional data on to sbref
-    nii = hmc.apply(data_path / 'func.nii.gz', order=1,
-                    reference=data_path / 'sbref.nii.gz')
+    nii = hmc.apply(testdata_path / 'func.nii.gz', order=1,
+                    reference=testdata_path / 'sbref.nii.gz')
     assert nii.dataobj.shape[-1] == len(hmc)
 
     # Test-case: write out a fieldmap moved with head
     hmcinv = ntl.LinearTransformsMapping(
         np.linalg.inv(hmc.matrix),
-        reference=data_path / 'func.nii.gz')
-    nii = hmcinv.apply(data_path / 'fmap.nii.gz', order=1)
+        reference=testdata_path / 'func.nii.gz')
+    nii = hmcinv.apply(testdata_path / 'fmap.nii.gz', order=1)
     assert nii.dataobj.shape[-1] == len(hmc)
 
     # Ensure a ValueError is issued when trying to do weird stuff
     hmc = ntl.LinearTransformsMapping(hmc.matrix[:1, ...])
     with pytest.raises(ValueError):
-        hmc.apply(data_path / 'func.nii.gz', order=1,
-                  reference=data_path / 'sbref.nii.gz')
+        hmc.apply(testdata_path / 'func.nii.gz', order=1,
+                  reference=testdata_path / 'sbref.nii.gz')

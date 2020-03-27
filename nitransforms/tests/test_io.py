@@ -187,10 +187,10 @@ def test_LinearList_common(tmpdir, data_path, sw, image_orientation,
                 for x1, x2 in zip(tflist1.xforms, tflist2.xforms)])
 
 
-def test_ITKLinearTransform(tmpdir, data_path):
+def test_ITKLinearTransform(tmpdir, testdata_path):
     tmpdir.chdir()
 
-    matlabfile = data_path / 'ds-005_sub-01_from-T1_to-OASIS_affine.mat'
+    matlabfile = testdata_path / 'ds-005_sub-01_from-T1_to-OASIS_affine.mat'
     mat = loadmat(str(matlabfile))
     with open(str(matlabfile), 'rb') as f:
         itkxfm = itk.ITKLinearTransform.from_fileobj(f)
@@ -339,15 +339,15 @@ def test_afni_Displacements():
         afni.AFNIDisplacementsField.from_image(field)
 
 
-def test_itk_h5(data_path):
+def test_itk_h5(testdata_path):
     """Test displacements fields."""
     assert len(list(itk.ITKCompositeH5.from_filename(
-        data_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5'
+        testdata_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5'
     ))) == 2
 
     with pytest.raises(RuntimeError):
         list(itk.ITKCompositeH5.from_filename(
-            data_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.x5'
+            testdata_path / 'ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.x5'
         ))
 
 

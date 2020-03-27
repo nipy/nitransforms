@@ -47,10 +47,10 @@ def test_apply_linear(tmpdir, data_path, get_testdata):
     assert output.check()
 
 
-def test_apply_nl(tmpdir, data_path):
+def test_apply_nl(tmpdir, testdata_path):
     tmpdir.chdir()
-    img = str(data_path / 'tpl-OASIS30ANTs_T1w.nii.gz')
-    nl_xform = str(data_path / 'ds-005_sub-01_from-OASIS_to-T1_warp_afni.nii.gz')
+    img = str(testdata_path / 'tpl-OASIS30ANTs_T1w.nii.gz')
+    nl_xform = str(testdata_path / 'ds-005_sub-01_from-OASIS_to-T1_warp_afni.nii.gz')
 
     nlargs = ['apply', nl_xform, img]
     # format not specified

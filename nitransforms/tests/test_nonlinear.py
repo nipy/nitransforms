@@ -96,11 +96,11 @@ def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool
 
 
 @pytest.mark.parametrize('sw_tool', ['itk', 'afni'])
-def test_displacements_field2(tmp_path, data_path, sw_tool):
+def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     """Check a translation-only field on one or more axes, different image orientations."""
     os.chdir(str(tmp_path))
-    img_fname = data_path / 'tpl-OASIS30ANTs_T1w.nii.gz'
-    xfm_fname = data_path / 'ds-005_sub-01_from-OASIS_to-T1_warp_{}.nii.gz'.format(sw_tool)
+    img_fname = testdata_path / 'tpl-OASIS30ANTs_T1w.nii.gz'
+    xfm_fname = testdata_path / 'ds-005_sub-01_from-OASIS_to-T1_warp_{}.nii.gz'.format(sw_tool)
 
     xfm = nlload(xfm_fname, fmt=sw_tool)
 

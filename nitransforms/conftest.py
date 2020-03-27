@@ -5,11 +5,9 @@ import numpy as np
 import nibabel as nb
 import pytest
 import tempfile
-import pkg_resources
 
-SOMEONES_ANATOMY = pkg_resources.resource_filename(
-    'nitransforms', 'tests/data/someones_anatomy.nii.gz')
 _data = None
+_testdir = Path(os.getenv('TEST_DATA_HOME', '~/.nitransforms/testdata')).expanduser()
 
 
 @pytest.fixture(autouse=True)
@@ -19,7 +17,8 @@ def doctest_autoimport(doctest_namespace):
     doctest_namespace['nb'] = nb
     doctest_namespace['os'] = os
     doctest_namespace['Path'] = Path
-    doctest_namespace['datadir'] = Path(__file__).parent / 'tests' / 'data'
+    doctest_namespace['regress_dir'] = Path(__file__).parent / 'tests' / 'data'
+    doctest_namespace['test_dir'] = _testdir
 
     tmpdir = tempfile.TemporaryDirectory()
     doctest_namespace['tmpdir'] = tmpdir.name
@@ -39,6 +38,12 @@ def data_path():
 
 
 @pytest.fixture
+def testdata_path():
+    """Return the heavy test-data folder."""
+    return _testdir
+
+
+@pytest.fixture
 def get_testdata():
     """Generate data in the requested orientation."""
     global _data
@@ -46,7 +51,7 @@ def get_testdata():
     if _data is not None:
         return _data
 
-    img = nb.load(SOMEONES_ANATOMY)
+    img = nb.load(_testdir / 'someones_anatomy.nii.gz')
     imgaff = img.affine
 
     _data = {'RAS': img}
