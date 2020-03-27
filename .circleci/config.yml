@@ -144,20 +144,12 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Setup Python environment with virtualenvs
-          command: |
-            python -m pip install --user --upgrade virtualenv pip
-      - run:
-          name: Prepare build environment
+          name: Prepare environment & build
           command: |
             python3 -m venv /tmp/buildenv
             source /tmp/buildenv/bin/activate
             python3 -m pip install "setuptools ~= 42.0" wheel "setuptools_scm[toml] >= 3.4" \
                 "pip>=10.0.1" twine docutils
-      - run:
-          name: Build NiTransforms in build environment and check
-          command: |
-            source /tmp/buildenv/bin/activate
             python setup.py sdist bdist_wheel
             twine check dist/nitransforms*
       - store_artifacts:
