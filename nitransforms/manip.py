@@ -8,7 +8,6 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
 from collections.abc import Iterable
-import numpy as np
 
 from .base import (
     TransformBase,

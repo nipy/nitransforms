@@ -5,6 +5,7 @@ import pytest
 import h5py
 
 from ..base import SpatialReference, SampledSpatialData, ImageGrid, TransformBase
+from .. import linear as nitl
 
 
 def test_SpatialReference(testdata_path):
@@ -134,3 +135,11 @@ def test_SampledSpatialData(testdata_path):
     with pytest.raises(TypeError):
         gii = nb.gifti.GiftiImage()
         SampledSpatialData(gii)
+
+
+def test_concatenation(testdata_path):
+    """Check concatenation of affines."""
+    aff = nitl.Affine(reference=testdata_path / 'someones_anatomy.nii.gz')
+    x = [(0., 0., 0.), (1., 1., 1.), (-1., -1., -1.)]
+    assert np.all((aff + nitl.Affine())(x) == x)
+    assert np.all((aff + nitl.Affine())(x, inverse=True) == x)
