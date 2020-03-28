@@ -8,6 +8,7 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
 from collections.abc import Iterable
+import numpy as np
 
 from .base import (
     TransformBase,
@@ -138,6 +139,13 @@ class TransformChain(TransformBase):
             x = xfm(x, inverse=inverse)
 
         return x
+
+    def asaffine(self):
+        """Combine a succession of linear transforms into one."""
+        matrix = np.eye(4)
+        for xfm in self.transforms:
+            matrix = xfm.matrix.dot(matrix)
+        return Affine(matrix, reference=self.reference)
 
     @classmethod
     def from_filename(cls, filename, fmt="X5",
