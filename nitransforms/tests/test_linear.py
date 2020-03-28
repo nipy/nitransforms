@@ -172,6 +172,11 @@ def test_apply_linear_transform(
     # A certain tolerance is necessary because of resampling at borders
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
 
+    nt_moved = xfm.apply('img.nii.gz', order=0)
+    diff = sw_moved.get_fdata() - nt_moved.get_fdata()
+    # A certain tolerance is necessary because of resampling at borders
+    assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
+
 
 def test_Affine_to_x5(tmpdir, testdata_path):
     """Test affine's operations."""
