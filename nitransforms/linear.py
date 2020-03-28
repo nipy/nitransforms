@@ -24,7 +24,7 @@ from . import io
 class Affine(TransformBase):
     """Represents linear transforms on image data."""
 
-    __slots__ = ("_matrix", )
+    __slots__ = ("_matrix", "_inverse")
 
     def __init__(self, matrix=None, reference=None):
         """
@@ -57,6 +57,7 @@ class Affine(TransformBase):
         """
         super().__init__(reference=reference)
         self._matrix = np.eye(4)
+        self._inverse = np.eye(4)
 
         if matrix is not None:
             matrix = np.array(matrix)
@@ -72,6 +73,7 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
 
             # Normalize last row
             self._matrix[3, :] = (0, 0, 0, 1)
+            self._inverse = np.linalg.inv(self._matrix)
 
     def __eq__(self, other):
         """
@@ -89,6 +91,44 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
         if _eq and self._reference != other._reference:
             warnings.warn("Affines are equal, but references do not match.")
         return _eq
+
+    def __invert__(self):
+        """
+        Get the inverse of this transform.
+
+        Example
+        -------
+        >>> matrix = [[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+        >>> Affine(np.linalg.inv(matrix)) == ~Affine(matrix)
+        True
+
+        """
+        return self.__class__(self._inverse)
+
+    def __matmul__(self, b):
+        """
+        Compose two Affines.
+
+        Example
+        -------
+        >>> xfm1 = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+        >>> xfm1 @ ~xfm1 == Affine()
+        True
+
+        >>> xfm1 = Affine([[1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+        >>> xfm1 @ np.eye(4) == xfm1
+        True
+
+        """
+        if not isinstance(b, self.__class__):
+            _b = self.__class__(b)
+        else:
+            _b = b
+
+        retval = self.__class__(self.matrix.dot(_b.matrix))
+        if _b.reference:
+            retval.reference = _b.reference
+        return retval
 
     @property
     def matrix(self):
@@ -124,14 +164,14 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
         affine = self._matrix
         coords = _as_homogeneous(x, dim=affine.shape[0] - 1).T
         if inverse is True:
-            affine = np.linalg.inv(self._matrix)
+            affine = self._inverse
         return affine.dot(coords).T[..., :-1]
 
     def _to_hdf5(self, x5_root):
         """Serialize this object into the x5 file format."""
         xform = x5_root.create_dataset("Transform", data=[self._matrix])
         xform.attrs["Type"] = "affine"
-        x5_root.create_dataset("Inverse", data=[np.linalg.inv(self._matrix)])
+        x5_root.create_dataset("Inverse", data=[(~self).matrix])
 
         if self._reference:
             self.reference._to_hdf5(x5_root.create_group("Reference"))
@@ -175,7 +215,7 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
             lt["dst"] = io.VolumeGeometry.from_image(moving)
             # However, the affine needs to be inverted
             # (i.e., it is not a pure "points" convention).
-            lt["m_L"] = np.linalg.inv(self.matrix)
+            lt["m_L"] = (~self).matrix
             # to make LTA file format
             lta = io.LinearTransformArray()
             lta["type"] = 1  # RAS2RAS
@@ -234,6 +274,11 @@ class LinearTransformsMapping(Affine):
                [0., 1., 0., 2.],
                [0., 0., 1., 3.],
                [0., 0., 0., 1.]])
+        >>> (~xfm)[0].matrix  # doctest: +NORMALIZE_WHITESPACE
+        array([[ 1., 0., 0., -1.],
+               [ 0., 1., 0., -2.],
+               [ 0., 0., 1., -3.],
+               [ 0., 0., 0.,  1.]])
 
         """
         super().__init__(reference=reference)
@@ -245,6 +290,7 @@ class LinearTransformsMapping(Affine):
             ).matrix
             for xfm in transforms
         ], axis=0)
+        self._inverse = np.linalg.inv(self._matrix)
 
     def __getitem__(self, i):
         """Enable indexed access to the series of matrices."""
@@ -304,7 +350,7 @@ class LinearTransformsMapping(Affine):
         affine = self.matrix
         coords = _as_homogeneous(x, dim=affine.shape[-1] - 1).T
         if inverse is True:
-            affine = np.linalg.inv(affine)
+            affine = self._inverse
         return np.swapaxes(affine.dot(coords), 1, 2)
 
     def to_filename(self, filename, fmt="X5", moving=None):
