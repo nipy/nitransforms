@@ -139,6 +139,13 @@ class TransformChain(TransformBase):
 
         return x
 
+    def asaffine(self):
+        """Combine a succession of linear transforms into one."""
+        retval = self.transforms[-1]
+        for xfm in self.transforms[:-1][::-1]:
+            retval @= xfm
+        return retval
+
     @classmethod
     def from_filename(cls, filename, fmt="X5",
                       reference=None, moving=None):

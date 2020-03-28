@@ -8,11 +8,14 @@ import pytest
 
 import numpy as np
 import nibabel as nb
-from ..manip import load as _load
+from ..manip import load as _load, TransformChain
+from ..linear import Affine
 from .test_nonlinear import (
     TESTS_BORDER_TOLERANCE,
     APPLY_NONLINEAR_CMD,
 )
+
+FMT = {"lta": "fs", "tfm": "itk"}
 
 
 def test_itk_h5(tmp_path, testdata_path):
@@ -51,3 +54,22 @@ def test_itk_h5(tmp_path, testdata_path):
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
+
+
+@pytest.mark.parametrize("ext0", ["lta", "tfm"])
+@pytest.mark.parametrize("ext1", ["lta", "tfm"])
+@pytest.mark.parametrize("ext2", ["lta", "tfm"])
+def test_collapse_affines(tmp_path, data_path, ext0, ext1, ext2):
+    """Check whether affines are correctly collapsed."""
+    chain = TransformChain([
+        Affine.from_filename(data_path / "regressions"
+                             / f"from-fsnative_to-scanner_mode-image.{ext0}", fmt=f"{FMT[ext0]}"),
+        Affine.from_filename(data_path / "regressions"
+                             / f"from-scanner_to-bold_mode-image.{ext1}", fmt=f"{FMT[ext1]}"),
+    ])
+    assert np.allclose(
+        chain.asaffine().matrix,
+        Affine.from_filename(
+            data_path / "regressions" / f"from-fsnative_to-bold_mode-image.{ext2}",
+            fmt=f"{FMT[ext2]}").matrix,
+    )
