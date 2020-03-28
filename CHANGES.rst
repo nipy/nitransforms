@@ -7,6 +7,7 @@ This release accompanies the `ISBI2020 preprint <https://doi.org/10.31219/osf.io
   * FIX: Remove the ``--inv`` flag from regression ``mri_vol2vol`` regression test (#78)
   * FIX: Improve handling of optional fields in LTA (#65)
   * FIX: LTA conversions (#36)
+  * ENH: Add an ``.asaffine()`` member to ``TransformChain`` (#90)
   * ENH: Read (and apply) ITK/ANTs' composite HDF5 transforms (#79)
   * ENH: Improved testing of LTA handling - ITK-to-LTA, ``mri_concatenate_lta`` (#75)
   * ENH: Add FS transform regression (#74)
