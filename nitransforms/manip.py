@@ -20,7 +20,7 @@ from .nonlinear import DisplacementsFieldTransform
 class TransformChain(TransformBase):
     """Implements the concatenation of transforms."""
 
-    __slots__ = ('_transforms', )
+    __slots__ = ("_transforms",)
 
     def __init__(self, transforms=None):
         """Initialize a chain of transforms."""
@@ -128,7 +128,7 @@ class TransformChain(TransformBase):
 
         """
         if not self.transforms:
-            raise TransformError('Cannot apply an empty transforms chain.')
+            raise TransformError("Cannot apply an empty transforms chain.")
 
         transforms = self.transforms
         if not inverse:
@@ -147,8 +147,7 @@ class TransformChain(TransformBase):
         return retval
 
     @classmethod
-    def from_filename(cls, filename, fmt="X5",
-                      reference=None, moving=None):
+    def from_filename(cls, filename, fmt="X5", reference=None, moving=None):
         """Load a transform file."""
         from .io import itk
 

@@ -3,7 +3,7 @@ from nibabel.wrapstruct import LabeledWrapStruct as LWS
 
 
 def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
-    ''' Get affine implied by given shape and zooms
+    """ Get affine implied by given shape and zooms
     We get the translations from the center of the image (implied by
     `shape`).
     Parameters
@@ -37,12 +37,12 @@ def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
            [ 0.,  2.,  0., -4.],
            [ 0.,  0.,  1., -3.],
            [ 0.,  0.,  0.,  1.]])
-    '''
+    """
     shape = np.asarray(shape)
     zooms = np.array(zooms)  # copy because of flip below
     ndims = len(shape)
     if ndims != len(zooms):
-        raise ValueError('Should be same length of zooms and shape')
+        raise ValueError("Should be same length of zooms and shape")
     if ndims >= 3:
         shape = shape[:3]
         zooms = zooms[:3]

@@ -12,9 +12,11 @@ class FSLLinearTransform(LinearParameters):
 
     def __str__(self):
         """Generate a string representation."""
-        lines = [' '.join(['%g' % col for col in row])
-                 for row in self.structarr['parameters']]
-        return '\n'.join(lines + [''])
+        lines = [
+            " ".join(["%g" % col for col in row])
+            for row in self.structarr["parameters"]
+        ]
+        return "\n".join(lines + [""])
 
     def to_string(self):
         """Convert to a string directly writeable to file."""
@@ -25,20 +27,17 @@ class FSLLinearTransform(LinearParameters):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         # Adjust for reference image offset and orientation
         refswp, refspc = _fsl_aff_adapt(reference)
-        pre = reference.affine.dot(
-            np.linalg.inv(refspc).dot(np.linalg.inv(refswp)))
+        pre = reference.affine.dot(np.linalg.inv(refspc).dot(np.linalg.inv(refswp)))
 
         # Adjust for moving image offset and orientation
         movswp, movspc = _fsl_aff_adapt(moving)
-        post = np.linalg.inv(movswp).dot(movspc.dot(np.linalg.inv(
-            moving.affine)))
+        post = np.linalg.inv(movswp).dot(movspc.dot(np.linalg.inv(moving.affine)))
 
         # Compose FSL transform
-        mat = np.linalg.inv(
-            np.swapaxes(post.dot(ras.dot(pre)), 0, 1))
+        mat = np.linalg.inv(np.swapaxes(post.dot(ras.dot(pre)), 0, 1))
 
         tf = cls()
-        tf.structarr['parameters'] = mat.T
+        tf.structarr["parameters"] = mat.T
         return tf
 
     @classmethod
@@ -46,14 +45,14 @@ class FSLLinearTransform(LinearParameters):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
-        lines = [l.strip() for l in string.splitlines()
-                 if l.strip()]
+        lines = [l.strip() for l in string.splitlines() if l.strip()]
         if not lines or len(lines) < 4:
             raise TransformFileError
 
         print(lines)
-        sa['parameters'] = np.genfromtxt(
-            ['\n'.join(lines)], dtype=cls.dtype['parameters'])
+        sa["parameters"] = np.genfromtxt(
+            ["\n".join(lines)], dtype=cls.dtype["parameters"]
+        )
         return tf
 
 
@@ -67,17 +66,19 @@ class FSLLinearTransformArray(BaseLinearTransformList):
         output_dir = Path(filename).parent
         output_dir.mkdir(exist_ok=True, parents=True)
         for i, xfm in enumerate(self.xforms):
-            (output_dir / '.'.join((str(filename), '%03d' % i))).write_text(
-                xfm.to_string())
+            (output_dir / ".".join((str(filename), "%03d" % i))).write_text(
+                xfm.to_string()
+            )
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
-        return np.stack([xfm.to_ras(moving=moving, reference=reference)
-                         for xfm in self.xforms])
+        return np.stack(
+            [xfm.to_ras(moving=moving, reference=reference) for xfm in self.xforms]
+        )
 
     def to_string(self):
         """Convert to a string directly writeable to file."""
-        return '\n\n'.join([xfm.to_string() for xfm in self.xforms])
+        return "\n\n".join([xfm.to_string() for xfm in self.xforms])
 
     @classmethod
     def from_fileobj(cls, fileobj, check=True):
@@ -88,9 +89,10 @@ class FSLLinearTransformArray(BaseLinearTransformList):
     def from_ras(cls, ras, moving=None, reference=None):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         _self = cls()
-        _self.xforms = [cls._inner_type.from_ras(
-            ras[i, ...], moving=moving, reference=reference)
-            for i in range(ras.shape[0])]
+        _self.xforms = [
+            cls._inner_type.from_ras(ras[i, ...], moving=moving, reference=reference)
+            for i in range(ras.shape[0])
+        ]
         return _self
 
     @classmethod
@@ -115,8 +117,8 @@ class FSLLinearTransformArray(BaseLinearTransformList):
 
         _xforms = []
         index = 0
-        while os.path.exists('%s.%03d' % (filename, index)):
-            with open('%s.%03d' % (filename, index)) as f:
+        while os.path.exists("%s.%03d" % (filename, index)):
+            with open("%s.%03d" % (filename, index)) as f:
                 string = f.read()
             _xforms.append(cls._inner_type.from_string(string))
             index += 1

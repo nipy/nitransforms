@@ -22,7 +22,10 @@ def test_itk_h5(tmp_path, testdata_path):
     """Check a translation-only field on one or more axes, different image orientations."""
     os.chdir(str(tmp_path))
     img_fname = testdata_path / "T1w_scanner.nii.gz"
-    xfm_fname = testdata_path / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"
+    xfm_fname = (
+        testdata_path
+        / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"
+    )
 
     xfm = _load(xfm_fname)
 
@@ -30,15 +33,13 @@ def test_itk_h5(tmp_path, testdata_path):
 
     ref_fname = tmp_path / "reference.nii.gz"
     nb.Nifti1Image(
-        np.zeros(xfm.reference.shape, dtype='uint16'),
-        xfm.reference.affine,
+        np.zeros(xfm.reference.shape, dtype="uint16"), xfm.reference.affine,
     ).to_filename(str(ref_fname))
 
     # Then apply the transform and cross-check with software
-    cmd = APPLY_NONLINEAR_CMD['itk'](
-        transform=xfm_fname,
-        reference=ref_fname,
-        moving=img_fname)
+    cmd = APPLY_NONLINEAR_CMD["itk"](
+        transform=xfm_fname, reference=ref_fname, moving=img_fname
+    )
 
     # skip test if command is not available on host
     exe = cmd.split(" ", 1)[0]
@@ -47,10 +48,10 @@ def test_itk_h5(tmp_path, testdata_path):
 
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
-    sw_moved = nb.load('resampled.nii.gz')
+    sw_moved = nb.load("resampled.nii.gz")
 
     nt_moved = xfm.apply(img_fname, order=0)
-    nt_moved.to_filename('nt_resampled.nii.gz')
+    nt_moved.to_filename("nt_resampled.nii.gz")
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders
     assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
@@ -61,15 +62,24 @@ def test_itk_h5(tmp_path, testdata_path):
 @pytest.mark.parametrize("ext2", ["lta", "tfm"])
 def test_collapse_affines(tmp_path, data_path, ext0, ext1, ext2):
     """Check whether affines are correctly collapsed."""
-    chain = TransformChain([
-        Affine.from_filename(data_path / "regressions"
-                             / f"from-fsnative_to-scanner_mode-image.{ext0}", fmt=f"{FMT[ext0]}"),
-        Affine.from_filename(data_path / "regressions"
-                             / f"from-scanner_to-bold_mode-image.{ext1}", fmt=f"{FMT[ext1]}"),
-    ])
+    chain = TransformChain(
+        [
+            Affine.from_filename(
+                data_path
+                / "regressions"
+                / f"from-fsnative_to-scanner_mode-image.{ext0}",
+                fmt=f"{FMT[ext0]}",
+            ),
+            Affine.from_filename(
+                data_path / "regressions" / f"from-scanner_to-bold_mode-image.{ext1}",
+                fmt=f"{FMT[ext1]}",
+            ),
+        ]
+    )
     assert np.allclose(
         chain.asaffine().matrix,
         Affine.from_filename(
             data_path / "regressions" / f"from-fsnative_to-bold_mode-image.{ext2}",
-            fmt=f"{FMT[ext2]}").matrix,
+            fmt=f"{FMT[ext2]}",
+        ).matrix,
     )

@@ -19,4 +19,4 @@ Read and write transforms.
 from .lta import LinearTransform, LinearTransformArray, VolumeGeometry
 
 
-__all__ = ['LinearTransform', 'LinearTransformArray', 'VolumeGeometry']
+__all__ = ["LinearTransform", "LinearTransformArray", "VolumeGeometry"]

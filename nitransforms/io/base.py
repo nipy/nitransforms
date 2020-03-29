@@ -15,12 +15,9 @@ class TransformFileError(Exception):
 class StringBasedStruct(LabeledWrapStruct):
     """File data structure from text files."""
 
-    def __init__(self,
-                 binaryblock=None,
-                 endianness=None,
-                 check=True):
+    def __init__(self, binaryblock=None, endianness=None, check=True):
         """Create a data structure based off of a string."""
-        _dtype = getattr(binaryblock, 'dtype', None)
+        _dtype = getattr(binaryblock, "dtype", None)
         if binaryblock is not None and _dtype == self.dtype:
             self._structarr = binaryblock.copy()
             return
@@ -48,21 +45,19 @@ class LinearParameters(StringBasedStruct):
 
     """
 
-    template_dtype = np.dtype([
-        ('parameters', 'f8', (4, 4)),
-    ])
+    template_dtype = np.dtype([("parameters", "f8", (4, 4)),])
     dtype = template_dtype
 
     def __init__(self, parameters=None):
         """Initialize with default parameters."""
         super().__init__()
-        self.structarr['parameters'] = np.eye(4)
+        self.structarr["parameters"] = np.eye(4)
         if parameters is not None:
-            self.structarr['parameters'] = parameters
+            self.structarr["parameters"] = parameters
 
     def to_filename(self, filename):
         """Store this transform to a file with the appropriate format."""
-        with open(str(filename), 'w') as f:
+        with open(str(filename), "w") as f:
             f.write(self.to_string())
 
     def to_ras(self, moving=None, reference=None):
@@ -90,20 +85,15 @@ class LinearParameters(StringBasedStruct):
 class BaseLinearTransformList(StringBasedStruct):
     """A string-based structure for series of linear transforms."""
 
-    template_dtype = np.dtype([('nxforms', 'i4')])
+    template_dtype = np.dtype([("nxforms", "i4")])
     dtype = template_dtype
     _xforms = None
     _inner_type = LinearParameters
 
-    def __init__(self,
-                 xforms=None,
-                 binaryblock=None,
-                 endianness=None,
-                 check=True):
+    def __init__(self, xforms=None, binaryblock=None, endianness=None, check=True):
         """Initialize with (optionally) a list of transforms."""
         super().__init__(binaryblock, endianness, check)
-        self.xforms = [self._inner_type(parameters=mat)
-                       for mat in xforms or []]
+        self.xforms = [self._inner_type(parameters=mat) for mat in xforms or []]
 
     @property
     def xforms(self):
@@ -116,15 +106,15 @@ class BaseLinearTransformList(StringBasedStruct):
 
     def __getitem__(self, idx):
         """Allow dictionary access to the transforms."""
-        if idx == 'xforms':
+        if idx == "xforms":
             return self._xforms
-        if idx == 'nxforms':
+        if idx == "nxforms":
             return len(self._xforms)
         raise KeyError(idx)
 
     def to_filename(self, filename):
         """Store this transform to a file with the appropriate format."""
-        with open(str(filename), 'w') as f:
+        with open(str(filename), "w") as f:
             f.write(self.to_string())
 
     def to_ras(self, moving=None, reference=None):
@@ -180,7 +170,7 @@ def _read_mat(byte_stream):
     elif mjv == 1:
         reader = MatFile5Reader(byte_stream)
     elif mjv == 2:
-        raise TransformFileError('Please use HDF reader for Matlab v7.3 files')
+        raise TransformFileError("Please use HDF reader for Matlab v7.3 files")
     else:
-        raise TransformFileError('Not a Matlab file.')
+        raise TransformFileError("Not a Matlab file.")
     return reader.get_variables()

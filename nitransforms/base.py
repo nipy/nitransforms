@@ -39,7 +39,7 @@ class SpatialReference:
 class SampledSpatialData:
     """Represent sampled spatial data: regularly gridded (images) and surfaces."""
 
-    __slots__ = ['_ndim', '_coords', '_npoints', '_shape']
+    __slots__ = ["_ndim", "_coords", "_npoints", "_shape"]
 
     def __init__(self, dataset):
         """Create a sampling reference."""
@@ -53,11 +53,12 @@ class SampledSpatialData:
         if isinstance(dataset, (str, Path)):
             dataset = _nbload(str(dataset))
 
-        if hasattr(dataset, 'numDA'):  # Looks like a Gifti file
-            _das = dataset.get_arrays_from_intent(INTENT_CODES['pointset'])
+        if hasattr(dataset, "numDA"):  # Looks like a Gifti file
+            _das = dataset.get_arrays_from_intent(INTENT_CODES["pointset"])
             if not _das:
                 raise TypeError(
-                    'Input Gifti file does not contain reference coordinates.')
+                    "Input Gifti file does not contain reference coordinates."
+                )
             self._coords = np.vstack([da.data for da in _das])
             self._npoints, self._ndim = self._coords.shape
             return
@@ -65,7 +66,7 @@ class SampledSpatialData:
         if isinstance(dataset, Cifti2Image):
             raise NotImplementedError
 
-        raise ValueError('Dataset could not be interpreted as an irregular sample.')
+        raise ValueError("Dataset could not be interpreted as an irregular sample.")
 
     @property
     def npoints(self):
@@ -91,7 +92,7 @@ class SampledSpatialData:
 class ImageGrid(SampledSpatialData):
     """Class to represent spaces of gridded data (images)."""
 
-    __slots__ = ['_affine', '_inverse', '_ndindex']
+    __slots__ = ["_affine", "_inverse", "_ndindex"]
 
     def __init__(self, image):
         """Create a gridded sampling reference."""
@@ -101,17 +102,15 @@ class ImageGrid(SampledSpatialData):
         self._affine = image.affine
         self._shape = image.shape
 
-        self._ndim = getattr(image, 'ndim', len(image.shape))
+        self._ndim = getattr(image, "ndim", len(image.shape))
         if self._ndim == 4:
             self._shape = image.shape[:3]
             self._ndim = 3
 
-        self._npoints = getattr(image, 'npoints',
-                                np.prod(self._shape))
+        self._npoints = getattr(image, "npoints", np.prod(self._shape))
         self._ndindex = None
         self._coords = None
-        self._inverse = getattr(image, 'inverse',
-                                np.linalg.inv(image.affine))
+        self._inverse = getattr(image, "inverse", np.linalg.inv(image.affine))
 
     @property
     def affine(self):
@@ -128,8 +127,9 @@ class ImageGrid(SampledSpatialData):
         """List the indexes corresponding to the space grid."""
         if self._ndindex is None:
             indexes = tuple([np.arange(s) for s in self._shape])
-            self._ndindex = np.array(np.meshgrid(
-                *indexes, indexing='ij')).reshape(self._ndim, self._npoints)
+            self._ndindex = np.array(np.meshgrid(*indexes, indexing="ij")).reshape(
+                self._ndim, self._npoints
+            )
         return self._ndindex
 
     @property
@@ -139,7 +139,7 @@ class ImageGrid(SampledSpatialData):
             self._coords = np.tensordot(
                 self._affine,
                 np.vstack((self.ndindex, np.ones((1, self._npoints)))),
-                axes=1
+                axes=1,
             )[:3, ...]
         return self._coords
 
@@ -152,15 +152,17 @@ class ImageGrid(SampledSpatialData):
         return _apply_affine(x, self._inverse, self._ndim)
 
     def _to_hdf5(self, group):
-        group.attrs['Type'] = 'image'
-        group.attrs['ndim'] = self.ndim
-        group.create_dataset('affine', data=self.affine)
-        group.create_dataset('shape', data=self.shape)
+        group.attrs["Type"] = "image"
+        group.attrs["ndim"] = self.ndim
+        group.create_dataset("affine", data=self.affine)
+        group.create_dataset("shape", data=self.shape)
 
     def __eq__(self, other):
         """Overload equals operator."""
-        return (np.allclose(self.affine, other.affine, rtol=EQUALITY_TOL)
-                and self.shape == other.shape)
+        return (
+            np.allclose(self.affine, other.affine, rtol=EQUALITY_TOL)
+            and self.shape == other.shape
+        )
 
     def __ne__(self, other):
         """Overload not equal operator."""
@@ -170,7 +172,7 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ('_reference', )
+    __slots__ = ("_reference",)
 
     def __init__(self, reference=None):
         """Instantiate a transform."""
@@ -195,13 +197,14 @@ class TransformBase:
 
         """
         from .manip import TransformChain
+
         return TransformChain(transforms=[self, b])
 
     @property
     def reference(self):
         """Access a reference space where data will be resampled onto."""
         if self._reference is None:
-            warnings.warn('Reference space not set')
+            warnings.warn("Reference space not set")
         return self._reference
 
     @reference.setter
@@ -213,8 +216,16 @@ class TransformBase:
         """Access the dimensions of the reference space."""
         return self.reference.ndim
 
-    def apply(self, spatialimage, reference=None,
-              order=3, mode='constant', cval=0.0, prefilter=True, output_dtype=None):
+    def apply(
+        self,
+        spatialimage,
+        reference=None,
+        order=3,
+        mode="constant",
+        cval=0.0,
+        prefilter=True,
+        output_dtype=None,
+    ):
         """
         Apply a transformation to an image, resampling on the reference spatial object.
 
@@ -252,8 +263,9 @@ class TransformBase:
         if reference is not None and isinstance(reference, (str, Path)):
             reference = _nbload(str(reference))
 
-        _ref = self.reference if reference is None \
-            else SpatialReference.factory(reference)
+        _ref = (
+            self.reference if reference is None else SpatialReference.factory(reference)
+        )
 
         if isinstance(spatialimage, (str, Path)):
             spatialimage = _nbload(str(spatialimage))
@@ -261,8 +273,8 @@ class TransformBase:
         data = np.asanyarray(spatialimage.dataobj)
         output_dtype = output_dtype or data.dtype
         targets = ImageGrid(spatialimage).index(  # data should be an image
-            _as_homogeneous(self.map(_ref.ndcoords.T),
-                            dim=_ref.ndim))
+            _as_homogeneous(self.map(_ref.ndcoords.T), dim=_ref.ndim)
+        )
 
         resampled = ndi.map_coordinates(
             data,
@@ -276,8 +288,8 @@ class TransformBase:
 
         if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
             moved = spatialimage.__class__(
-                resampled.reshape(_ref.shape),
-                _ref.affine, spatialimage.header)
+                resampled.reshape(_ref.shape), _ref.affine, spatialimage.header
+            )
             moved.header.set_data_dtype(output_dtype)
             return moved
 
@@ -304,12 +316,12 @@ class TransformBase:
         """
         return x
 
-    def to_filename(self, filename, fmt='X5'):
+    def to_filename(self, filename, fmt="X5"):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-        with h5py.File(filename, 'w') as out_file:
-            out_file.attrs['Format'] = 'X5'
-            out_file.attrs['Version'] = np.uint16(1)
-            root = out_file.create_group('/0')
+        with h5py.File(filename, "w") as out_file:
+            out_file.attrs["Format"] = "X5"
+            out_file.attrs["Version"] = np.uint16(1)
+            root = out_file.create_group("/0")
             self._to_hdf5(root)
 
         return filename
@@ -319,7 +331,7 @@ class TransformBase:
         raise NotImplementedError
 
 
-def _as_homogeneous(xyz, dtype='float32', dim=3):
+def _as_homogeneous(xyz, dtype="float32", dim=3):
     """
     Convert 2D and 3D coordinates into homogeneous coordinates.
 

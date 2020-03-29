@@ -9,11 +9,11 @@ def assert_affines_by_filename(affine1, affine2):
     """Check affines by filename."""
     affine1 = Path(affine1)
     affine2 = Path(affine2)
-    assert affine1.suffix == affine2.suffix, 'affines of different type'
+    assert affine1.suffix == affine2.suffix, "affines of different type"
 
     ext_to_fmt = {
-        '.tfm': 'itk',  # An ITK transform
-        '.lta': 'fs',  # FreeSurfer LTA
+        ".tfm": "itk",  # An ITK transform
+        ".lta": "fs",  # FreeSurfer LTA
     }
 
     ext = affine1.suffix[-4:]

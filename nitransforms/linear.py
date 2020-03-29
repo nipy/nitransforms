@@ -15,8 +15,11 @@ from scipy import ndimage as ndi
 from nibabel.loadsave import load as _nbload
 
 from .base import (
-    ImageGrid, TransformBase, SpatialReference,
-    _as_homogeneous, EQUALITY_TOL
+    ImageGrid,
+    TransformBase,
+    SpatialReference,
+    _as_homogeneous,
+    EQUALITY_TOL,
 )
 from . import io
 
@@ -68,8 +71,11 @@ class Affine(TransformBase):
             self._matrix = matrix
 
             if not np.allclose(self._matrix[3, :], (0, 0, 0, 1)):
-                raise ValueError("""The last row of a homogeneus matrix \
-should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
+                raise ValueError(
+                    """The last row of a homogeneus matrix \
+should be (0, 0, 0, 1), got %s."""
+                    % self._matrix[3, :]
+                )
 
             # Normalize last row
             self._matrix[3, :] = (0, 0, 0, 1)
@@ -191,7 +197,8 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
 
         if fmt.lower() == "afni":
             afniobj = io.afni.AFNILinearTransform.from_ras(
-                self.matrix, moving=moving, reference=self.reference)
+                self.matrix, moving=moving, reference=self.reference
+            )
             afniobj.to_filename(filename)
             return filename
 
@@ -205,7 +212,7 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
         if fmt.lower() == "fs":
             # xform info
             lt = io.LinearTransform()
-            lt["sigma"] = 1.
+            lt["sigma"] = 1.0
             # Just for reference, nitransforms does not write VOX2VOX
             # PLEASE NOTE THAT LTA USES THE "POINTS" CONVENTION, therefore
             # the source is the reference (coordinates for which we need
@@ -228,8 +235,7 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
         raise NotImplementedError
 
     @classmethod
-    def from_filename(cls, filename, fmt="X5",
-                      reference=None, moving=None):
+    def from_filename(cls, filename, fmt="X5", reference=None, moving=None):
         """Create an affine from a transform file."""
         if fmt.lower() in ("itk", "ants", "elastix"):
             _factory = io.itk.ITKLinearTransformArray
@@ -242,8 +248,7 @@ should be (0, 0, 0, 1), got %s.""" % self._matrix[3, :])
         matrix = struct.to_ras(reference=reference, moving=moving)
         if cls == Affine:
             if np.shape(matrix)[0] != 1:
-                raise TypeError(
-                    "Cannot load transform array '%s'" % filename)
+                raise TypeError("Cannot load transform array '%s'" % filename)
             matrix = matrix[0]
         return cls(matrix, reference=reference)
 
@@ -283,13 +288,13 @@ class LinearTransformsMapping(Affine):
         """
         super().__init__(reference=reference)
 
-        self._matrix = np.stack([
-            (
-                xfm if isinstance(xfm, Affine)
-                else Affine(xfm)
-            ).matrix
-            for xfm in transforms
-        ], axis=0)
+        self._matrix = np.stack(
+            [
+                (xfm if isinstance(xfm, Affine) else Affine(xfm)).matrix
+                for xfm in transforms
+            ],
+            axis=0,
+        )
         self._inverse = np.linalg.inv(self._matrix)
 
     def __getitem__(self, i):
@@ -368,7 +373,8 @@ class LinearTransformsMapping(Affine):
 
         if fmt.lower() == "afni":
             afniobj = io.afni.AFNILinearTransformArray.from_ras(
-                self.matrix, moving=moving, reference=self.reference)
+                self.matrix, moving=moving, reference=self.reference
+            )
             afniobj.to_filename(filename)
             return filename
 
@@ -386,7 +392,7 @@ class LinearTransformsMapping(Affine):
             lta["type"] = 1  # RAS2RAS
             for m in self.matrix:
                 lt = io.LinearTransform()
-                lt["sigma"] = 1.
+                lt["sigma"] = 1.0
                 lt["m_L"] = m
                 # Just for reference, nitransforms does not write VOX2VOX
                 lt["src"] = io.VolumeGeometry.from_image(moving)
@@ -399,8 +405,16 @@ class LinearTransformsMapping(Affine):
 
         raise NotImplementedError
 
-    def apply(self, spatialimage, reference=None,
-              order=3, mode="constant", cval=0.0, prefilter=True, output_dtype=None):
+    def apply(
+        self,
+        spatialimage,
+        reference=None,
+        order=3,
+        mode="constant",
+        cval=0.0,
+        prefilter=True,
+        output_dtype=None,
+    ):
         """
         Apply a transformation to an image, resampling on the reference spatial object.
 
@@ -438,8 +452,9 @@ class LinearTransformsMapping(Affine):
         if reference is not None and isinstance(reference, (str, Path)):
             reference = _nbload(str(reference))
 
-        _ref = self.reference if reference is None \
-            else SpatialReference.factory(reference)
+        _ref = (
+            self.reference if reference is None else SpatialReference.factory(reference)
+        )
 
         if isinstance(spatialimage, (str, Path)):
             spatialimage = _nbload(str(spatialimage))
@@ -449,7 +464,8 @@ class LinearTransformsMapping(Affine):
 
         ycoords = self.map(_ref.ndcoords.T)
         targets = ImageGrid(spatialimage).index(  # data should be an image
-            _as_homogeneous(np.vstack(ycoords), dim=_ref.ndim))
+            _as_homogeneous(np.vstack(ycoords), dim=_ref.ndim)
+        )
 
         if data.ndim == 4:
             if len(self) != data.shape[-1]:
@@ -458,22 +474,25 @@ class LinearTransformsMapping(Affine):
                     "%d timepoints" % (len(self), data.shape[-1])
                 )
             targets = targets.reshape((len(self), -1, targets.shape[-1]))
-            resampled = np.stack([
-                ndi.map_coordinates(
-                    data[..., t],
-                    targets[t, ..., :_ref.ndim].T,
-                    output=output_dtype,
-                    order=order,
-                    mode=mode,
-                    cval=cval,
-                    prefilter=prefilter)
-                for t in range(data.shape[-1])],
-                axis=0
+            resampled = np.stack(
+                [
+                    ndi.map_coordinates(
+                        data[..., t],
+                        targets[t, ..., : _ref.ndim].T,
+                        output=output_dtype,
+                        order=order,
+                        mode=mode,
+                        cval=cval,
+                        prefilter=prefilter,
+                    )
+                    for t in range(data.shape[-1])
+                ],
+                axis=0,
             )
         elif data.ndim in (2, 3):
             resampled = ndi.map_coordinates(
                 data,
-                targets[..., :_ref.ndim].T,
+                targets[..., : _ref.ndim].T,
                 output=output_dtype,
                 order=order,
                 mode=mode,
@@ -484,8 +503,8 @@ class LinearTransformsMapping(Affine):
         if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
             newdata = resampled.reshape((len(self), *_ref.shape))
             moved = spatialimage.__class__(
-                np.moveaxis(newdata, 0, -1),
-                _ref.affine, spatialimage.header)
+                np.moveaxis(newdata, 0, -1), _ref.affine, spatialimage.header
+            )
             moved.header.set_data_dtype(output_dtype)
             return moved
 

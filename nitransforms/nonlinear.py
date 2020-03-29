@@ -19,7 +19,7 @@ from . import io
 class DisplacementsFieldTransform(TransformBase):
     """Represents a dense field of displacements (one vector per voxel)."""
 
-    __slots__ = ['_field']
+    __slots__ = ["_field"]
 
     def __init__(self, field, reference=None):
         """Create a dense deformation field transform."""
@@ -29,11 +29,13 @@ class DisplacementsFieldTransform(TransformBase):
         ndim = self._field.ndim - 1
         if self._field.shape[-1] != ndim:
             raise ValueError(
-                'The number of components of the displacements (%d) does not '
-                'the number of dimensions (%d)' % (self._field.shape[-1], ndim))
+                "The number of components of the displacements (%d) does not "
+                "the number of dimensions (%d)" % (self._field.shape[-1], ndim)
+            )
 
-        self.reference = field.__class__(np.zeros(self._field.shape[:-1]),
-                                         field.affine, field.header)
+        self.reference = field.__class__(
+            np.zeros(self._field.shape[:-1]), field.affine, field.header
+        )
 
     def map(self, x, inverse=False):
         r"""
@@ -67,18 +69,17 @@ class DisplacementsFieldTransform(TransformBase):
         if inverse is True:
             raise NotImplementedError
         ijk = self.reference.index(x)
-        indexes = np.round(ijk).astype('int')
+        indexes = np.round(ijk).astype("int")
         if np.any(np.abs(ijk - indexes) > 0.05):
-            warnings.warn(
-                'Some coordinates are off-grid of the displacements field.')
+            warnings.warn("Some coordinates are off-grid of the displacements field.")
         indexes = tuple(tuple(i) for i in indexes.T)
         return x + self._field[indexes]
 
     @classmethod
-    def from_filename(cls, filename, fmt='X5'):
-        if fmt == 'afni':
+    def from_filename(cls, filename, fmt="X5"):
+        if fmt == "afni":
             _factory = io.afni.AFNIDisplacementsField
-        elif fmt == 'itk':
+        elif fmt == "itk":
             _factory = io.itk.ITKDisplacementsField
         else:
             raise NotImplementedError
