@@ -33,6 +33,7 @@ This release accompanies the `ISBI2020 preprint <https://doi.org/10.31219/osf.io
   * ENH: Revise doctests and get them ready for more thorough testing. (#10)
   * DOC: Add figure to JOSS draft / Add @smoia to author list (#61)
   * DOC: Initial JOSS draft (#47)
+  * MAINT: Add imports of modules in ``__init__.py`` to workaround #91 (#92)
   * MAINT: Fix missing python3 binary on CircleCI build job step (#85)
   * MAINT: Use setuptools_scm to manage versioning (#83)
   * MAINT: Split binary test-data out from gh repo (#84)
