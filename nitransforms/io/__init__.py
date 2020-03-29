@@ -15,8 +15,18 @@ Read and write transforms.
    :toctree: ../generated
 
    io
+
 """
+from . import afni, fsl, itk, lta
 from .lta import LinearTransform, LinearTransformArray, VolumeGeometry
 
 
-__all__ = ["LinearTransform", "LinearTransformArray", "VolumeGeometry"]
+__all__ = [
+    "afni",
+    "fsl",
+    "itk",
+    "lta",
+    "LinearTransform",
+    "LinearTransformArray",
+    "VolumeGeometry",
+]

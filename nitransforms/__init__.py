@@ -16,8 +16,10 @@ Geometric transforms.
 
    transform
 """
-from .linear import Affine
+from . import linear, manip, nonlinear
+from .linear import Affine, LinearTransformsMapping
 from .nonlinear import DisplacementsFieldTransform
+from .manip import TransformChain
 
 try:
     from ._version import __version__
@@ -33,7 +35,12 @@ except ModuleNotFoundError:
 
 
 __all__ = [
+    "linear",
+    "manip",
+    "nonlinear",
     "Affine",
+    "LinearTransformsMapping",
     "DisplacementsFieldTransform",
+    "TransformChain",
     "__version__",
 ]
