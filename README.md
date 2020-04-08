@@ -4,6 +4,7 @@
 [![CircleCI](https://circleci.com/gh/poldracklab/nitransforms.svg?style=svg)](https://circleci.com/gh/poldracklab/nitransforms)
 [![codecov](https://codecov.io/gh/poldracklab/nitransforms/branch/master/graph/badge.svg)](https://codecov.io/gh/poldracklab/nitransforms)
 [![doi](https://img.shields.io/badge/doi-10.31219%2Fosf.io%2F8aq7b-blue.svg)](https://doi.org/10.31219/osf.io/8aq7b)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/poldracklab/nitransforms/master?filepath=docs%2Fnotebooks%2F)
 
 A development repo for [nipy/nibabel#656](https://github.com/nipy/nibabel/pull/656)
 
