@@ -157,9 +157,9 @@ class TransformChain(TransformBase):
             xforms = itk.ITKCompositeH5.from_filename(filename)
             for xfmobj in xforms:
                 if isinstance(xfmobj, itk.ITKLinearTransform):
-                    retval.append(Affine(xfmobj.to_ras(), reference=reference))
+                    retval.insert(0, Affine(xfmobj.to_ras(), reference=reference))
                 else:
-                    retval.append(DisplacementsFieldTransform(xfmobj))
+                    retval.insert(0, DisplacementsFieldTransform(xfmobj))
 
             return TransformChain(retval)
 
