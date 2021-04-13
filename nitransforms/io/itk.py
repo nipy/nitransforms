@@ -133,6 +133,9 @@ class ITKLinearTransform(LinearParameters):
             "AffineTransform_double_3_3",
             mdict.get("AffineTransform_float_3_3")
         )
+        
+        if affine is None:
+            raise NotImplementedError("Unsupported transform type")
 
         sa["index"] = index
         parameters = np.eye(4, dtype=affine.dtype)
