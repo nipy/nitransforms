@@ -22,7 +22,7 @@ class ITKLinearTransform(LinearParameters):
         [
             ("type", "i4"),
             ("index", "i4"),
-            ("parameters", "f4", (4, 4)),
+            ("parameters", "f8", (4, 4)),
             ("offset", "f4", 3),  # Center of rotation
         ]
     )
@@ -67,11 +67,11 @@ class ITKLinearTransform(LinearParameters):
                 np.hstack(
                     (sa["parameters"][:3, :3].reshape(-1), sa["parameters"][:3, 3])
                 )[..., np.newaxis],
-                dtype="f4",
+                dtype="f8",
             )
             fixed = np.array(sa["offset"][..., np.newaxis], dtype="f4")
             mdict = {
-                "AffineTransform_float_3_3": affine,
+                "AffineTransform_double_3_3": affine,
                 "fixed": fixed,
             }
             _save_mat(str(filename), mdict, format="4")
@@ -129,10 +129,18 @@ class ITKLinearTransform(LinearParameters):
         tf = cls()
         sa = tf.structarr
 
+        affine = mdict.get(
+            "AffineTransform_double_3_3",
+            mdict.get("AffineTransform_float_3_3")
+        )
+        
+        if affine is None:
+            raise NotImplementedError("Unsupported transform type")
+
         sa["index"] = index
-        parameters = np.eye(4, dtype="f4")
-        parameters[:3, :3] = mdict["AffineTransform_float_3_3"][:-3].reshape((3, 3))
-        parameters[:3, 3] = mdict["AffineTransform_float_3_3"][-3:].flatten()
+        parameters = np.eye(4, dtype=affine.dtype)
+        parameters[:3, :3] = affine[:-3].reshape((3, 3))
+        parameters[:3, 3] = affine[-3:].flatten()
         sa["parameters"] = parameters
         sa["offset"] = mdict["fixed"].flatten()
         return tf
