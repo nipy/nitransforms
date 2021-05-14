@@ -4,6 +4,7 @@ A first beta release of NiTransforms with the purpose of integrating
 it within *fMRIPrep*.
 This release accompanies the `ISBI2020 preprint <https://doi.org/10.31219/osf.io/8aq7b>`__.
 
+  * FIX: Accept double precision when reading ANTs' ``.mat`` affines (#102)
   * FIX: Remove the ``--inv`` flag from regression ``mri_vol2vol`` regression test (#78)
   * FIX: Improve handling of optional fields in LTA (#65)
   * FIX: LTA conversions (#36)
@@ -31,8 +32,10 @@ This release accompanies the `ISBI2020 preprint <https://doi.org/10.31219/osf.io
   * ENH: Use ``obliquity`` directly from nibabel (#18)
   * ENH: Setting up a battery of tests (#9)
   * ENH: Revise doctests and get them ready for more thorough testing. (#10)
+  * DOC: Add Jupyter notebooks (#93, #96, #97, #98)
   * DOC: Add figure to JOSS draft / Add @smoia to author list (#61)
   * DOC: Initial JOSS draft (#47)
+  * MAINT: Revise tests and Docker image dependencies (#104)
   * MAINT: Add imports of modules in ``__init__.py`` to workaround #91 (#92)
   * MAINT: Fix missing python3 binary on CircleCI build job step (#85)
   * MAINT: Use setuptools_scm to manage versioning (#83)
