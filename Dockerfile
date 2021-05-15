@@ -86,10 +86,11 @@ ENV FSLDIR="/usr/share/fsl/5.0" \
     AFNI_PLUGINPATH="/usr/lib/afni/plugins"
 ENV PATH="/usr/lib/fsl/5.0:/usr/lib/afni/bin:$PATH"
 
-# Installing ANTs 2.2.0 (NeuroDocker build)
+# Installing ANTs 2.3.3 (NeuroDocker build)
+# Note: the URL says 2.3.4 but it is actually 2.3.3
 ENV ANTSPATH=/usr/lib/ants
 RUN mkdir -p $ANTSPATH && \
-    curl -sSL "https://dl.dropbox.com/s/2f4sui1z6lcgyek/ANTs-Linux-centos5_x86_64-v2.2.0-0740f91.tar.gz" \
+    curl -sSL "https://dl.dropbox.com/s/gwf51ykkk5bifyj/ants-Linux-centos6_x86_64-v2.3.4.tar.gz" \
     | tar -xzC $ANTSPATH --strip-components 1
 ENV PATH=$ANTSPATH:$PATH
 
@@ -106,14 +107,18 @@ ENV PATH="/usr/local/miniconda/bin:$PATH" \
     PYTHONNOUSERSITE=1
 
 # Installing precomputed python packages
-RUN conda install -y python=3.7.1 \
-                     pip=19.1 \
-                     mkl=2018.0.3 \
+RUN conda install -y -c anaconda -c conda-forge \
+                     python=3.7 \
+                     libxml2=2.9 \
+                     libxslt=1.1 \
+                     mkl \
                      mkl-service \
-                     numpy=1.15.4 \
-                     scipy=1.1.0 \
-                     libxml2=2.9.8 \
-                     libxslt=1.1.32 \
+                     numpy=1.20 \
+                     pip=21 \
+                     scipy=1.6 \
+                     setuptools \
+                     setuptools_scm \
+                     toml \
                      zlib; sync && \
     chmod -R a+rX /usr/local/miniconda; sync && \
     chmod +x /usr/local/miniconda/bin/*; sync && \
