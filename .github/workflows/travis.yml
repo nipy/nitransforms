@@ -4,74 +4,16 @@ on: [push, pull_request]
 
 jobs:
   build-linux:
-    if: "!contains(github.event.head_commit.message, '[skip ci]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != 'nipreps/sdcflows'))"
+    if: "!contains(github.event.head_commit.message, '[skip ci]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != 'poldracklab/nitransforms'))"
     runs-on: ubuntu-latest
     env:
-      TEST_DATA_HOME: /home/runner/sdcflows-tests
-      FSLDIR: /usr/share/fsl/5.0
-      FSLOUTPUTTYPE: NIFTI_GZ
-      FSLMULTIFILEQUIT: TRUE
-      POSSUMDIR: /usr/share/fsl/5.0
-      FSLTCLSH: /usr/bin/tclsh
-      FSLWISH: /usr/bin/wish
-      AFNI_HOME: /opt/afni
-      AFNI_MODELPATH: /opt/afni/models
-      AFNI_IMSAVE_WARNINGS: NO
-      AFNI_TTATLAS_DATASET: /opt/afni/atlases
-      AFNI_PLUGINPATH: /opt/afni/plugins
-      ANTSPATH: /opt/ants
+      TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
     strategy:
       max-parallel: 5
       matrix:
         python-version: [3.7, 3.8, 3.9]
 
     steps:
-    - uses: actions/cache@v2
-      with:
-        path: /var/lib/apt
-        key: apt-cache-v2
-        restore-keys: |
-          apt-cache-v2
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
-                        curl bzip2 ca-certificates        \
-                        tcsh gsl-bin netpbm               \
-                        libjpeg62 xvfb xterm              \
-                        libglu1-mesa-dev libglw1-mesa     \
-                        libxm4 build-essential
-
-    - name: Install FSL
-      run: |
-        sudo apt-get install -y --no-install-recommends fsl
-
-    - uses: actions/cache@v2
-      with:
-        path: /opt/afni
-        key: afni-v1
-        restore-keys: |
-          afni-v1
-    - name: Install AFNI
-      run: |
-        if [[ ! -d "${AFNI_HOME}" ]]; then
-          curl -O https://afni.nimh.nih.gov/pub/dist/bin/misc/@update.afni.binaries && \
-          tcsh @update.afni.binaries -package linux_ubuntu_16_64 -bindir ${AFNI_HOME}
-        fi
-
-    - uses: actions/cache@v2
-      with:
-        path: /opt/ants
-        key: ants-v1
-        restore-keys: |
-          ants-v1
-    - name: Install ANTS
-      run: |
-        if [[ ! -d "${ANTSPATH}" ]]; then
-          sudo mkdir -p $ANTSPATH
-          curl -sSL "https://dl.dropbox.com/s/gwf51ykkk5bifyj/ants-Linux-centos6_x86_64-v2.3.4.tar.gz" | sudo tar -xzC $ANTSPATH --strip-components 1
-        fi
-
     - name: Git settings (pacify DataLad)
       run: |
         git config --global user.name 'NiPreps Bot'
@@ -86,29 +28,13 @@ jobs:
         path: |
           /usr/share/miniconda/pkgs
           /home/runner/.cache/pip
-        key: python-${{ matrix.python-version }}-v2
+        key: python-${{ matrix.python-version }}-v1
         restore-keys: |
           python-${{ matrix.python-version }}-
     - name: Install DataLad
       run: |
-        $CONDA/bin/conda install -c conda-forge git-annex datalad pip
+        $CONDA/bin/conda install -c conda-forge git-annex datalad pip codecov
         $CONDA/bin/pip install datalad-osf
-    - uses: actions/checkout@v2
-    - name: Install minimal dependencies
-      run: |
-        $CONDA/bin/pip install -r min-requirements.txt
-        $CONDA/bin/pip install .[tests]
-
-
-    - uses: actions/cache@v2
-      with:
-        path: ~/.cache/templateflow
-        key: tf-cache-v1
-        restore-keys: |
-          tf-cache-
-    - name: Get TemplateFlow's required objects
-      run: |
-        $CONDA/bin/python tools/cache_templateflow.py
 
     - uses: actions/cache@v2
       with:
@@ -119,51 +45,21 @@ jobs:
     - name: Install test data
       run: |
         export PATH=$CONDA/bin:$PATH
-        mkdir -p ${{ env.TEST_DATA_HOME }}
-        cd ${{ env.TEST_DATA_HOME }}
+        mkdir -p /home/runner/testdata
+        cd /home/runner/testdata
 
-        # ds001600
-        datalad install -r https://github.com/nipreps-data/ds001600.git
-        datalad update -r --merge -d ds001600/
-        datalad get -r -d ds001600/ ds001600/sub-1/
+        datalad install -r https://github.com/nipreps-data/nitransforms-tests.git
+        datalad update -r --merge -d nitransforms-tests/
+        datalad get -r -d nitransforms-tests/
 
-        # HCP/sub-101006
-        datalad install -r https://github.com/nipreps-data/HCP101006.git
-        datalad update -r --merge -d HCP101006/
-        datalad get -r -d HCP101006
-
-        # ds001771
-        datalad install -r https://github.com/nipreps-data/ds001771.git
-        datalad update -r --merge -d ds001771/
-        datalad get -r -d ds001771/ ds001771/sub-36/*
-        datalad get -r -d ds001771/derivatives ds001771/derivatives/openneuro/sub-36/*
-
-        # ds000054
-        datalad install -r https://github.com/nipreps-data/ds000054.git
-        datalad update --merge -d ds000054/
-        datalad get -r -d ds000054/ ds000054/sub-100185/*
-
-        # ds000206
-        datalad install -r https://github.com/nipreps-data/ds000206.git
-        datalad update -r --merge -d ds000206/
-        datalad get -r -d ds000206/ ds000206/sub-05/
-
-    - name: Install FreeSurfer's mri_robust_template
-      env:
-        MRI_ROBUST_TEMPLATE: sx2n7/providers/osfstorage/5e825301d0e35400ebb481f2
+    - uses: actions/checkout@v2
+    - name: Install minimal dependencies
       run: |
-        curl https://files.osf.io/v1/resources/$MRI_ROBUST_TEMPLATE?direct > mri_robust_template
-        sudo install mri_robust_template /usr/local/bin
-        mkdir -p $HOME/.cache/freesurfer/
-        echo "b2VzdGViYW5Ac3RhbmZvcmQuZWR1CjMwNzU2CiAqQ1MzYkJ5VXMxdTVNCiBGU2kvUGJsejJxR1V3Cg==" | base64 -d > $HOME/.cache/freesurfer/license.txt
-
-    - name: Run pytest with coverage
+        $CONDA/bin/pip install .[tests]
+    - name: Run pytest
       run: |
-        export LD_LIBRARY_PATH=/usr/lib/fsl/5.0:$LD_LIBRARY_PATH
-        export PATH=$ANTSPATH:${AFNI_HOME}:/usr/lib/fsl/5.0:$PATH
-        $CONDA/bin/pytest -v --cov sdcflows --cov-report xml:cov.xml --doctest-modules sdcflows
+        $CONDA/bin/pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
 
     - name: Submit code coverage
       run: |
-        $CONDA/bin/conda install codecov
         $CONDA/bin/python -m codecov --flags travis --file cov.xml -e $GITHUB_RUN_NUMBER
