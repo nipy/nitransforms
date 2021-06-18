@@ -67,9 +67,9 @@ class AFNILinearTransform(LinearParameters):
         tf = cls()
         sa = tf.structarr
         lines = [
-            l
-            for l in string.splitlines()
-            if l.strip() and not (l.startswith("#") or "3dvolreg matrices" in l)
+            line
+            for line in string.splitlines()
+            if line.strip() and not (line.startswith("#") or "3dvolreg matrices" in line)
         ]
 
         if not lines:
@@ -101,9 +101,9 @@ class AFNILinearTransformArray(BaseLinearTransformList):
         strings = []
         for i, xfm in enumerate(self.xforms):
             lines = [
-                l.strip()
-                for l in xfm.to_string(banner=(i == 0)).splitlines()
-                if l.strip()
+                line.strip()
+                for line in xfm.to_string(banner=(i == 0)).splitlines()
+                if line.strip()
             ]
             strings += lines
         return "\n".join(strings)
@@ -124,14 +124,14 @@ class AFNILinearTransformArray(BaseLinearTransformList):
         _self = cls()
 
         lines = [
-            l.strip()
-            for l in string.splitlines()
-            if l.strip() and not l.startswith("#")
+            line.strip()
+            for line in string.splitlines()
+            if line.strip() and not line.startswith("#")
         ]
         if not lines:
             raise TransformFileError("Input string is empty.")
 
-        _self.xforms = [cls._inner_type.from_string(l) for l in lines]
+        _self.xforms = [cls._inner_type.from_string(line) for line in lines]
         return _self
 
 

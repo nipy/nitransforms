@@ -294,9 +294,9 @@ class LinearTransformArray(BaseLinearTransformList):
         lta = klass()
         sa = lta.structarr
         lines = [
-            l.strip()
-            for l in string.splitlines()
-            if l.strip() and not l.strip().startswith("#")
+            line.strip()
+            for line in string.splitlines()
+            if line.strip() and not line.strip().startswith("#")
         ]
         if not lines or not lines[0].startswith("type"):
             raise TransformFileError("Invalid LTA format")

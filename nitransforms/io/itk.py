@@ -133,7 +133,7 @@ class ITKLinearTransform(LinearParameters):
             "AffineTransform_double_3_3",
             mdict.get("AffineTransform_float_3_3")
         )
-        
+
         if affine is None:
             raise NotImplementedError("Unsupported transform type")
 
@@ -159,7 +159,7 @@ class ITKLinearTransform(LinearParameters):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
-        lines = [l.strip() for l in string.splitlines() if l.strip()]
+        lines = [line.strip() for line in string.splitlines() if line.strip()]
         if not lines or not lines[0].startswith("#"):
             raise TransformFileError
 
@@ -167,7 +167,7 @@ class ITKLinearTransform(LinearParameters):
             lines = lines[1:]  # Drop banner with version
 
         parameters = np.eye(4, dtype="f4")
-        sa["index"] = int(lines[0][lines[0].index("T") :].split()[1])
+        sa["index"] = int(lines[0][lines[0].index("T"):].split()[1])
         sa["offset"] = np.genfromtxt(
             [lines[3].split(":")[-1].encode()], dtype=cls.dtype["offset"]
         )
@@ -258,7 +258,7 @@ class ITKLinearTransformArray(BaseLinearTransformList):
     def from_string(cls, string):
         """Read the struct from string."""
         _self = cls()
-        lines = [l.strip() for l in string.splitlines() if l.strip()]
+        lines = [line.strip() for line in string.splitlines() if line.strip()]
 
         if (
             not lines
