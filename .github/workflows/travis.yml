@@ -33,8 +33,9 @@ jobs:
           python-${{ matrix.python-version }}-
     - name: Install DataLad
       run: |
-        $CONDA/bin/conda install -c conda-forge git-annex datalad pip codecov
-        $CONDA/bin/pip install datalad-osf
+        $CONDA/bin/conda install -c conda-forge git-annex datalad pip codecov pytest
+        $CONDA/bin/python -m pip install datalad-osf
+        # $CONDA/bin/pip install git+https://github.com/Lykos153/AnnexRemote.git
 
     - uses: actions/cache@v2
       with:
@@ -42,15 +43,19 @@ jobs:
         key: data-cache-v1
         restore-keys: |
           data-cache-
+
     - name: Install test data
+      shell: bash
+      env:
+        OSF_TOKEN: ${{ secrets.OSF_AUTH_TOKEN }}
       run: |
         export PATH=$CONDA/bin:$PATH
         mkdir -p /home/runner/testdata
         cd /home/runner/testdata
 
-        datalad install -r https://github.com/nipreps-data/nitransforms-tests.git
-        datalad update -r --merge -d nitransforms-tests/
-        datalad get -r -d nitransforms-tests/
+        $CONDA/bin/datalad install https://github.com/nipreps-data/nitransforms-tests.git
+        $CONDA/bin/datalad update --merge -d nitransforms-tests/
+        $CONDA/bin/datalad get -d nitransforms-tests/
 
     - uses: actions/checkout@v2
     - name: Install minimal dependencies
