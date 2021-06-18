@@ -38,7 +38,7 @@ jobs:
         if [[ "$GITHUB_REF" == refs/tags/* ]]; then
           TAG=${GITHUB_REF##*/}
         fi
-        THISVERSION=$( python get_version.py )
+        THISVERSION=$( python setup.py --version )
         THISVERSION=${TAG:-$THISVERSION}
         echo "Expected VERSION: \"${THISVERSION}\""
         echo "THISVERSION=${THISVERSION}" >> ${GITHUB_ENV}
