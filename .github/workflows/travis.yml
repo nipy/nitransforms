@@ -45,9 +45,6 @@ jobs:
           data-cache-
 
     - name: Install test data
-      shell: bash
-      env:
-        OSF_TOKEN: ${{ secrets.OSF_AUTH_TOKEN }}
       run: |
         export PATH=$CONDA/bin:$PATH
         mkdir -p /home/runner/testdata
