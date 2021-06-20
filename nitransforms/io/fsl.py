@@ -45,7 +45,7 @@ class FSLLinearTransform(LinearParameters):
         """Read the struct from string."""
         tf = cls()
         sa = tf.structarr
-        lines = [l.strip() for l in string.splitlines() if l.strip()]
+        lines = [line.strip() for line in string.splitlines() if line.strip()]
         if not lines or len(lines) < 4:
             raise TransformFileError
 

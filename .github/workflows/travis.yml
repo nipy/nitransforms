@@ -1,0 +1,67 @@
+name: Deps & CI
+
+on: [push, pull_request]
+
+jobs:
+  build-linux:
+    if: "!contains(github.event.head_commit.message, '[skip ci]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != 'poldracklab/nitransforms'))"
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
+    strategy:
+      max-parallel: 5
+      matrix:
+        python-version: [3.7, 3.8, 3.9]
+
+    steps:
+    - name: Git settings (pacify DataLad)
+      run: |
+        git config --global user.name 'NiPreps Bot'
+        git config --global user.email 'nipreps@gmail.com'
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: actions/cache@v2
+      id: conda
+      with:
+        path: |
+          /usr/share/miniconda/pkgs
+          /home/runner/.cache/pip
+        key: python-${{ matrix.python-version }}-v1
+        restore-keys: |
+          python-${{ matrix.python-version }}-
+    - name: Install DataLad
+      run: |
+        $CONDA/bin/conda install -c conda-forge git-annex datalad pip codecov pytest
+        $CONDA/bin/python -m pip install datalad-osf
+        # $CONDA/bin/pip install git+https://github.com/Lykos153/AnnexRemote.git
+
+    - uses: actions/cache@v2
+      with:
+        path: ${{ env.TEST_DATA_HOME }}
+        key: data-cache-v1
+        restore-keys: |
+          data-cache-
+
+    - name: Install test data
+      run: |
+        export PATH=$CONDA/bin:$PATH
+        mkdir -p /home/runner/testdata
+        cd /home/runner/testdata
+
+        $CONDA/bin/datalad install https://github.com/nipreps-data/nitransforms-tests.git
+        $CONDA/bin/datalad update --merge -d nitransforms-tests/
+        $CONDA/bin/datalad get -d nitransforms-tests/
+
+    - uses: actions/checkout@v2
+    - name: Install minimal dependencies
+      run: |
+        $CONDA/bin/pip install .[tests]
+    - name: Run pytest
+      run: |
+        $CONDA/bin/pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
+
+    - name: Submit code coverage
+      run: |
+        $CONDA/bin/python -m codecov --flags travis --file cov.xml -e $GITHUB_RUN_NUMBER
