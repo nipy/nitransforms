@@ -33,6 +33,8 @@ except ModuleNotFoundError:
     del get_distribution
     del DistributionNotFound
 
+__packagename__ = "nitransforms"
+__copyright__ = "Copyright (c) 2021 The NiPy developers"
 
 __all__ = [
     "linear",
@@ -42,5 +44,7 @@ __all__ = [
     "LinearTransformsMapping",
     "DisplacementsFieldTransform",
     "TransformChain",
+    "__copyright__",
+    "__packagename__",
     "__version__",
 ]

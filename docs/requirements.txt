@@ -1,0 +1,9 @@
+git+https://github.com/rwblair/sphinxcontrib-versioning.git@39b40b0b84bf872fc398feff05344051bbce0f63#egg=sphinxcontrib-versioning
+nbsphinx
+packaging
+pydot>=1.2.3
+pydotplus
+sphinx-argparse
+sphinx~=3.2.1
+sphinx_rtd_theme
+sphinxcontrib-apidoc

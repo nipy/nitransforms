@@ -3,9 +3,12 @@ from nibabel.wrapstruct import LabeledWrapStruct as LWS
 
 
 def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
-    """ Get affine implied by given shape and zooms
+    """
+    Get affine implied by given shape and zooms.
+
     We get the translations from the center of the image (implied by
     `shape`).
+
     Parameters
     ----------
     shape : (N,) array-like
@@ -18,11 +21,13 @@ def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
     y_flip : {False, True}
        whether to flip the Y row of the affine.  Corresponds to
        DICOM storage on disk when x_flip is also True.
+
     Returns
     -------
     aff : (4,4) array
        affine giving correspondance of voxel coordinates to mm
        coordinates, taking the center of the image as origin
+
     Examples
     --------
     >>> shape = (3, 5, 7)
@@ -37,6 +42,7 @@ def shape_zoom_affine(shape, zooms, x_flip=True, y_flip=False):
            [ 0.,  2.,  0., -4.],
            [ 0.,  0.,  1., -3.],
            [ 0.,  0.,  0.,  1.]])
+
     """
     shape = np.asarray(shape)
     zooms = np.array(zooms)  # copy because of flip below
