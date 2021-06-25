@@ -37,8 +37,6 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.githubpages",
     "sphinxcontrib.apidoc",
-    "nipype.sphinxext.plot_workflow",
-    "nipype.sphinxext.apidoc",
 ]
 
 autodoc_mock_imports = [
