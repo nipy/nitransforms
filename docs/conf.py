@@ -29,15 +29,14 @@ release = version
 # -- General configuration ---------------------------------------------------
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.doctest",
-    "sphinx.ext.intersphinx",
     "sphinx.ext.coverage",
+    "sphinx.ext.doctest",
+    "sphinx.ext.githubpages",
+    "sphinx.ext.ifconfig",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "sphinx.ext.ifconfig",
     "sphinx.ext.viewcode",
-    "sphinx.ext.githubpages",
-    "sphinxcontrib.apidoc",
 ]
 
 autodoc_mock_imports = [
@@ -55,16 +54,8 @@ autodoc_mock_imports = [
 
 # Accept custom section names to be parsed for numpy-style docstrings
 # of parameters.
-# Requires pinning sphinxcontrib-napoleon to a specific commit while
-# https://github.com/sphinx-contrib/napoleon/pull/10 is merged.
 napoleon_use_param = True
-napoleon_custom_sections = [
-    # ("Inputs", "params_style"),
-    # ("Outputs", "Parameters"),
-    # ("Attributes", "Parameters"),
-    # ("Mandatory Inputs", "Parameters"),
-    # ("Optional Inputs", "Parameters"),
-]
+napoleon_custom_sections = []
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
