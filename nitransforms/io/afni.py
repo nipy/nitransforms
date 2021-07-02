@@ -1,7 +1,7 @@
 """Read/write AFNI's transforms."""
 from math import pi
 import numpy as np
-from nibabel.affines import obliquity, voxel_sizes
+from nibabel.affines import obliquity, voxel_sizes, from_matvec
 
 from ..patched import shape_zoom_affine
 from .base import (
@@ -44,22 +44,14 @@ class AFNILinearTransform(LinearParameters):
 
         if reference is not None and _is_oblique(reference.affine):
             print("Reference affine axes are oblique.")
-            M = reference.affine
-            A = shape_zoom_affine(
-                reference.shape, voxel_sizes(M), x_flip=False, y_flip=False
-            )
-            pre = M.dot(np.linalg.inv(A)).dot(LPS)
+            ras = ras @ _afni_warpdrive(reference.affine, ras=True, forward=False)
 
         if moving is not None:
             moving = _ensure_image(moving)
 
         if moving is not None and _is_oblique(moving.affine):
             print("Moving affine axes are oblique.")
-            M2 = moving.affine
-            A2 = shape_zoom_affine(
-                moving.shape, voxel_sizes(M2), x_flip=True, y_flip=True
-            )
-            post = A2.dot(np.linalg.inv(M2))
+            ras = _afni_warpdrive(reference.affine, ras=True) @ ras
 
         # swapaxes is necessary, as axis 0 encodes series of transforms
         parameters = np.swapaxes(post @ ras @ pre, 0, 1)
@@ -185,3 +177,38 @@ class AFNIDisplacementsField(DisplacementsField):
 
 def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
     return (obliquity(affine).min() * 180 / pi) > thres
+
+
+def _afni_warpdrive(oblique, forward=True, ras=False):
+    """
+    Calculate AFNI's ``WARPDRIVE_MATVEC_FOR_000000`` (de)obliquing affine.
+
+    Parameters
+    ----------
+    oblique : 4x4 numpy.array
+        affine that is not aligned to the cardinal axes.
+    plumb : 4x4 numpy.array
+        corresponding affine that is aligned to the cardinal axes.
+    forward : :obj:`bool`
+        Transforms the affine of oblique into an AFNI's plumb (if ``True``)
+        or viceversa plumb -> oblique (if ``false``).
+
+    Returns
+    -------
+    plumb_to_oblique : 4x4 numpy.array
+        the matrix that pre-pended to the plumb affine rotates it
+        to be oblique.
+
+    """
+    plumb = oblique[:3, :3] / np.abs(oblique[:3, :3]).max(0)
+    plumb[np.abs(plumb) < 1.0] = 0
+    plumb *= voxel_sizes(oblique)
+
+    R = from_matvec(plumb @ np.linalg.inv(oblique[:3, :3]), (0, 0, 0))
+    R[:3, 3] = oblique[:3, 3] - (R[:3, :3] @ oblique[:3, 3])
+    if not ras:
+        # Change sign to match AFNI's warpdrive_matvec signs
+        B = np.ones((2, 2))
+        R *= np.block([[B, -1.0 * B], [-1.0 * B, B]])
+
+    return R if forward else np.linalg.inv(R)
