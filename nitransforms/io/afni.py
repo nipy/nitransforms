@@ -3,7 +3,6 @@ from math import pi
 import numpy as np
 from nibabel.affines import obliquity, voxel_sizes, from_matvec
 
-from ..patched import shape_zoom_affine
 from .base import (
     BaseLinearTransformList,
     DisplacementsField,
@@ -68,7 +67,8 @@ class AFNILinearTransform(LinearParameters):
         lines = [
             line
             for line in string.splitlines()
-            if line.strip() and not (line.startswith("#") or "3dvolreg matrices" in line)
+            if line.strip()
+            and not (line.startswith("#") or "3dvolreg matrices" in line)
         ]
 
         if not lines:
