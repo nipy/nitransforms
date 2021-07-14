@@ -51,5 +51,6 @@ Contents
 .. toctree::
     :maxdepth: 3
 
-    api
+    installation
     changes
+    api
