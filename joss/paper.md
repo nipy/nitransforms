@@ -51,6 +51,8 @@ This assortment of formats presents the challenge of compatibility between tools
 Additionally, the tool provides seamless conversion between these formats, as well as the ability of applying the transforms to other images.
 _NiTransforms_ is inspired by _NiBabel_ [@brett_nibabel_2006], a Python package with a collection of tools to read, write and handle neuroimaging data, and will be included as a new module.
 
+**Audience**. Computer vision researchers and experts using Python, developers of neuroimaging workflows built on AFNI, FSL, FreeSurfer, ITK/ANTs, or SPM, developers of neuroimaging visualization tools.
+
 # Implementation
 We first mathematically formulate the problem of spatial alignment of images and highlight common pitfalls.
 We then justify the architectural design of _NiTransforms_ and describe the major elements of the implementation.
