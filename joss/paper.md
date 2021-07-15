@@ -38,20 +38,27 @@ date: 04 November 2019
 bibliography: nt.bib
 ---
 
-# Summary
+# Introduction
 
 Spatial transforms formalize mappings between coordinates of objects in biomedical images.
 Transforms typically are the outcome of image registration methodologies, which estimate the alignment between two images.
-Image registration is a prominent task present in image processing.
-In neuroimaging, the proliferation of image registration software implementations has resulted in a disparate collection of structures and file formats used to preserve and communicate the transformation.
+Image registration is a prominent task present in almost any image processing workflow.
+
+**Statement of need**. In neuroimaging, the proliferation of image registration software implementations has resulted in a disparate collection of structures and file formats used to preserve and communicate the transformation.
 This assortment of formats presents the challenge of compatibility between tools and endangers the reproducibility of results.
 
-_NiTransforms_ is a Python tool capable of reading and writing tranforms produced by the most popular neuroimaging software (AFNI [@cox_software_1997], FSL [@jenkinson_fsl_2012], FreeSurfer [@fischl_freesurfer_2012], ITK via ANTs [@avants_symmetric_2008], and SPM [@friston_statistical_2006]).
+**Summary**. _NiTransforms_ is a Python tool capable of reading and writing tranforms produced by the most popular neuroimaging software (AFNI [@cox_software_1997], FSL [@jenkinson_fsl_2012], FreeSurfer [@fischl_freesurfer_2012], ITK via ANTs [@avants_symmetric_2008], and SPM [@friston_statistical_2006]).
 Additionally, the tool provides seamless conversion between these formats, as well as the ability of applying the transforms to other images.
-_NiTransforms_ is inspired by `NiBabel` [@brett_nibabel_2006], a Python package with a collection of tools to read, write and handle neuroimaging data, and will be included as a new module.
+The tool has already been integrated into _fMRIPrep_, a popular neuroimaging preprocessing pipeline that leverages many of the neuroimaging software already mentioned.
+_NiTransforms_ is inspired by _NiBabel_ [@brett_nibabel_2006], a Python package with a collection of tools to read, write and handle neuroimaging data, and will be included as a new module.
 
-# Spatial transforms
+**Audience**. Computer vision researchers and experts using Python, developers of neuroimaging workflows built on AFNI, FSL, FreeSurfer, ITK/ANTs, or SPM, developers of neuroimaging visualization tools.
 
+# Implementation
+We first mathematically formulate the problem of spatial alignment of images and highlight common pitfalls.
+We then justify the architectural design of _NiTransforms_ and describe the major elements of the implementation.
+
+## Methods
 Let $\vec{x}$ represent the coordinates of a point in the reference coordinate system $R$, and $\vec{x}'$ its projection on to another coordinate system $M$:
 
 $T\colon R \subset \mathbb{R}^n \to M \subset \mathbb{R}^n$
@@ -67,9 +74,9 @@ An example of image fusion application would be the alignment of functional data
 Therefore, "applying a transform" entails two operations: first, transforming the coordinates of the samples in the reference image $R$ to find their mapping $\vec{x}'$ on $M$ via $T\{\cdot\}$, and second an interpolation step as $\vec{x}'$ will likely fall off-the-grid of the moving image $M$.
 These two operations are confusing because, while the spatial transformation projects from $R$ to $M$, the data flows in reversed way after the interpolation of the values of $M$ at the mapped coordinates $\vec{x}'$.
 
-![figure1](https://github.com/poldracklab/nitransforms/raw/master/docs/_static/figure1-joss.png "Figure 1")
+![figure1](https://github.com/poldracklab/nitransforms/raw/master/docs/_static/figure1-joss.png "Figure 1: Resampling a 3D image via a spatial transform to fuse the information of one into another image.")
 
-# Software Architecture
+## Software Architecture
 
 There are four main components within the tool: an `io` submodule to handle the structure of the various file formats, a `base` submodule where abstract classes are defined, a `linear` submodule implementing $n$-dimensional linear transforms, and a `nonlinear` submodule for both parametric and non-parametric nonlinear transforms.
 Furthermore, _NiTranforms_ provides a straightforward _Application Programming Interface_ (API) that allows researchers to map point sets via transforms, as well as apply transforms (i.e., mapping the coordinates and interpolating the data) to data structures with ease.
