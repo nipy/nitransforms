@@ -49,6 +49,7 @@ This assortment of formats presents the challenge of compatibility between tools
 
 **Summary**. _NiTransforms_ is a Python tool capable of reading and writing tranforms produced by the most popular neuroimaging software (AFNI [@cox_software_1997], FSL [@jenkinson_fsl_2012], FreeSurfer [@fischl_freesurfer_2012], ITK via ANTs [@avants_symmetric_2008], and SPM [@friston_statistical_2006]).
 Additionally, the tool provides seamless conversion between these formats, as well as the ability of applying the transforms to other images.
+The tool has already been integrated into _fMRIPrep_, a popular neuroimaging preprocessing pipeline that leverages many of the neuroimaging software already mentioned.
 _NiTransforms_ is inspired by _NiBabel_ [@brett_nibabel_2006], a Python package with a collection of tools to read, write and handle neuroimaging data, and will be included as a new module.
 
 **Audience**. Computer vision researchers and experts using Python, developers of neuroimaging workflows built on AFNI, FSL, FreeSurfer, ITK/ANTs, or SPM, developers of neuroimaging visualization tools.
