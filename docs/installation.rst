@@ -10,6 +10,12 @@ directly from the GitHub repo with::
 
   python -m pip install git+https://github.com/poldracklab/nitransforms.git@master
 
+To verify the installation, you can run the following command::
+
+  python -c "import nitransforms as nt; print(nt.__version__)"
+
+You should see the version number.
+
 Developers
 ----------
 Advanced users and developers who plan to contribute with bugfixes, documentation,
