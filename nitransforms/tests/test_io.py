@@ -76,10 +76,10 @@ def test_LinearTransformArray(tmpdir, data_path):
         lta2 = LTA.from_fileobj(fp)
     assert np.allclose(lta["xforms"][0]["m_L"], lta2["xforms"][0]["m_L"])
 
-
-def test_LT_conversions(data_path):
-    r = str(data_path / "affine-RAS.fs.lta")
-    v = str(data_path / "affine-RAS.fs.v2v.lta")
+@pytest.mark.parametrize("fname", ["affine-RAS.fs", "bold-to-t1w"])
+def test_LT_conversions(data_path, fname):
+    r = str(data_path / f"{fname}.lta")
+    v = str(data_path / f"{fname}.v2v.lta")
     with open(r) as fa, open(v) as fb:
         r2r = LTA.from_fileobj(fa)
         v2v = LTA.from_fileobj(fb)
@@ -92,7 +92,7 @@ def test_LT_conversions(data_path):
     # convert vox2vox LTA to ras2ras
     v2v["xforms"][0].set_type("LINEAR_RAS_TO_RAS")
     assert v2v["xforms"][0]["type"] == 1
-    assert np.allclose(r2r_m, v2v_m, atol=1e-05)
+    assert np.allclose(r2r_m, v2v_m, rtol=1e-04)
 
 
 @pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))

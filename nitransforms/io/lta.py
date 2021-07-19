@@ -39,10 +39,8 @@ class VolumeGeometry(StringBasedStruct):
         """Return the internal affine of this regular grid."""
         affine = np.eye(4)
         sa = self.structarr
-        A = np.hstack((sa["xras"], sa["yras"], sa["zras"])) * sa["voxelsize"]
-        b = sa["cras"] - A.dot(sa["volume"]) / 2
-        affine[:3, :3] = A
-        affine[:3, [3]] = b
+        affine[:3, :3] = np.hstack((sa["xras"], sa["yras"], sa["zras"])) * sa["voxelsize"].flatten()
+        affine[:3, [3]] = sa["cras"] - affine[:3, :3] @ sa["volume"] / 2
         return affine
 
     def __str__(self):
@@ -165,7 +163,10 @@ class LinearTransform(StringBasedStruct):
 
         # VOX2VOX -> RAS2RAS
         if (current, new_type) == (0, 1):
-            M = dst.as_affine().dot(sa["m_L"].dot(np.linalg.inv(src.as_affine())))
+            # See https://github.com/freesurfer/freesurfer/
+            # blob/bbb2ef78591dec2c1ede3faea47f8dd8a530e92e/utils/transform.cpp#L3696-L3705
+            # blob/bbb2ef78591dec2c1ede3faea47f8dd8a530e92e/utils/transform.cpp#L3548-L3568
+            M = dst.as_affine() @ sa["m_L"] @ np.linalg.inv(src.as_affine())
             sa["m_L"] = M
             sa["type"] = new_type
             return
