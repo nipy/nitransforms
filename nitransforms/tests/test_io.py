@@ -76,6 +76,7 @@ def test_LinearTransformArray(tmpdir, data_path):
         lta2 = LTA.from_fileobj(fp)
     assert np.allclose(lta["xforms"][0]["m_L"], lta2["xforms"][0]["m_L"])
 
+
 @pytest.mark.parametrize("fname", ["affine-RAS.fs", "bold-to-t1w"])
 def test_LT_conversions(data_path, fname):
     r = str(data_path / f"{fname}.lta")
@@ -96,7 +97,15 @@ def test_LT_conversions(data_path, fname):
 
 
 @pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
-@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique",])
+@pytest.mark.parametrize(
+    "image_orientation",
+    [
+        "RAS",
+        "LAS",
+        "LPS",
+        "oblique",
+    ],
+)
 @pytest.mark.parametrize("sw", ["afni", "fsl", "fs", "itk"])
 def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     tmpdir.chdir()
@@ -143,7 +152,15 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
 
 
-@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique",])
+@pytest.mark.parametrize(
+    "image_orientation",
+    [
+        "RAS",
+        "LAS",
+        "LPS",
+        "oblique",
+    ],
+)
 @pytest.mark.parametrize("sw", ["afni", "fsl", "itk"])
 def test_LinearList_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     tmpdir.chdir()

@@ -39,7 +39,9 @@ class VolumeGeometry(StringBasedStruct):
         """Return the internal affine of this regular grid."""
         affine = np.eye(4)
         sa = self.structarr
-        affine[:3, :3] = np.hstack((sa["xras"], sa["yras"], sa["zras"])) * sa["voxelsize"].flatten()
+        affine[:3, :3] = (
+            np.hstack((sa["xras"], sa["yras"], sa["zras"])) * sa["voxelsize"].flatten()
+        )
         affine[:3, [3]] = sa["cras"] - affine[:3, :3] @ sa["volume"] / 2
         return affine
 
