@@ -3,6 +3,7 @@
 """I/O test cases."""
 import numpy as np
 import pytest
+from io import StringIO
 
 import filecmp
 import nibabel as nb
@@ -35,6 +36,22 @@ def test_VolumeGeometry(tmpdir, get_testdata):
     assert np.all(vg.as_affine() == img.affine)
 
     assert len(vg.to_string().split("\n")) == 8
+
+
+def test_VG_from_LTA(data_path):
+    """Check the affine interpolation from volume geometries."""
+    # affine manually clipped after running mri_info on the image
+    oracle = np.loadtxt(StringIO("""\
+-3.0000   0.0000  -0.0000    91.3027
+-0.0000   2.0575  -2.9111   -25.5251
+ 0.0000   2.1833   2.7433  -105.0820
+ 0.0000   0.0000   0.0000     1.0000"""))
+
+    lta_text = "\n".join(
+        (data_path / "bold-to-t1w.lta").read_text().splitlines()[13:21]
+    )
+    r2r = VG.from_string(lta_text)
+    assert np.allclose(r2r.as_affine(), oracle, rtol=1e-4)
 
 
 def test_LinearTransform(tmpdir):
