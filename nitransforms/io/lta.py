@@ -72,7 +72,7 @@ class VolumeGeometry(StringBasedStruct):
         sa["volume"] = img.shape[:3]  # Assumes xyzt-ordered image
         sa["voxelsize"] = voxel_sizes(img.affine)[:3]
         A = img.affine[:3, :3]
-        b = img.affine[:3, [3]].flatten()
+        b = img.affine[:3, 3]
         cols = A / sa["voxelsize"]
         sa["xras"] = cols[:, [0]]
         sa["yras"] = cols[:, [1]]
