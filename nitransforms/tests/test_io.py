@@ -38,6 +38,23 @@ def test_VolumeGeometry(tmpdir, get_testdata):
     assert len(vg.to_string().split("\n")) == 8
 
 
+def test_volume_group_voxel_ordering():
+    """Check voxel scalings are correctly applied in non-canonical axis orderings."""
+    vg = VG.from_string("""\
+valid = 1  # volume info valid
+filename = no_file
+volume = 5 6 7
+voxelsize = 2 3 4
+xras   = -1 0 0
+yras   = 0 0 1
+zras   = 0 -1 0
+cras   = 0 0 0""")
+    aff = vg.as_affine()
+    assert np.allclose(vg["voxelsize"], [2, 3, 4])
+    assert np.allclose(nb.affines.voxel_sizes(aff), [2, 3, 4])
+    assert nb.aff2axcodes(aff) == ("L", "S", "P")
+
+
 def test_VG_from_LTA(data_path):
     """Check the affine interpolation from volume geometries."""
     # affine manually clipped after running mri_info on the image

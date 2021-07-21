@@ -38,9 +38,9 @@ class VolumeGeometry(StringBasedStruct):
     def as_affine(self):
         """Return the internal affine of this regular grid."""
         sa = self.structarr
-        R = np.hstack((sa["xras"], sa["yras"], sa["zras"])) * sa["voxelsize"]
-        offset = sa["cras"] - R @ sa["volume"] / 2
-        return from_matvec(R, offset)
+        A = np.hstack((sa["xras"], sa["yras"], sa["zras"])) * sa["voxelsize"]
+        b = sa["cras"] - A @ sa["volume"] / 2
+        return from_matvec(A, b)
 
     def __str__(self):
         """Format the structure as a text file."""
