@@ -1,7 +1,7 @@
 """Read/write linear transforms."""
 import numpy as np
 from nibabel.volumeutils import Recoder
-from nibabel.affines import voxel_sizes
+from nibabel.affines import voxel_sizes, from_matvec
 
 from .base import BaseLinearTransformList, StringBasedStruct, TransformFileError
 
@@ -24,12 +24,12 @@ class VolumeGeometry(StringBasedStruct):
     template_dtype = np.dtype(
         [
             ("valid", "i4"),  # Valid values: 0, 1
-            ("volume", "i4", (3, 1)),  # width, height, depth
-            ("voxelsize", "f4", (3, 1)),  # xsize, ysize, zsize
+            ("volume", "i4", (3, )),  # width, height, depth
+            ("voxelsize", "f4", (3, )),  # xsize, ysize, zsize
             ("xras", "f8", (3, 1)),  # x_r, x_a, x_s
             ("yras", "f8", (3, 1)),  # y_r, y_a, y_s
             ("zras", "f8", (3, 1)),  # z_r, z_a, z_s
-            ("cras", "f8", (3, 1)),  # c_r, c_a, c_s
+            ("cras", "f8", (3, )),  # c_r, c_a, c_s
             ("filename", "U1024"),
         ]
     )  # Not conformant (may be >1024 bytes)
@@ -37,13 +37,10 @@ class VolumeGeometry(StringBasedStruct):
 
     def as_affine(self):
         """Return the internal affine of this regular grid."""
-        affine = np.eye(4)
         sa = self.structarr
         A = np.hstack((sa["xras"], sa["yras"], sa["zras"])) * sa["voxelsize"]
-        b = sa["cras"] - A.dot(sa["volume"]) / 2
-        affine[:3, :3] = A
-        affine[:3, [3]] = b
-        return affine
+        b = sa["cras"] - A @ sa["volume"] / 2
+        return from_matvec(A, b)
 
     def __str__(self):
         """Format the structure as a text file."""
@@ -53,8 +50,8 @@ class VolumeGeometry(StringBasedStruct):
                 sa["valid"], "" if sa["valid"] else "in"
             ),
             "filename = {}".format(sa["filename"]),
-            "volume = {:d} {:d} {:d}".format(*sa["volume"].flatten()),
-            "voxelsize = {:.15e} {:.15e} {:.15e}".format(*sa["voxelsize"].flatten()),
+            "volume = {:d} {:d} {:d}".format(*sa["volume"]),
+            "voxelsize = {:.15e} {:.15e} {:.15e}".format(*sa["voxelsize"]),
             "xras   = {:.15e} {:.15e} {:.15e}".format(*sa["xras"].flatten()),
             "yras   = {:.15e} {:.15e} {:.15e}".format(*sa["yras"].flatten()),
             "zras   = {:.15e} {:.15e} {:.15e}".format(*sa["zras"].flatten()),
@@ -72,15 +69,15 @@ class VolumeGeometry(StringBasedStruct):
         volgeom = klass()
         sa = volgeom.structarr
         sa["valid"] = 1
-        sa["volume"][:, 0] = img.shape[:3]  # Assumes xyzt-ordered image
-        sa["voxelsize"][:, 0] = voxel_sizes(img.affine)[:3]
+        sa["volume"] = img.shape[:3]  # Assumes xyzt-ordered image
+        sa["voxelsize"] = voxel_sizes(img.affine)[:3]
         A = img.affine[:3, :3]
-        b = img.affine[:3, [3]]
+        b = img.affine[:3, 3]
         cols = A / sa["voxelsize"]
         sa["xras"] = cols[:, [0]]
         sa["yras"] = cols[:, [1]]
         sa["zras"] = cols[:, [2]]
-        sa["cras"] = b + A.dot(sa["volume"]) / 2
+        sa["cras"] = b + A @ sa["volume"] / 2
         try:
             sa["filename"] = img.file_map["image"].filename
         except Exception:
@@ -154,8 +151,6 @@ class LinearTransform(StringBasedStruct):
 
         """
         sa = self.structarr
-        src = VolumeGeometry(sa["src"])
-        dst = VolumeGeometry(sa["dst"])
         current = sa["type"]
         if isinstance(new_type, str):
             new_type = transform_codes.code[new_type]
@@ -165,7 +160,12 @@ class LinearTransform(StringBasedStruct):
 
         # VOX2VOX -> RAS2RAS
         if (current, new_type) == (0, 1):
-            M = dst.as_affine().dot(sa["m_L"].dot(np.linalg.inv(src.as_affine())))
+            src = VolumeGeometry(sa["src"])
+            dst = VolumeGeometry(sa["dst"])
+            # See https://github.com/freesurfer/freesurfer/
+            # blob/bbb2ef78591dec2c1ede3faea47f8dd8a530e92e/utils/transform.cpp#L3696-L3705
+            # blob/bbb2ef78591dec2c1ede3faea47f8dd8a530e92e/utils/transform.cpp#L3548-L3568
+            M = dst.as_affine() @ sa["m_L"] @ np.linalg.inv(src.as_affine())
             sa["m_L"] = M
             sa["type"] = new_type
             return

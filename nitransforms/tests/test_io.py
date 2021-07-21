@@ -3,6 +3,7 @@
 """I/O test cases."""
 import numpy as np
 import pytest
+from io import StringIO
 
 import filecmp
 import nibabel as nb
@@ -35,6 +36,39 @@ def test_VolumeGeometry(tmpdir, get_testdata):
     assert np.all(vg.as_affine() == img.affine)
 
     assert len(vg.to_string().split("\n")) == 8
+
+
+def test_volume_group_voxel_ordering():
+    """Check voxel scalings are correctly applied in non-canonical axis orderings."""
+    vg = VG.from_string("""\
+valid = 1  # volume info valid
+filename = no_file
+volume = 5 6 7
+voxelsize = 2 3 4
+xras   = -1 0 0
+yras   = 0 0 1
+zras   = 0 -1 0
+cras   = 0 0 0""")
+    aff = vg.as_affine()
+    assert np.allclose(vg["voxelsize"], [2, 3, 4])
+    assert np.allclose(nb.affines.voxel_sizes(aff), [2, 3, 4])
+    assert nb.aff2axcodes(aff) == ("L", "S", "P")
+
+
+def test_VG_from_LTA(data_path):
+    """Check the affine interpolation from volume geometries."""
+    # affine manually clipped after running mri_info on the image
+    oracle = np.loadtxt(StringIO("""\
+-3.0000   0.0000  -0.0000    91.3027
+-0.0000   2.0575  -2.9111   -25.5251
+ 0.0000   2.1833   2.7433  -105.0820
+ 0.0000   0.0000   0.0000     1.0000"""))
+
+    lta_text = "\n".join(
+        (data_path / "bold-to-t1w.lta").read_text().splitlines()[13:21]
+    )
+    r2r = VG.from_string(lta_text)
+    assert np.allclose(r2r.as_affine(), oracle, rtol=1e-4)
 
 
 def test_LinearTransform(tmpdir):
@@ -77,9 +111,10 @@ def test_LinearTransformArray(tmpdir, data_path):
     assert np.allclose(lta["xforms"][0]["m_L"], lta2["xforms"][0]["m_L"])
 
 
-def test_LT_conversions(data_path):
-    r = str(data_path / "affine-RAS.fs.lta")
-    v = str(data_path / "affine-RAS.fs.v2v.lta")
+@pytest.mark.parametrize("fname", ["affine-RAS.fs", "bold-to-t1w"])
+def test_LT_conversions(data_path, fname):
+    r = str(data_path / f"{fname}.lta")
+    v = str(data_path / f"{fname}.v2v.lta")
     with open(r) as fa, open(v) as fb:
         r2r = LTA.from_fileobj(fa)
         v2v = LTA.from_fileobj(fb)
@@ -92,11 +127,19 @@ def test_LT_conversions(data_path):
     # convert vox2vox LTA to ras2ras
     v2v["xforms"][0].set_type("LINEAR_RAS_TO_RAS")
     assert v2v["xforms"][0]["type"] == 1
-    assert np.allclose(r2r_m, v2v_m, atol=1e-05)
+    assert np.allclose(r2r_m, v2v_m, rtol=1e-04)
 
 
 @pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
-@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique",])
+@pytest.mark.parametrize(
+    "image_orientation",
+    [
+        "RAS",
+        "LAS",
+        "LPS",
+        "oblique",
+    ],
+)
 @pytest.mark.parametrize("sw", ["afni", "fsl", "fs", "itk"])
 def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     tmpdir.chdir()
@@ -143,7 +186,15 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
 
 
-@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique",])
+@pytest.mark.parametrize(
+    "image_orientation",
+    [
+        "RAS",
+        "LAS",
+        "LPS",
+        "oblique",
+    ],
+)
 @pytest.mark.parametrize("sw", ["afni", "fsl", "itk"])
 def test_LinearList_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     tmpdir.chdir()
