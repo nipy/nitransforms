@@ -53,5 +53,6 @@ Contents
 
     installation
     examples
+    contributing
     changes
     api
