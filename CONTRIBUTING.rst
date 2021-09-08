@@ -1,6 +1,5 @@
 Contributing to *NiTransforms* (a *NiBabel* feature-repo)
 =========================================================
-
 Welcome to *NiBabel*, and the *NiTransforms* repository! We’re excited
 you’re here and want to contribute.
 
