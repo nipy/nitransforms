@@ -46,6 +46,7 @@ Image registration is a prominent task present in almost any image processing wo
 
 **Statement of need**. In neuroimaging, the proliferation of image registration software implementations has resulted in a disparate collection of structures and file formats used to preserve and communicate the transformation.
 This assortment of formats presents the challenge of compatibility between tools and endangers the reproducibility of results.
+Some tools are available that permit some conversions between formats, either within neuroimaging packages or standalone such as Convert3D [@yushkevich_open_nodate]. However, they are typically limited either in compatible packages and/or application coverage (e.g., only linear transforms).
 
 **Summary**. _NiTransforms_ is a Python tool capable of reading and writing tranforms produced by the most popular neuroimaging software (AFNI [@cox_software_1997], FSL [@jenkinson_fsl_2012], FreeSurfer [@fischl_freesurfer_2012], ITK via ANTs [@avants_symmetric_2008], and SPM [@friston_statistical_2006]).
 Additionally, the tool provides seamless conversion between these formats, as well as the ability of applying the transforms to other images.
