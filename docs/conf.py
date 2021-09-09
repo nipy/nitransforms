@@ -222,3 +222,33 @@ intersphinx_mapping = {
 
 # -- Options for versioning extension ----------------------------------------
 scv_show_banner = True
+
+nbsphinx_prolog = """
+{% set docname = 'docs/' + env.doc2path(env.docname, base=None) %}
+
+.. raw:: html
+
+    <div class="admonition note">
+      This page was generated from
+      <a class="reference external" href="https://github.com/poldracklab/nitransforms/blob/master\
+/{{ docname|e }}">{{ docname|e }}</a>.
+      <script>
+        if (document.location.host) {
+          $(document.currentScript).replaceWith(
+            '<a class="reference external" ' +
+            'href="https://nbviewer.jupyter.org/url' +
+            (window.location.protocol == 'https:' ? 's/' : '/') +
+            window.location.host +
+            window.location.pathname.slice(0, -4) +
+            'ipynb">View in <em>nbviewer</em></a>.'
+          );
+        }
+      </script>
+    </div>
+
+"""
+
+# This is processed by Jinja2 and inserted after each notebook
+nbsphinx_epilog = """
+{% set docname = 'docs/notebooks' + env.doc2path(env.docname, base=None) %}
+"""
