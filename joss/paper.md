@@ -50,7 +50,7 @@ Some tools are available that permit some conversions between formats, either wi
 
 **Summary**. _NiTransforms_ is a Python tool capable of reading and writing tranforms produced by the most popular neuroimaging software (AFNI [@cox_software_1997], FSL [@jenkinson_fsl_2012], FreeSurfer [@fischl_freesurfer_2012], ITK via ANTs [@avants_symmetric_2008], and SPM [@friston_statistical_2006]).
 Additionally, the tool provides seamless conversion between these formats, as well as the ability of applying the transforms to other images.
-The tool has already been integrated into _fMRIPrep_, a popular neuroimaging preprocessing pipeline that leverages many of the neuroimaging software already mentioned.
+The tool has already been integrated into _fMRIPrep_ [@esteban_fmriprep_2019], a popular neuroimaging preprocessing pipeline that leverages many of the neuroimaging software already mentioned.
 _NiTransforms_ is inspired by _NiBabel_ [@brett_nibabel_2006], a Python package with a collection of tools to read, write and handle neuroimaging data, and will be included as a new module.
 
 **Audience**. Computer vision researchers and experts using Python, developers of neuroimaging workflows built on AFNI, FSL, FreeSurfer, ITK/ANTs, or SPM, developers of neuroimaging visualization tools.
@@ -72,8 +72,8 @@ There are a multiplicity of image registration algorithms and corresponding imag
 
 The problem has been traditionally confused by the need of _transforming_ or mapping one image (generally referred to as _moving_) into another that serves as reference, with the goal of _fusing_ the information from both.
 An example of image fusion application would be the alignment of functional data from one individual's brain to the same individual's corresponding anatomical MRI scan for visualization.
-Therefore, "applying a transform" entails two operations: first, transforming the coordinates of the samples in the reference image $R$ to find their mapping $\vec{x}'$ on $M$ via $T\{\cdot\}$, and second an interpolation step as $\vec{x}'$ will likely fall off-the-grid of the moving image $M$.
-These two operations are confusing because, while the spatial transformation projects from $R$ to $M$, the data flows in reversed way after the interpolation of the values of $M$ at the mapped coordinates $\vec{x}'$ (\autoref{fig:resampling}).
+Therefore, "applying a transform" entails two operations (\autoref{fig:resampling}): first, transforming the coordinates of the samples in the reference image $R$ to find their mapping $\vec{x}'$ on $M$ via $T\{\cdot\}$, and second an interpolation step, as $\vec{x}'$ will likely fall off-the-grid of the moving image $M$.
+These two operations are confusing because, while the spatial transformation projects from $R$ to $M$, the data flows in reversed way after the interpolation of the values of $M$ at the mapped coordinates $\vec{x}'$.
 
 ![Resampling a 3D image via a spatial transform to fuse the information of one into another image. \label{fig:resampling}](https://github.com/poldracklab/nitransforms/raw/master/docs/_static/figure1-joss.png)
 
