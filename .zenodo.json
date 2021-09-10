@@ -1,0 +1,42 @@
+{
+  "title": "NiTransforms: A Python tool to read, represent, manipulate, and apply $n$-dimensional spatial transforms",
+  "description": "<p>A Python package to access a cacophony of neuroimaging file formats representing spatio-temporal, linear-and-nonlinear transformations.</p>",
+  "creators": [
+    {
+      "affiliation": "Department of Psychology, Stanford University, Stanford, CA, USA",
+      "name": "Goncalves, Mathias",
+      "orcid": "0000-0002-7252-7771"
+    },
+    {
+      "affiliation": "Department of Psychology, Stanford University, Stanford, CA, USA",
+      "name": "Markiewicz, Christopher J.",
+      "orcid": "0000-0002-6533-164X"
+    },
+    {
+      "affiliation": "Basque Center on Cognition Brain and Language, San Sebastian, Spain",
+      "name": "Moia, Stefano",
+      "orcid": "0000-0002-2553-3327"
+    },
+    {
+      "affiliation": "McGovern Institute for Brain Research, Massachusetts Institute of Technology (MIT), Cambridge, MA, USA; and Department of Otolaryngology, Harvard Medical School, Boston, MA, USA",
+      "name": "Ghosh, Satrajit",
+      "orcid": "0000-0002-5312-6729"
+    },
+    {
+      "affiliation": "Department of Psychology, Stanford University, Stanford, CA, USA",
+      "name": "Poldrack, Russell A.",
+      "orcid": "0000-0001-6755-0259"
+    },
+    {
+      "affiliation": "Lausanne University Hospital and University of Lausanne, Lausanne, Switzerland",
+      "name": "Esteban, Oscar",
+      "orcid": "0000-0001-8435-6191"
+    }
+  ],
+  "keywords": [
+    "neuroimaging",
+    "spatial normalization"
+  ],
+  "license": "mit-license",
+  "upload_type": "software"
+}
