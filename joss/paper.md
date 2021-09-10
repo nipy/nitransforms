@@ -73,9 +73,9 @@ There are a multiplicity of image registration algorithms and corresponding imag
 The problem has been traditionally confused by the need of _transforming_ or mapping one image (generally referred to as _moving_) into another that serves as reference, with the goal of _fusing_ the information from both.
 An example of image fusion application would be the alignment of functional data from one individual's brain to the same individual's corresponding anatomical MRI scan for visualization.
 Therefore, "applying a transform" entails two operations: first, transforming the coordinates of the samples in the reference image $R$ to find their mapping $\vec{x}'$ on $M$ via $T\{\cdot\}$, and second an interpolation step as $\vec{x}'$ will likely fall off-the-grid of the moving image $M$.
-These two operations are confusing because, while the spatial transformation projects from $R$ to $M$, the data flows in reversed way after the interpolation of the values of $M$ at the mapped coordinates $\vec{x}'$.
+These two operations are confusing because, while the spatial transformation projects from $R$ to $M$, the data flows in reversed way after the interpolation of the values of $M$ at the mapped coordinates $\vec{x}'$ (\autoref{fig:resampling}).
 
-![figure1](https://github.com/poldracklab/nitransforms/raw/master/docs/_static/figure1-joss.png "Figure 1: Resampling a 3D image via a spatial transform to fuse the information of one into another image.")
+![Resampling a 3D image via a spatial transform to fuse the information of one into another image. \label{fig:resampling}](https://github.com/poldracklab/nitransforms/raw/master/docs/_static/figure1-joss.png)
 
 ## Software Architecture
 
