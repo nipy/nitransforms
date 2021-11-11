@@ -1,7 +1,11 @@
 """Read/write AFNI's transforms."""
 from math import pi
 import numpy as np
-from nibabel.affines import obliquity, voxel_sizes, from_matvec
+from nibabel.affines import (
+    from_matvec,
+    obliquity,
+    voxel_sizes,
+)
 
 from .base import (
     BaseLinearTransformList,
@@ -179,7 +183,7 @@ def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
     return (obliquity(affine).min() * 180 / pi) > thres
 
 
-def _afni_warpdrive(oblique, forward=True, ras=False):
+def _afni_warpdrive(nii, forward=True, ras=False):
     """
     Calculate AFNI's ``WARPDRIVE_MATVEC_FOR_000000`` (de)obliquing affine.
 
@@ -200,15 +204,29 @@ def _afni_warpdrive(oblique, forward=True, ras=False):
         to be oblique.
 
     """
+    oblique = nii.affine
     plumb = oblique[:3, :3] / np.abs(oblique[:3, :3]).max(0)
     plumb[np.abs(plumb) < 1.0] = 0
     plumb *= voxel_sizes(oblique)
 
     R = from_matvec(plumb @ np.linalg.inv(oblique[:3, :3]), (0, 0, 0))
-    R[:3, 3] = oblique[:3, 3] - (R[:3, :3] @ oblique[:3, 3])
+    plumb_orig = np.linalg.inv(R[:3, :3]) @ oblique[:3, 3]
+    print(plumb_orig)
+    R[:3, 3] = R[:3, :3] @ (plumb_orig - oblique[:3, 3])
     if not ras:
         # Change sign to match AFNI's warpdrive_matvec signs
         B = np.ones((2, 2))
         R *= np.block([[B, -1.0 * B], [-1.0 * B, B]])
 
     return R if forward else np.linalg.inv(R)
+
+
+def _afni_header(nii, field="WARPDRIVE_MATVEC_FOR_000000"):
+    from lxml import etree
+    root = etree.fromstring(nii.header.extensions[0].get_content().decode())
+    retval = np.fromstring(
+        root.find(f".//*[@atr_name='{field}']").text,
+        sep="\n",
+        dtype="float32"
+    ).reshape((3, 4))
+    return np.vstack((retval, (0, 0, 0, 1)))
