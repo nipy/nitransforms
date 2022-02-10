@@ -2,7 +2,7 @@
 from math import pi
 import numpy as np
 from nibabel.affines import (
-    from_matvec,
+    apply_affine,
     obliquity,
     voxel_sizes,
 )
@@ -39,25 +39,8 @@ class AFNILinearTransform(LinearParameters):
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
         """Create an AFNI affine from a nitransform's RAS+ matrix."""
-        pre = LPS
-        post = LPS
-
-        if reference is not None:
-            reference = _ensure_image(reference)
-
-        if reference is not None and _is_oblique(reference.affine):
-            print("Reference affine axes are oblique.")
-            ras = ras @ _afni_warpdrive(reference.affine, ras=True, forward=False)
-
-        if moving is not None:
-            moving = _ensure_image(moving)
-
-        if moving is not None and _is_oblique(moving.affine):
-            print("Moving affine axes are oblique.")
-            ras = _afni_warpdrive(reference.affine, ras=True) @ ras
-
         # swapaxes is necessary, as axis 0 encodes series of transforms
-        parameters = np.swapaxes(post @ ras @ pre, 0, 1)
+        parameters = np.swapaxes(LPS @ ras @ LPS, 0, 1)
 
         tf = cls()
         tf.structarr["parameters"] = parameters.T
@@ -89,23 +72,8 @@ class AFNILinearTransform(LinearParameters):
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
-        pre = LPS
-        post = LPS
-
-        if reference is not None:
-            reference = _ensure_image(reference)
-
-        if reference is not None and _is_oblique(reference.affine):
-            raise NotImplementedError
-
-        if moving is not None:
-            moving = _ensure_image(moving)
-
-        if moving is not None and _is_oblique(moving.affine):
-            raise NotImplementedError
-
         # swapaxes is necessary, as axis 0 encodes series of transforms
-        return post @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ pre
+        return LPS @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ LPS
 
 
 class AFNILinearTransformArray(BaseLinearTransformList):
@@ -183,7 +151,7 @@ def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
     return (obliquity(affine).min() * 180 / pi) > thres
 
 
-def _afni_warpdrive(nii, forward=True, ras=False):
+def _afni_warpdrive(oblique, shape, forward=True, ras=False):
     """
     Calculate AFNI's ``WARPDRIVE_MATVEC_FOR_000000`` (de)obliquing affine.
 
@@ -204,15 +172,18 @@ def _afni_warpdrive(nii, forward=True, ras=False):
         to be oblique.
 
     """
-    oblique = nii.affine
-    plumb = oblique[:3, :3] / np.abs(oblique[:3, :3]).max(0)
-    plumb[np.abs(plumb) < 1.0] = 0
-    plumb *= voxel_sizes(oblique)
+    shape = np.array(shape[:3])
+    plumb_r = oblique[:3, :3] / np.abs(oblique[:3, :3]).max(0)
+    plumb_r[np.abs(plumb_r) < 1.0] = 0
+    plumb_r *= voxel_sizes(oblique)
+    plumb = np.eye(4)
+    plumb[:3, :3] = plumb_r
+    obliq_o = apply_affine(oblique, 0.5 * (shape - 1))
+    plumb_c = apply_affine(plumb, 0.5 * (shape - 1))
+    plumb[:3, 3] = -plumb_c + obliq_o
+    print(obliq_o, apply_affine(plumb, 0.5 * (shape - 1)))
 
-    R = from_matvec(plumb @ np.linalg.inv(oblique[:3, :3]), (0, 0, 0))
-    plumb_orig = np.linalg.inv(R[:3, :3]) @ oblique[:3, 3]
-    print(plumb_orig)
-    R[:3, 3] = R[:3, :3] @ (plumb_orig - oblique[:3, 3])
+    R = plumb @ np.linalg.inv(oblique)
     if not ras:
         # Change sign to match AFNI's warpdrive_matvec signs
         B = np.ones((2, 2))
@@ -228,5 +199,8 @@ def _afni_header(nii, field="WARPDRIVE_MATVEC_FOR_000000"):
         root.find(f".//*[@atr_name='{field}']").text,
         sep="\n",
         dtype="float32"
-    ).reshape((3, 4))
-    return np.vstack((retval, (0, 0, 0, 1)))
+    )
+    if retval.size == 12:
+        return np.vstack((retval.reshape((3, 4)), (0, 0, 0, 1)))
+
+    return retval

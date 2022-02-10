@@ -34,7 +34,7 @@ mri_vol2vol --mov {moving} --targ {reference} --lta {transform} \
 }
 
 
-@pytest.mark.parametrize("matrix", [[0.0], np.ones((3, 3, 3)), np.ones((3, 4)),])
+@pytest.mark.parametrize("matrix", [[0.0], np.ones((3, 3, 3)), np.ones((3, 4)), ])
 def test_linear_typeerrors1(matrix):
     """Exercise errors in Affine creation."""
     with pytest.raises(TypeError):
@@ -141,9 +141,6 @@ def test_loadsave(tmp_path, data_path, testdata_path, fmt):
 @pytest.mark.parametrize("sw_tool", ["itk", "fsl", "afni", "fs"])
 def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
-    if (image_orientation, sw_tool) == ("oblique", "afni"):
-        pytest.skip("AFNI Deoblique unsupported.")
-
     tmpdir.chdir()
     img = get_testdata[image_orientation]
     # Generate test transform

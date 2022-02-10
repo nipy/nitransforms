@@ -112,8 +112,6 @@ def test_displacements_field1(
     axis,
 ):
     """Check a translation-only field on one or more axes, different image orientations."""
-    if (image_orientation, sw_tool) == ("oblique", "afni") and axis in ((1, 2), (0, 1, 2)):
-        pytest.skip("AFNI Deoblique unsupported.")
     os.chdir(str(tmp_path))
     nii = get_testdata[image_orientation]
     msk = get_testmask[image_orientation]
@@ -176,6 +174,7 @@ def test_displacements_field1(
     sw_moved = nb.load("resampled.nii.gz")
 
     nt_moved = xfm.apply(nii, order=0)
+    nt_moved.set_data_dtype(nii.get_data_dtype())
     nt_moved.to_filename("nt_resampled.nii.gz")
     sw_moved.set_data_dtype(nt_moved.get_data_dtype())
     diff = (
