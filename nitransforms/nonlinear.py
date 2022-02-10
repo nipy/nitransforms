@@ -10,7 +10,7 @@
 import warnings
 from pathlib import Path
 import numpy as np
-from scipy.sparse import sparse_vstack
+from scipy.sparse import vstack as sparse_vstack
 from scipy import ndimage as ndi
 from nibabel.funcs import four_to_three
 from nibabel.loadsave import load as _nbload
