@@ -8,12 +8,21 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Nonlinear transforms."""
 import warnings
+from pathlib import Path
 import numpy as np
-from .base import TransformBase
-from . import io
+from scipy.sparse import sparse_vstack
+from scipy import ndimage as ndi
+from nibabel.funcs import four_to_three
+from nibabel.loadsave import load as _nbload
 
-# from .base import ImageGrid
-# from nibabel.funcs import four_to_three
+from . import io
+from .interp.bspline import grid_bspline_weights
+from .base import (
+    TransformBase,
+    ImageGrid,
+    SpatialReference,
+    _as_homogeneous,
+)
 
 
 class DisplacementsFieldTransform(TransformBase):
@@ -90,70 +99,118 @@ class DisplacementsFieldTransform(TransformBase):
 
 load = DisplacementsFieldTransform.from_filename
 
-# class BSplineFieldTransform(TransformBase):
-#     """Represent a nonlinear transform parameterized by BSpline basis."""
 
-#     __slots__ = ['_coeffs', '_knots', '_refknots', '_order', '_moving']
-#     __s = (slice(None), )
+class BSplineFieldTransform(TransformBase):
+    """Represent a nonlinear transform parameterized by BSpline basis."""
 
-#     def __init__(self, reference, coefficients, order=3):
-#         """Create a smooth deformation field using B-Spline basis."""
-#         super(BSplineFieldTransform, self).__init__()
-#         self._order = order
-#         self.reference = reference
+    __slots__ = ['_coeffs', '_knots', '_weights', '_order', '_moving']
+    __s = (slice(None), )
 
-#         if coefficients.shape[-1] != self.ndim:
-#             raise ValueError(
-#                 'Number of components of the coefficients does '
-#                 'not match the number of dimensions')
+    def __init__(self, reference, coefficients, order=3):
+        """Create a smooth deformation field using B-Spline basis."""
+        super(BSplineFieldTransform, self).__init__()
+        self._order = order
+        self.reference = reference
 
-#         self._coeffs = np.asanyarray(coefficients.dataobj)
-#         self._knots = ImageGrid(four_to_three(coefficients)[0])
-#         self._cache_moving()
+        if coefficients.shape[-1] != self.ndim:
+            raise ValueError(
+                'Number of components of the coefficients does '
+                'not match the number of dimensions')
 
-#     def _cache_moving(self):
-#         self._moving = np.zeros((self.reference.shape) + (3, ),
-#                                 dtype='float32')
-#         ijk = np.moveaxis(self.reference.ndindex, 0, -1).reshape(-1, self.ndim)
-#         xyz = np.moveaxis(self.reference.ndcoords, 0, -1).reshape(-1, self.ndim)
-#         print(np.shape(xyz))
+        self._coeffs = np.asanyarray(coefficients.dataobj)
+        self._knots = ImageGrid(four_to_three(coefficients)[0])
+        self._weights = None
 
-#         for i in range(np.shape(xyz)[0]):
-#             print(i, xyz[i, :])
-#             self._moving[tuple(ijk[i]) + self.__s] = self._interp_transform(xyz[i, :])
+    def apply(
+        self,
+        spatialimage,
+        reference=None,
+        order=3,
+        mode="constant",
+        cval=0.0,
+        prefilter=True,
+        output_dtype=None,
+    ):
+        """Apply a B-Spline transform on input data."""
 
-#     def _interp_transform(self, coords):
-#         # Calculate position in the grid of control points
-#         knots_ijk = self._knots.inverse.dot(np.hstack((coords, 1)))[:3]
-#         neighbors = []
-#         offset = 0.0 if self._order & 1 else 0.5
-#         # Calculate neighbors along each dimension
-#         for dim in range(self.ndim):
-#             first = int(np.floor(knots_ijk[dim] + offset) - self._order // 2)
-#             neighbors.append(list(range(first, first + self._order + 1)))
+        if reference is not None and isinstance(reference, (str, Path)):
+            reference = _nbload(str(reference))
 
-#         # Get indexes of the neighborings clique
-#         ndindex = np.moveaxis(
-#             np.array(np.meshgrid(*neighbors, indexing='ij')), 0, -1).reshape(
-#             -1, self.ndim)
+        _ref = (
+            self.reference if reference is None else SpatialReference.factory(reference)
+        )
 
-#         # Calculate the tensor B-spline weights of each neighbor
-#         # weights = np.prod(vbspl(ndindex - knots_ijk), axis=-1)
-#         ndindex = [tuple(v) for v in ndindex]
+        if isinstance(spatialimage, (str, Path)):
+            spatialimage = _nbload(str(spatialimage))
 
-#         # Retrieve coefficients and deal with boundary conditions
-#         zero = np.zeros(self.ndim)
-#         shape = np.array(self._knots.shape)
-#         coeffs = []
-#         for ijk in ndindex:
-#             offbounds = (zero > ijk) | (shape <= ijk)
-#             coeffs.append(
-#                 self._coeffs[ijk] if not np.any(offbounds)
-#                 else [0.0] * self.ndim)
+        if not isinstance(_ref, ImageGrid):
+            return super().apply(
+                spatialimage,
+                reference=reference,
+                order=order,
+                mode=mode,
+                cval=cval,
+                prefilter=prefilter,
+                output_dtype=output_dtype,
+            )
 
-#         # coords[:3] += weights.dot(np.array(coeffs, dtype=float))
-#         return self.reference.inverse.dot(np.hstack((coords, 1)))[:3]
+        # If locations to be interpolated are on a grid, use faster tensor-bspline calculation
+        if self._weights is None:
+            self._weights = grid_bspline_weights(_ref, self._knots)
 
-#     def _map_voxel(self, index, moving=None):
-#         """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
-#         return tuple(self._moving[index + self.__s])
+        ycoords = _ref.ndcoords.T + (
+            np.squeeze(np.hstack(self._coeffs).T) @ sparse_vstack(self._weights)
+        )
+
+        data = np.squeeze(np.asanyarray(spatialimage.dataobj))
+        output_dtype = output_dtype or data.dtype
+        targets = ImageGrid(spatialimage).index(  # data should be an image
+            _as_homogeneous(np.vstack(ycoords), dim=_ref.ndim)
+        )
+
+        if data.ndim == 4:
+            if len(self) != data.shape[-1]:
+                raise ValueError(
+                    "Attempting to apply %d transforms on a file with "
+                    "%d timepoints" % (len(self), data.shape[-1])
+                )
+            targets = targets.reshape((len(self), -1, targets.shape[-1]))
+            resampled = np.stack(
+                [
+                    ndi.map_coordinates(
+                        data[..., t],
+                        targets[t, ..., : _ref.ndim].T,
+                        output=output_dtype,
+                        order=order,
+                        mode=mode,
+                        cval=cval,
+                        prefilter=prefilter,
+                    )
+                    for t in range(data.shape[-1])
+                ],
+                axis=0,
+            )
+        elif data.ndim in (2, 3):
+            resampled = ndi.map_coordinates(
+                data,
+                targets[..., : _ref.ndim].T,
+                output=output_dtype,
+                order=order,
+                mode=mode,
+                cval=cval,
+                prefilter=prefilter,
+            )
+
+        newdata = resampled.reshape((len(self), *_ref.shape))
+        moved = spatialimage.__class__(
+            np.moveaxis(newdata, 0, -1), _ref.affine, spatialimage.header
+        )
+        moved.header.set_data_dtype(output_dtype)
+        return moved
+
+    def map(self, x, inverse=False):
+        raise NotImplementedError
+
+    def _map_voxel(self, index, moving=None):
+        """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
+        raise NotImplementedError
