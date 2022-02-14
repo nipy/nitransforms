@@ -14,23 +14,23 @@ from nibabel.affines import from_matvec
 from .. import linear as nitl
 from .utils import assert_affines_by_filename
 
-TESTS_BORDER_TOLERANCE = 0.05
+RMSE_TOL = 0.1
 APPLY_LINEAR_CMD = {
     "fsl": """\
 flirt -setbackground 0 -interp nearestneighbour -in {moving} -ref {reference} \
--applyxfm -init {transform} -out resampled.nii.gz\
+-applyxfm -init {transform} -out {resampled}\
 """.format,
     "itk": """\
 antsApplyTransforms -d 3 -r {reference} -i {moving} \
--o resampled.nii.gz -n NearestNeighbor -t {transform} --float\
+-o {resampled} -n NearestNeighbor -t {transform} --float\
 """.format,
     "afni": """\
 3dAllineate -base {reference} -input {moving} \
--prefix resampled.nii.gz -1Dmatrix_apply {transform} -final NN\
+-prefix {resampled} -1Dmatrix_apply {transform} -final NN\
 """.format,
     "fs": """\
 mri_vol2vol --mov {moving} --targ {reference} --lta {transform} \
---o resampled.nii.gz --nearest""".format,
+--o {resampled} --nearest""".format,
 }
 
 
@@ -121,13 +121,15 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 
-@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS",])  # 'oblique',
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", ])  # 'oblique',
 @pytest.mark.parametrize("sw_tool", ["itk", "fsl", "afni", "fs"])
-def test_apply_linear_transform(tmpdir, get_testdata, image_orientation, sw_tool):
+def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
     tmpdir.chdir()
 
     img = get_testdata[image_orientation]
+    msk = get_testmask[image_orientation]
+
     # Generate test transform
     T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
     xfm = nitl.Affine(T)
@@ -140,13 +142,17 @@ def test_apply_linear_transform(tmpdir, get_testdata, image_orientation, sw_tool
         ext = ".lta"
 
     img.to_filename("img.nii.gz")
+    msk.to_filename("mask.nii.gz")
+
+    # Write out transform file (software-dependent)
     xfm_fname = "M.%s%s" % (sw_tool, ext)
     xfm.to_filename(xfm_fname, fmt=sw_tool)
 
     cmd = APPLY_LINEAR_CMD[sw_tool](
         transform=os.path.abspath(xfm_fname),
-        reference=os.path.abspath("img.nii.gz"),
-        moving=os.path.abspath("img.nii.gz"),
+        reference=os.path.abspath("mask.nii.gz"),
+        moving=os.path.abspath("mask.nii.gz"),
+        resampled=os.path.abspath("resampled_brainmask.nii.gz"),
     )
 
     # skip test if command is not available on host
@@ -154,19 +160,42 @@ def test_apply_linear_transform(tmpdir, get_testdata, image_orientation, sw_tool
     if not shutil.which(exe):
         pytest.skip("Command {} not found on host".format(exe))
 
+    # resample mask
+    exit_code = check_call([cmd], shell=True)
+    assert exit_code == 0
+    sw_moved_mask = nb.load("resampled_brainmask.nii.gz")
+    nt_moved_mask = xfm.apply(msk, order=0)
+    nt_moved_mask.set_data_dtype(msk.get_data_dtype())
+    diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
+
+    assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
+
+    cmd = APPLY_LINEAR_CMD[sw_tool](
+        transform=os.path.abspath(xfm_fname),
+        reference=os.path.abspath("img.nii.gz"),
+        moving=os.path.abspath("img.nii.gz"),
+        resampled=os.path.abspath("resampled.nii.gz"),
+    )
+
+    brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
+
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
     sw_moved = nb.load("resampled.nii.gz")
+    sw_moved.set_data_dtype(img.get_data_dtype())
 
     nt_moved = xfm.apply(img, order=0)
-    diff = sw_moved.get_fdata() - nt_moved.get_fdata()
+    diff = (sw_moved.get_fdata() - nt_moved.get_fdata())
+    diff[~brainmask] = 0.0
+    diff[np.abs(diff) < 1e-3] = 0
+
     # A certain tolerance is necessary because of resampling at borders
-    assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
+    assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
 
     nt_moved = xfm.apply("img.nii.gz", order=0)
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders
-    assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
+    assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL
 
 
 def test_Affine_to_x5(tmpdir, testdata_path):
