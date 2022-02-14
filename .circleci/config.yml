@@ -2,7 +2,7 @@ version: 2
 jobs:
   build_pytest:
     machine:
-      image: circleci/classic:201808-01
+      image: ubuntu-2004:202107-02
     working_directory: /tmp/src/nitransforms
     environment:
       TZ: "/usr/share/zoneinfo/America/Los_Angeles"
@@ -44,13 +44,17 @@ jobs:
       - run:
           name: Prepare a Python environment
           command: |
-              pyenv local 3.7.0
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
               python3 -m pip install "setuptools >= 45.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1"
       - run:
           name: Build Docker image & push to registry
           no_output_timeout: 60m
           command: |
-              pyenv local 3.7.0
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
               e=1 && for i in {1..5}; do
                   docker build --rm --cache-from=nitransforms:latest \
                   -t nitransforms:latest \
@@ -73,7 +77,9 @@ jobs:
       - run:
           name: Check version packaged in Docker image
           command: |
-              pyenv local 3.7.0
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
               THISVERSION=${CIRCLE_TAG:-$(python3 setup.py --version)}
               INSTALLED_VERSION=$(\
                 docker run -it --rm --entrypoint=python nitransforms \
@@ -90,24 +96,56 @@ jobs:
 
       - restore_cache:
           keys:
-            - data-v1-{{ .Branch }}-{{ epoch }}
-            - data-v1-{{ .Branch }}-
-            - data-v1-master-
-            - data-v1-
-          paths:
-            - /tmp/data
+            - env-v1-{{ .Branch }}-
+            - env-v1-master-
+            - env-v1-
+      - restore_cache:
+          keys:
+            - data-v2-{{ .Branch }}-
+            - data-v2-master-
+            - data-v2-
       - run:
-          name: Download data
+          name: Setup git-annex
           command: |
-              if [[ ! -d /tmp/data ]]; then
-                wget --retry-connrefused --waitretry=5 --read-timeout=20 --timeout=15 -t 0 -q \
-                  -O data.zip "https://files.osf.io/v1/resources/fvuh8/providers/osfstorage/5e7d5b65c3f8d300bafa05e0/?zip="
-                unzip -d /tmp/data data.zip
-              else
-                echo "Dataset was cached"
+              if [[ ! -d /usr/lib/git-annex.linux ]]; then
+                wget -O- http://neuro.debian.net/lists/focal.us-ca.full | tee /etc/apt/sources.list.d/neurodebian.sources.list
+                apt-key add /tmp/src/nitransforms/docker/files/neurodebian.gpg
+                apt-key adv --recv-keys --keyserver hkps://keys.openpgp.org 0xA5D32F012649A5A9 || true
+                apt update && apt-get install -y --no-install-recommends git-annex-standalone
               fi
+              git config --global user.name 'NiPy'
+              git config --global user.email 'nipreps@gmail.com'
+      - run:
+          name: Setup DataLad & TemplateFlow
+          command: |
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
+              python -m pip install --no-cache-dir -U pip
+              python -m pip install --no-cache-dir -U datalad datalad-osf
+
       - save_cache:
-          key: data-v1-{{ .Branch }}-{{ epoch }}
+          key: env-v1-{{ .Branch }}-{{ .BuildNum }}
+          paths:
+            - /usr/local/bin
+            - /usr/local/lib/python3.7/site-packages
+            - /usr/bin/git-annex
+            - /usr/bin/git-annex-shell
+            - /usr/lib/git-annex.linux
+
+      - run:
+          name: Install test data from GIN
+          command: |
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
+
+              cd /tmp/data
+              datalad install -r https://gin.g-node.org/oesteban/nitransforms-tests
+              datalad update -r --merge -d nitransforms-tests/
+              datalad get -r -d nitransforms-tests/
+      - save_cache:
+          key: data-v1-{{ .Branch }}-{{ .BuildNum }}
           paths:
             - /tmp/data
       - run:
@@ -119,7 +157,7 @@ jobs:
           command: |
             mkdir -p $PWD/{artifacts,summaries}
             docker run -u $( id -u ) -it --rm -w /src/nitransforms \
-              -v /tmp/data:/data -e TEST_DATA_HOME=/data \
+              -v /tmp/data/nitransforms-tests:/data -e TEST_DATA_HOME=/data \
               -e COVERAGE_FILE=/tmp/summaries/.pytest.coverage \
               -v /tmp/fslicense/license.txt:/opt/freesurfer/license.txt:ro \
               -v ${PWD}:/tmp nitransforms:latest \
