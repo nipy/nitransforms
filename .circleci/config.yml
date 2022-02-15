@@ -42,9 +42,9 @@ jobs:
 
       - restore_cache:
           keys:
-            - data-v2-{{ .Branch }}-
-            - data-v2-master-
-            - data-v2-
+            - data-v3-{{ .Branch }}-
+            - data-v3-master-
+            - data-v3-
       - run:
           name: Install test data from GIN
           command: |
@@ -58,7 +58,7 @@ jobs:
               datalad update -r --merge -d nitransforms-tests/
               datalad get -r -d nitransforms-tests/
       - save_cache:
-          key: data-v2-{{ .Branch }}-{{ .BuildNum }}
+          key: data-v3-{{ .Branch }}-{{ .BuildNum }}
           paths:
             - /tmp/data
 
