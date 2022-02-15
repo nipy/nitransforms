@@ -76,14 +76,14 @@ class FSLLinearTransform(LinearParameters):
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
+        if reference is None:
+            raise ValueError("Cannot build FSL linear transform without a reference")
+
         if moving is None:
             warnings.warn(
                 "Converting FSL to RAS: moving image not provided, using reference."
             )
             moving = reference
-
-        if reference is None:
-            raise ValueError("Cannot build FSL linear transform without a reference")
 
         reference = _ensure_image(reference)
         moving = _ensure_image(moving)
