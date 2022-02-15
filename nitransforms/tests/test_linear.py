@@ -72,7 +72,7 @@ def test_loadsave_itk(tmp_path, data_path, testdata_path):
     )
 
 
-# @pytest.mark.xfail(reason="Not fully implemented")
+@pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize("fmt", ["itk", "fsl", "afni", "lta"])
 def test_loadsave(tmp_path, data_path, testdata_path, fmt):
     """Test idempotency."""

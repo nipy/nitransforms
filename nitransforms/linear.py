@@ -243,6 +243,8 @@ should be (0, 0, 0, 1), got %s."""
             _factory = io.LinearTransformArray
         elif fmt.lower() == "fsl":
             _factory = io.fsl.FSLLinearTransformArray
+        elif fmt.lower() == "afni":
+            _factory = io.afni.AFNILinearTransformArray
         else:
             raise NotImplementedError
 
