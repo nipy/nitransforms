@@ -9,6 +9,7 @@ jobs:
       FS_LICENSE: "/tmp/fslicense/license.txt"
 
     steps:
+      - checkout
       - restore_cache:
           keys:
             - env-v3-{{ .Branch }}-
@@ -93,7 +94,6 @@ jobs:
                   docker tag ubuntu:xenial-20200114 localhost:5000/ubuntu
                   docker push localhost:5000/ubuntu
               fi
-      - checkout
       - run:
           name: Build Docker image & push to registry
           no_output_timeout: 60m
