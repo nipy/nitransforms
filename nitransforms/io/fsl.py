@@ -1,7 +1,9 @@
 """Read/write FSL's transforms."""
 import os
+import warnings
 import numpy as np
 from pathlib import Path
+from nibabel import load as _nbload
 from nibabel.affines import voxel_sizes
 
 from .base import BaseLinearTransformList, LinearParameters, TransformFileError
@@ -24,7 +26,19 @@ class FSLLinearTransform(LinearParameters):
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
-        """Create an ITK affine from a nitransform's RAS+ matrix."""
+        """Create an FSL affine from a nitransform's RAS+ matrix."""
+        if moving is None:
+            warnings.warn(
+                "[Converting FSL to RAS] moving not provided, using reference as moving"
+            )
+            moving = reference
+
+        if reference is None:
+            raise ValueError("Cannot build FSL linear transform without a reference")
+
+        reference = _ensure_image(reference)
+        moving = _ensure_image(moving)
+
         # Adjust for reference image offset and orientation
         refswp, refspc = _fsl_aff_adapt(reference)
         pre = reference.affine.dot(np.linalg.inv(refspc).dot(np.linalg.inv(refswp)))
@@ -54,6 +68,35 @@ class FSLLinearTransform(LinearParameters):
             ["\n".join(lines)], dtype=cls.dtype["parameters"]
         )
         return tf
+
+    def to_ras(self, moving=None, reference=None):
+        """Return a nitransforms internal RAS+ matrix."""
+        if moving is None:
+            warnings.warn(
+                "Converting FSL to RAS: moving image not provided, using reference."
+            )
+            moving = reference
+
+        if reference is None:
+            raise ValueError("Cannot build FSL linear transform without a reference")
+
+        reference = _ensure_image(reference)
+        moving = _ensure_image(moving)
+
+        refswp, refspc = _fsl_aff_adapt(reference)
+        pre = reference.affine.dot(np.linalg.inv(refspc).dot(np.linalg.inv(refswp)))
+
+        # Adjust for moving image offset and orientation
+        movswp, movspc = _fsl_aff_adapt(moving)
+        post = np.linalg.inv(movswp).dot(movspc.dot(np.linalg.inv(moving.affine)))
+
+        mat = self.structarr["parameters"].T
+
+        return (
+            np.linalg.inv(post)
+            @ np.swapaxes(np.linalg.inv(mat), 0, 1)
+            @ np.linalg.inv(pre)
+        )
 
 
 class FSLLinearTransformArray(BaseLinearTransformList):
@@ -144,3 +187,9 @@ def _fsl_aff_adapt(space):
         swp[0, 0] = -1.0
         swp[0, 3] = (space.shape[0] - 1) * zooms[0]
     return swp, np.diag(zooms)
+
+
+def _ensure_image(img):
+    if isinstance(img, (str, Path)):
+        return _nbload(img)
+    return img
