@@ -20,7 +20,7 @@ class FSLLinearTransform(LinearParameters):
     def __str__(self):
         """Generate a string representation."""
         lines = [
-            " ".join(["%g" % col for col in row])
+            " ".join("%.08f" % col for col in row)
             for row in self.structarr["parameters"]
         ]
         return "\n".join(lines + [""])
