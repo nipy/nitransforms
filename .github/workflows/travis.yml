@@ -35,14 +35,13 @@ jobs:
       run: |
         $CONDA/bin/conda install -c conda-forge git-annex datalad pip codecov pytest
         $CONDA/bin/python -m pip install datalad-osf
-        # $CONDA/bin/pip install git+https://github.com/Lykos153/AnnexRemote.git
 
     - uses: actions/cache@v2
       with:
         path: ${{ env.TEST_DATA_HOME }}
-        key: data-cache-v1
+        key: data-cache-v2
         restore-keys: |
-          data-cache-
+          data-cache-v2
 
     - name: Install test data
       run: |
@@ -50,7 +49,7 @@ jobs:
         mkdir -p /home/runner/testdata
         cd /home/runner/testdata
 
-        $CONDA/bin/datalad install https://github.com/nipreps-data/nitransforms-tests.git
+        $CONDA/bin/datalad install https://gin.g-node.org/oesteban/nitransforms-tests
         $CONDA/bin/datalad update --merge -d nitransforms-tests/
         $CONDA/bin/datalad get -d nitransforms-tests/
 

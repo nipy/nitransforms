@@ -2,13 +2,67 @@ version: 2
 jobs:
   build_pytest:
     machine:
-      image: circleci/classic:201808-01
+      image: ubuntu-2004:202107-02
     working_directory: /tmp/src/nitransforms
     environment:
       TZ: "/usr/share/zoneinfo/America/Los_Angeles"
       FS_LICENSE: "/tmp/fslicense/license.txt"
 
     steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - env-v3-{{ .Branch }}-
+            - env-v3-master-
+            - env-v3-
+      - run:
+          name: Setup git-annex
+          command: |
+              sudo apt update && sudo apt-get install apt-transport-https ca-certificates -y && sudo update-ca-certificates
+              if [[ ! -d /opt/circleci/git-annex.linux ]]; then
+                cd /tmp
+                wget https://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz
+                tar xzf git-annex-standalone-amd64.tar.gz -C /opt/circleci/
+              fi
+              git config --global user.name 'NiPy'
+              git config --global user.email 'nipreps@gmail.com'
+      - run:
+          name: Setup DataLad
+          command: |
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
+              python -m pip install --no-cache-dir -U pip "setuptools >= 45.0" "setuptools_scm[toml] >= 3.4"
+              python -m pip install --no-cache-dir -U datalad datalad-osf
+
+      - save_cache:
+          key: env-v3-{{ .Branch }}-{{ .BuildNum }}
+          paths:
+            - /opt/circleci/git-annex.linux
+            - /opt/circleci/.pyenv/versions/3.9.4
+
+      - restore_cache:
+          keys:
+            - data-v3-{{ .Branch }}-
+            - data-v3-master-
+            - data-v3-
+      - run:
+          name: Install test data from GIN
+          command: |
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
+              export PATH=/opt/circleci/git-annex.linux:$PATH
+              mkdir -p /tmp/data
+              cd /tmp/data
+              datalad install -r https://gin.g-node.org/oesteban/nitransforms-tests
+              datalad update --merge -d ./nitransforms-tests/
+              datalad get -r -d ./nitransforms-tests/ *
+      - save_cache:
+          key: data-v3-{{ .Branch }}-{{ .BuildNum }}
+          paths:
+            - /tmp/data
+
       - restore_cache:
           keys:
             - build-v1-{{ .Branch }}-{{ epoch }}
@@ -40,17 +94,13 @@ jobs:
                   docker tag ubuntu:xenial-20200114 localhost:5000/ubuntu
                   docker push localhost:5000/ubuntu
               fi
-      - checkout
-      - run:
-          name: Prepare a Python environment
-          command: |
-              pyenv local 3.7.0
-              python3 -m pip install "setuptools >= 45.0" "setuptools_scm[toml] >= 3.4" "pip>=10.0.1"
       - run:
           name: Build Docker image & push to registry
           no_output_timeout: 60m
           command: |
-              pyenv local 3.7.0
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
               e=1 && for i in {1..5}; do
                   docker build --rm --cache-from=nitransforms:latest \
                   -t nitransforms:latest \
@@ -73,7 +123,9 @@ jobs:
       - run:
           name: Check version packaged in Docker image
           command: |
-              pyenv local 3.7.0
+              export PY3=$(pyenv versions | grep '3\.' |
+                           sed -e 's/.* 3\./3./' -e 's/ .*//')
+              pyenv local $PY3
               THISVERSION=${CIRCLE_TAG:-$(python3 setup.py --version)}
               INSTALLED_VERSION=$(\
                 docker run -it --rm --entrypoint=python nitransforms \
@@ -87,29 +139,6 @@ jobs:
               mkdir -p /tmp/fslicense
               cd /tmp/fslicense
               echo "cHJpbnRmICJrcnp5c3p0b2YuZ29yZ29sZXdza2lAZ21haWwuY29tXG41MTcyXG4gKkN2dW12RVYzelRmZ1xuRlM1Si8yYzFhZ2c0RVxuIiA+IGxpY2Vuc2UudHh0Cg==" | base64 -d | sh
-
-      - restore_cache:
-          keys:
-            - data-v1-{{ .Branch }}-{{ epoch }}
-            - data-v1-{{ .Branch }}-
-            - data-v1-master-
-            - data-v1-
-          paths:
-            - /tmp/data
-      - run:
-          name: Download data
-          command: |
-              if [[ ! -d /tmp/data ]]; then
-                wget --retry-connrefused --waitretry=5 --read-timeout=20 --timeout=15 -t 0 -q \
-                  -O data.zip "https://files.osf.io/v1/resources/fvuh8/providers/osfstorage/5e7d5b65c3f8d300bafa05e0/?zip="
-                unzip -d /tmp/data data.zip
-              else
-                echo "Dataset was cached"
-              fi
-      - save_cache:
-          key: data-v1-{{ .Branch }}-{{ epoch }}
-          paths:
-            - /tmp/data
       - run:
           name: Get codecov
           command: python -m pip install codecov
@@ -119,7 +148,7 @@ jobs:
           command: |
             mkdir -p $PWD/{artifacts,summaries}
             docker run -u $( id -u ) -it --rm -w /src/nitransforms \
-              -v /tmp/data:/data -e TEST_DATA_HOME=/data \
+              -v /tmp/data/nitransforms-tests:/data -e TEST_DATA_HOME=/data \
               -e COVERAGE_FILE=/tmp/summaries/.pytest.coverage \
               -v /tmp/fslicense/license.txt:/opt/freesurfer/license.txt:ro \
               -v ${PWD}:/tmp nitransforms:latest \
