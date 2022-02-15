@@ -54,9 +54,9 @@ jobs:
               export PATH=/opt/circleci/git-annex.linux:$PATH
               mkdir -p /tmp/data
               cd /tmp/data
-              datalad install -r https://gin.g-node.org/oesteban/nitransforms-tests.git
-              datalad update -r --merge -d nitransforms-tests/
-              datalad get -r -d nitransforms-tests/
+              datalad install -r https://gin.g-node.org/oesteban/nitransforms-tests
+              datalad update --merge -d ./nitransforms-tests/
+              datalad get -r -d ./nitransforms-tests/ *
       - save_cache:
           key: data-v3-{{ .Branch }}-{{ .BuildNum }}
           paths:
