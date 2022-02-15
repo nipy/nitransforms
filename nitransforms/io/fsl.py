@@ -1,10 +1,17 @@
 """Read/write FSL's transforms."""
 import os
+import warnings
 import numpy as np
+from numpy.linalg import inv
 from pathlib import Path
 from nibabel.affines import voxel_sizes
 
-from .base import BaseLinearTransformList, LinearParameters, TransformFileError
+from .base import (
+    BaseLinearTransformList,
+    LinearParameters,
+    TransformFileError,
+    _ensure_image,
+)
 
 
 class FSLLinearTransform(LinearParameters):
@@ -24,17 +31,29 @@ class FSLLinearTransform(LinearParameters):
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
-        """Create an ITK affine from a nitransform's RAS+ matrix."""
+        """Create an FSL affine from a nitransform's RAS+ matrix."""
+        if moving is None:
+            warnings.warn(
+                "[Converting FSL to RAS] moving not provided, using reference as moving"
+            )
+            moving = reference
+
+        if reference is None:
+            raise ValueError("Cannot build FSL linear transform without a reference")
+
+        reference = _ensure_image(reference)
+        moving = _ensure_image(moving)
+
         # Adjust for reference image offset and orientation
         refswp, refspc = _fsl_aff_adapt(reference)
-        pre = reference.affine.dot(np.linalg.inv(refspc).dot(np.linalg.inv(refswp)))
+        pre = reference.affine.dot(inv(refspc).dot(inv(refswp)))
 
         # Adjust for moving image offset and orientation
         movswp, movspc = _fsl_aff_adapt(moving)
-        post = np.linalg.inv(movswp).dot(movspc.dot(np.linalg.inv(moving.affine)))
+        post = inv(movswp).dot(movspc.dot(inv(moving.affine)))
 
         # Compose FSL transform
-        mat = np.linalg.inv(np.swapaxes(post.dot(ras.dot(pre)), 0, 1))
+        mat = inv(np.swapaxes(post.dot(ras.dot(pre)), 0, 1))
 
         tf = cls()
         tf.structarr["parameters"] = mat.T
@@ -54,6 +73,29 @@ class FSLLinearTransform(LinearParameters):
             ["\n".join(lines)], dtype=cls.dtype["parameters"]
         )
         return tf
+
+    def to_ras(self, moving=None, reference=None):
+        """Return a nitransforms internal RAS+ matrix."""
+        if reference is None:
+            raise ValueError("Cannot build FSL linear transform without a reference")
+
+        if moving is None:
+            warnings.warn(
+                "Converting FSL to RAS: moving image not provided, using reference."
+            )
+            moving = reference
+
+        reference = _ensure_image(reference)
+        moving = _ensure_image(moving)
+
+        refswp, refspc = _fsl_aff_adapt(reference)
+
+        pre = refswp @ refspc @ inv(reference.affine)
+        # Adjust for moving image offset and orientation
+        movswp, movspc = _fsl_aff_adapt(moving)
+        post = moving.affine @ inv(movspc) @ inv(movswp)
+        mat = self.structarr["parameters"].T
+        return post @ np.swapaxes(inv(mat), 0, 1) @ pre
 
 
 class FSLLinearTransformArray(BaseLinearTransformList):

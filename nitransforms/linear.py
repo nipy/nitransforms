@@ -241,6 +241,8 @@ should be (0, 0, 0, 1), got %s."""
             _factory = io.itk.ITKLinearTransformArray
         elif fmt.lower() in ("lta", "fs"):
             _factory = io.LinearTransformArray
+        elif fmt.lower() == "fsl":
+            _factory = io.fsl.FSLLinearTransformArray
         else:
             raise NotImplementedError
 

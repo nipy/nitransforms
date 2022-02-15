@@ -1,4 +1,5 @@
 """Read/write linear transforms."""
+from pathlib import Path
 import numpy as np
 from nibabel import load as loadimg
 from scipy.io.matlab.miobase import get_matfile_version
@@ -174,3 +175,9 @@ def _read_mat(byte_stream):
     else:
         raise TransformFileError("Not a Matlab file.")
     return reader.get_variables()
+
+
+def _ensure_image(img):
+    if isinstance(img, (str, Path)):
+        return loadimg(img)
+    return img

@@ -82,18 +82,62 @@ def test_loadsave(tmp_path, data_path, testdata_path, fmt):
 
     fname = tmp_path / ".".join(("transform-mapping", fmt))
     xfm.to_filename(fname, fmt=fmt)
-    xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+
+    if fmt == "fsl":
+        # FSL should not read a transform without reference
+        with pytest.raises(ValueError):
+            nitl.load(fname, fmt=fmt)
+            nitl.load(fname, fmt=fmt, moving=ref_file)
+
+        with pytest.warns(UserWarning):
+            assert np.allclose(
+                xfm.matrix,
+                nitl.load(fname, fmt=fmt, reference=ref_file).matrix,
+                rtol=1e-2,  # FSL incurs into large errors due to rounding
+            )
+
+        assert np.allclose(
+            xfm.matrix,
+            nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
+            rtol=1e-2,  # FSL incurs into large errors due to rounding
+        )
+    else:
+        assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+
     xfm.to_filename(fname, fmt=fmt, moving=ref_file)
-    xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+
+    if fmt == "fsl":
+        assert np.allclose(
+            xfm.matrix,
+            nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
+            rtol=1e-2,  # FSL incurs into large errors due to rounding
+        )
+    else:
+        assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
 
     ref_file = testdata_path / "someones_anatomy.nii.gz"
     xfm = nitl.load(data_path / "affine-LAS.itk.tfm", fmt="itk")
     xfm.reference = ref_file
     fname = tmp_path / ".".join(("single-transform", fmt))
     xfm.to_filename(fname, fmt=fmt)
-    xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+    if fmt == "fsl":
+        assert np.allclose(
+            xfm.matrix,
+            nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
+            rtol=1e-2,  # FSL incurs into large errors due to rounding
+        )
+    else:
+        assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+
     xfm.to_filename(fname, fmt=fmt, moving=ref_file)
-    xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+    if fmt == "fsl":
+        assert np.allclose(
+            xfm.matrix,
+            nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
+            rtol=1e-2,  # FSL incurs into large errors due to rounding
+        )
+    else:
+        assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
 
 
 @pytest.mark.xfail(reason="Not fully implemented")
