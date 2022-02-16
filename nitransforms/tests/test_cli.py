@@ -57,12 +57,7 @@ def test_apply_nl(tmpdir, testdata_path):
     with pytest.raises(ValueError):
         ntcli(nlargs)
 
-    nlargs.extend(["--fmt", "afni"])
-    # no linear afni support
-    with pytest.raises(NotImplementedError):
-        ntcli(nlargs)
-
     output = "moved_from_warp.nii.gz"
-    nlargs.extend(["--nonlinear", "--out", output])
+    nlargs.extend(["--nonlinear", "--fmt", "afni", "--out", output])
     ntcli(nlargs)
     assert (tmpdir / output).check()
