@@ -29,10 +29,11 @@ def cli_apply(pargs):
             "Cannot determine transformation format, manually set format with the `--fmt` flag"
         )
 
-    if pargs.nonlinear:
-        xfm = nlinload(pargs.transform, fmt=fmt)
-    else:
-        xfm = linload(pargs.transform, fmt=fmt)
+    xfm = (
+        nlinload(pargs.transform, fmt=fmt)
+        if pargs.nonlinear else
+        linload(pargs.transform, fmt=fmt)
+    )
 
     # ensure a reference is set
     xfm.reference = pargs.ref or pargs.moving

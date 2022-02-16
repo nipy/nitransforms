@@ -9,6 +9,7 @@ from .base import (
     DisplacementsField,
     LinearParameters,
     TransformFileError,
+    _ensure_image,
 )
 
 LPS = np.diag([-1, -1, 1, 1])
@@ -34,11 +35,14 @@ class AFNILinearTransform(LinearParameters):
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
-        """Create an ITK affine from a nitransform's RAS+ matrix."""
-        ras = ras.copy()
-        pre = LPS.copy()
-        post = LPS.copy()
-        if _is_oblique(reference.affine):
+        """Create an AFNI affine from a nitransform's RAS+ matrix."""
+        pre = LPS
+        post = LPS
+
+        if reference is not None:
+            reference = _ensure_image(reference)
+
+        if reference is not None and _is_oblique(reference.affine):
             print("Reference affine axes are oblique.")
             M = reference.affine
             A = shape_zoom_affine(
@@ -46,7 +50,10 @@ class AFNILinearTransform(LinearParameters):
             )
             pre = M.dot(np.linalg.inv(A)).dot(LPS)
 
-        if _is_oblique(moving.affine):
+        if moving is not None:
+            moving = _ensure_image(moving)
+
+        if moving is not None and _is_oblique(moving.affine):
             print("Moving affine axes are oblique.")
             M2 = moving.affine
             A2 = shape_zoom_affine(
@@ -55,7 +62,7 @@ class AFNILinearTransform(LinearParameters):
             post = A2.dot(np.linalg.inv(M2))
 
         # swapaxes is necessary, as axis 0 encodes series of transforms
-        parameters = np.swapaxes(post.dot(ras.dot(pre)), 0, 1)
+        parameters = np.swapaxes(post @ ras @ pre, 0, 1)
 
         tf = cls()
         tf.structarr["parameters"] = parameters.T
@@ -83,6 +90,26 @@ class AFNILinearTransform(LinearParameters):
         )
         sa["parameters"] = parameters
         return tf
+
+    def to_ras(self, moving=None, reference=None):
+        """Return a nitransforms internal RAS+ matrix."""
+        pre = LPS
+        post = LPS
+
+        if reference is not None:
+            reference = _ensure_image(reference)
+
+        if reference is not None and _is_oblique(reference.affine):
+            raise NotImplementedError
+
+        if moving is not None:
+            moving = _ensure_image(moving)
+
+        if moving is not None and _is_oblique(moving.affine):
+            raise NotImplementedError
+
+        # swapaxes is necessary, as axis 0 encodes series of transforms
+        return post @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ pre
 
 
 class AFNILinearTransformArray(BaseLinearTransformList):
