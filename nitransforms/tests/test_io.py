@@ -222,6 +222,14 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     xfm = factory.from_ras(RAS, reference=reference, moving=moving)
     assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
 
+    # Test without images
+    if sw == "fsl":
+        with pytest.raises(ValueError):
+            factory.from_ras(RAS)
+    else:
+        xfm = factory.from_ras(RAS)
+        assert np.allclose(xfm.to_ras(), RAS)
+
 
 @pytest.mark.parametrize(
     "image_orientation",
