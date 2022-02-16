@@ -35,10 +35,9 @@ class AFNILinearTransform(LinearParameters):
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
-        """Create an ITK affine from a nitransform's RAS+ matrix."""
-        ras = ras.copy()
-        pre = LPS.copy()
-        post = LPS.copy()
+        """Create an AFNI affine from a nitransform's RAS+ matrix."""
+        pre = LPS
+        post = LPS
 
         if reference is not None:
             reference = _ensure_image(reference)
@@ -94,8 +93,8 @@ class AFNILinearTransform(LinearParameters):
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
-        pre = LPS.copy()
-        post = LPS.copy()
+        pre = LPS
+        post = LPS
 
         if reference is not None:
             reference = _ensure_image(reference)
