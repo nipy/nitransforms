@@ -92,13 +92,11 @@ def test_loadsave(tmp_path, data_path, testdata_path, fmt):
             assert np.allclose(
                 xfm.matrix,
                 nitl.load(fname, fmt=fmt, reference=ref_file).matrix,
-                rtol=1e-2,  # FSL incurs into large errors due to rounding
             )
 
         assert np.allclose(
             xfm.matrix,
             nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
-            rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
         assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)

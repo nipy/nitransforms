@@ -20,7 +20,7 @@ class FSLLinearTransform(LinearParameters):
     def __str__(self):
         """Generate a string representation."""
         lines = [
-            " ".join(["%g" % col for col in row])
+            " ".join("%.08f" % col for col in row)
             for row in self.structarr["parameters"]
         ]
         return "\n".join(lines + [""])
@@ -46,14 +46,14 @@ class FSLLinearTransform(LinearParameters):
 
         # Adjust for reference image offset and orientation
         refswp, refspc = _fsl_aff_adapt(reference)
-        pre = reference.affine.dot(inv(refspc).dot(inv(refswp)))
+        pre = reference.affine @ inv(refswp @ refspc)
 
         # Adjust for moving image offset and orientation
         movswp, movspc = _fsl_aff_adapt(moving)
-        post = inv(movswp).dot(movspc.dot(inv(moving.affine)))
+        post = movswp @ movspc @ inv(moving.affine)
 
         # Compose FSL transform
-        mat = inv(np.swapaxes(post.dot(ras.dot(pre)), 0, 1))
+        mat = inv(np.swapaxes(post @ ras @ pre, 0, 1))
 
         tf = cls()
         tf.structarr["parameters"] = mat.T
@@ -92,7 +92,7 @@ class FSLLinearTransform(LinearParameters):
         pre = refswp @ refspc @ inv(reference.affine)
         # Adjust for moving image offset and orientation
         movswp, movspc = _fsl_aff_adapt(moving)
-        post = moving.affine @ inv(movspc) @ inv(movswp)
+        post = moving.affine @ inv(movswp @ movspc)
         mat = self.structarr["parameters"].T
         return post @ np.swapaxes(inv(mat), 0, 1) @ pre
 
