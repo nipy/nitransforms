@@ -15,9 +15,11 @@ from ..io import (
     fsl,
     lta as fs,
     itk,
+)
+from ..io.lta import (
     VolumeGeometry as VG,
-    LinearTransform as LT,
-    LinearTransformArray as LTA,
+    FSLinearTransform as LT,
+    FSLinearTransformArray as LTA,
 )
 from ..io.base import _read_mat, LinearParameters, TransformFileError
 
@@ -78,6 +80,39 @@ def test_LinearTransform(tmpdir):
     for vol in ("src", "dst"):
         assert lt[vol]["valid"] == 0
 
+    lta_text = """\
+# LTA file created by NiTransforms
+type      = 1
+nxforms   = 1
+mean      = 0.0000 0.0000 0.0000
+sigma     = 1.0000
+1 4 4
+1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00
+0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00
+0.000000000000000e+00 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00
+0.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00 1.000000000000000e+00
+src volume info
+valid = 1  # volume info valid
+filename = file.nii.gz
+volume = 57 67 56
+voxelsize = 2.750000000000000e+00 2.750000000000000e+00 2.750000000000000e+00
+xras   = -1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00
+yras   = 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00
+zras   = 0.000000000000000e+00 0.000000000000000e+00 1.000000000000000e+00
+cras   = -2.375000000000000e+00 1.125000000000000e+00 -1.400000000000000e+01
+dst volume info
+valid = 1  # volume info valid
+filename = file.nii.gz
+volume = 57 67 56
+voxelsize = 2.750000000000000e+00 2.750000000000000e+00 2.750000000000000e+00
+xras   = -1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00
+yras   = 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00
+zras   = 0.000000000000000e+00 0.000000000000000e+00 1.000000000000000e+00
+cras   = -2.375000000000000e+00 1.125000000000000e+00 -1.400000000000000e+01
+"""
+    xfm = LT.from_string(lta_text)
+    assert xfm.to_string() == lta_text
+
 
 def test_LinearTransformArray(tmpdir, data_path):
     lta = LTA()
@@ -99,7 +134,7 @@ def test_LinearTransformArray(tmpdir, data_path):
     xform = lta["xforms"][0]
 
     assert np.allclose(
-        xform["m_L"], np.genfromtxt(test_lta, skip_header=5, skip_footer=20)
+        xform["m_L"], np.genfromtxt(test_lta, skip_header=6, skip_footer=20)
     )
 
     outlta = (tmpdir / "out.lta").strpath
@@ -130,7 +165,6 @@ def test_LT_conversions(data_path, fname):
     assert np.allclose(r2r_m, v2v_m, rtol=1e-04)
 
 
-@pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
 @pytest.mark.parametrize(
     "image_orientation",
     [
@@ -142,6 +176,9 @@ def test_LT_conversions(data_path, fname):
 )
 @pytest.mark.parametrize("sw", ["afni", "fsl", "fs", "itk"])
 def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
+    if (image_orientation, sw) == ("oblique", "afni"):
+        pytest.skip("AFNI Deoblique unsupported.")
+
     tmpdir.chdir()
 
     moving = get_testdata[image_orientation]
@@ -159,7 +196,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
         factory = itk.ITKLinearTransform
     elif sw == "fs":
         ext = ".lta"
-        factory = fs.LinearTransformArray
+        factory = fs.FSLinearTransformArray
 
     with pytest.raises(TransformFileError):
         factory.from_string("")
@@ -175,7 +212,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
         xfm = factory.from_fileobj(f)
 
     # Test to_string
-    assert text == xfm.to_string()
+    assert fs._drop_comments(text) == fs._drop_comments(xfm.to_string())
 
     xfm.to_filename(fname)
     assert filecmp.cmp(fname, str((data_path / fname).resolve()))
@@ -184,6 +221,14 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     RAS = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
     xfm = factory.from_ras(RAS, reference=reference, moving=moving)
     assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
+
+    # Test without images
+    if sw == "fsl":
+        with pytest.raises(ValueError):
+            factory.from_ras(RAS)
+    else:
+        xfm = factory.from_ras(RAS)
+        assert np.allclose(xfm.to_ras(), RAS)
 
 
 @pytest.mark.parametrize(

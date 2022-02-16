@@ -72,7 +72,6 @@ def test_loadsave_itk(tmp_path, data_path, testdata_path):
     )
 
 
-@pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize("fmt", ["itk", "fsl", "afni", "lta"])
 def test_loadsave(tmp_path, data_path, testdata_path, fmt):
     """Test idempotency."""
@@ -140,15 +139,21 @@ def test_loadsave(tmp_path, data_path, testdata_path, fmt):
         assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
 
 
-@pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
 @pytest.mark.parametrize("sw_tool", ["itk", "fsl", "afni", "fs"])
 def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
+    if (image_orientation, sw_tool) == ("oblique", "afni"):
+        pytest.skip("AFNI Deoblique unsupported.")
+
     tmpdir.chdir()
     img = get_testdata[image_orientation]
     # Generate test transform
     T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+    if sw_tool == "fs":
+        # Account for the fact that FS defines LTA transforms reversed
+        T = np.linalg.inv(T)
+
     xfm = nitl.Affine(T)
     xfm.reference = img
 

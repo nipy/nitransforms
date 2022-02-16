@@ -22,39 +22,24 @@ class StringBasedStruct(LabeledWrapStruct):
         if binaryblock is not None and _dtype == self.dtype:
             self._structarr = binaryblock.copy()
             return
-        super(StringBasedStruct, self).__init__(binaryblock, endianness, check)
+        super().__init__(binaryblock, endianness, check)
 
     def __array__(self):
         """Return the internal structure array."""
         return self._structarr
 
+    def to_string(self):
+        """Convert to a string directly writeable to file."""
+        raise NotImplementedError
 
-class LinearParameters(StringBasedStruct):
-    """
-    A string-based structure for linear transforms.
+    @classmethod
+    def from_string(cls, string):
+        """Read the struct from string."""
+        raise NotImplementedError
 
-    Examples
-    --------
-    >>> lp = LinearParameters()
-    >>> np.all(lp.structarr['parameters'] == np.eye(4))
-    True
 
-    >>> p = np.diag([2., 2., 2., 1.])
-    >>> lp = LinearParameters(p)
-    >>> np.all(lp.structarr['parameters'] == p)
-    True
-
-    """
-
-    template_dtype = np.dtype([("parameters", "f8", (4, 4))])
-    dtype = template_dtype
-
-    def __init__(self, parameters=None):
-        """Initialize with default parameters."""
-        super().__init__()
-        self.structarr["parameters"] = np.eye(4)
-        if parameters is not None:
-            self.structarr["parameters"] = parameters
+class LinearTransformStruct(StringBasedStruct):
+    """File data structure from linear transforms."""
 
     def to_filename(self, filename):
         """Store this transform to a file with the appropriate format."""
@@ -78,12 +63,44 @@ class LinearParameters(StringBasedStruct):
         return cls.from_string(fileobj.read())
 
     @classmethod
-    def from_string(cls, string):
-        """Read the struct from string."""
+    def from_ras(cls, ras, moving=None, reference=None):
+        """Create an affine from a nitransform's RAS+ matrix."""
         raise NotImplementedError
 
 
-class BaseLinearTransformList(StringBasedStruct):
+class LinearParameters(LinearTransformStruct):
+    """
+    A string-based structure for linear transforms.
+
+    Examples
+    --------
+    >>> lp = LinearParameters()
+    >>> np.all(lp.structarr['parameters'] == np.eye(4))
+    True
+
+    >>> p = np.diag([2., 2., 2., 1.])
+    >>> lp = LinearParameters(p)
+    >>> np.all(lp.structarr['parameters'] == p)
+    True
+
+    """
+
+    template_dtype = np.dtype([("parameters", "f8", (4, 4))])
+    dtype = template_dtype
+
+    def __init__(self, parameters=None):
+        """
+        Initialize with default parameters.
+
+
+        """
+        super().__init__()
+        self.structarr["parameters"] = np.eye(4)
+        if parameters is not None:
+            self.structarr["parameters"] = parameters
+
+
+class BaseLinearTransformList(LinearTransformStruct):
     """A string-based structure for series of linear transforms."""
 
     template_dtype = np.dtype([("nxforms", "i4")])
@@ -112,41 +129,6 @@ class BaseLinearTransformList(StringBasedStruct):
         if idx == "nxforms":
             return len(self._xforms)
         raise KeyError(idx)
-
-    def to_filename(self, filename):
-        """Store this transform to a file with the appropriate format."""
-        with open(str(filename), "w") as f:
-            f.write(self.to_string())
-
-    def to_ras(self, moving=None, reference=None):
-        """Return a nitransforms' internal RAS matrix."""
-        raise NotImplementedError
-
-    def to_string(self):
-        """Convert to a string directly writeable to file."""
-        raise NotImplementedError
-
-    @classmethod
-    def from_filename(cls, filename):
-        """Read the struct from a file given its path."""
-        with open(str(filename)) as f:
-            string = f.read()
-        return cls.from_string(string)
-
-    @classmethod
-    def from_fileobj(cls, fileobj, check=True):
-        """Read the struct from a file object."""
-        return cls.from_string(fileobj.read())
-
-    @classmethod
-    def from_ras(cls, ras, moving=None, reference=None):
-        """Create an ITK affine from a nitransform's RAS+ matrix."""
-        raise NotImplementedError
-
-    @classmethod
-    def from_string(cls, string):
-        """Read the struct from string."""
-        raise NotImplementedError
 
 
 class DisplacementsField:
