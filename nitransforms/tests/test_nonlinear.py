@@ -12,6 +12,7 @@ from ..io.base import TransformFileError
 from ..nonlinear import DisplacementsFieldTransform, load as nlload
 from ..io.itk import ITKDisplacementsField
 
+
 TESTS_BORDER_TOLERANCE = 0.05
 APPLY_NONLINEAR_CMD = {
     "itk": """\
@@ -22,6 +23,9 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 3dNwarpApply -nwarp {transform} -source {moving} \
 -master {reference} -interp NN -prefix resampled.nii.gz
 """.format,
+    'fsl': """\
+applywarp -i {moving} -r {reference} -o resampled.nii.gz \
+-w {transform} --interp=nn""".format,
 }
 
 
@@ -59,7 +63,10 @@ def test_displacements_field1(tmp_path, get_testdata, image_orientation, sw_tool
     os.chdir(str(tmp_path))
     nii = get_testdata[image_orientation]
     nii.to_filename("reference.nii.gz")
-    fieldmap = np.zeros((*nii.shape[:3], 1, 3), dtype="float32")
+    fieldmap = np.zeros(
+        (*nii.shape[:3], 1, 3) if sw_tool != "fsl" else (*nii.shape[:3], 3),
+        dtype="float32",
+    )
     fieldmap[..., axis] = -10.0
 
     _hdr = nii.header.copy()
