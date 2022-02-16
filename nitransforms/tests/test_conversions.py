@@ -4,7 +4,7 @@
 import numpy as np
 import pytest
 from .. import linear as _l
-from ..io import LinearTransformArray as LTA
+from ..io.lta import LinearTransformArray as LTA
 
 
 @pytest.mark.parametrize(

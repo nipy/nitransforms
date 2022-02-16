@@ -1,3 +1,4 @@
+# LTA-array file created by NiTransforms
 type      = 1 # LINEAR_RAS_TO_RAS
 nxforms   = 1
 mean      = 0.0000 0.0000 0.0000

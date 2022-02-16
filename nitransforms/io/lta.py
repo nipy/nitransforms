@@ -3,7 +3,12 @@ import numpy as np
 from nibabel.volumeutils import Recoder
 from nibabel.affines import voxel_sizes, from_matvec
 
-from .base import BaseLinearTransformList, StringBasedStruct, TransformFileError
+from .base import (
+    BaseLinearTransformList,
+    StringBasedStruct,
+    LinearTransformStruct,
+    TransformFileError,
+)
 
 
 transform_codes = Recoder(
@@ -64,9 +69,9 @@ class VolumeGeometry(StringBasedStruct):
         return self.__str__()
 
     @classmethod
-    def from_image(klass, img):
+    def from_image(cls, img):
         """Create struct from an image."""
-        volgeom = klass()
+        volgeom = cls()
         sa = volgeom.structarr
         sa["valid"] = 1
         sa["volume"] = img.shape[:3]  # Assumes xyzt-ordered image
@@ -86,9 +91,9 @@ class VolumeGeometry(StringBasedStruct):
         return volgeom
 
     @classmethod
-    def from_string(klass, string):
+    def from_string(cls, string):
         """Create a volume structure off of text."""
-        volgeom = klass()
+        volgeom = cls()
         sa = volgeom.structarr
         lines = string.splitlines()
         for key in (
@@ -107,7 +112,7 @@ class VolumeGeometry(StringBasedStruct):
             val = ""
             if valstring.strip():
                 parsed = np.genfromtxt(
-                    [valstring.encode()], autostrip=True, dtype=klass.dtype[key]
+                    [valstring.encode()], autostrip=True, dtype=cls.dtype[key]
                 )
                 if parsed.size:
                     val = parsed.reshape(sa[key].shape)
@@ -115,7 +120,7 @@ class VolumeGeometry(StringBasedStruct):
         return volgeom
 
 
-class LinearTransform(StringBasedStruct):
+class LinearTransform(LinearTransformStruct):
     """Represents a single LTA's transform structure."""
 
     template_dtype = np.dtype(
@@ -210,10 +215,16 @@ class LinearTransform(StringBasedStruct):
         self.set_type(1)
         return np.linalg.inv(self.structarr["m_L"])
 
-    def to_string(self):
+    def to_string(self, partial=False):
         """Convert this transform to text."""
         sa = self.structarr
         lines = [
+            "# LTA file created by NiTransforms",
+            "type      = {}".format(sa["type"]),
+            "nxforms   = 1",
+        ] if not partial else []
+
+        lines += [
             "mean      = {:6.4f} {:6.4f} {:6.4f}".format(*sa["mean"].flatten()),
             "sigma     = {:6.4f}".format(float(sa["sigma"])),
             "1 4 4",
@@ -229,17 +240,25 @@ class LinearTransform(StringBasedStruct):
         return "\n".join(lines)
 
     @classmethod
-    def from_string(klass, string):
+    def from_string(cls, string, partial=False):
         """Read a transform from text."""
-        lt = klass()
+        lt = cls()
         sa = lt.structarr
-        lines = string.splitlines()
-        for key in ("mean", "sigma"):
+
+        # Drop commented out lines
+        lines = _drop_comments(string).splitlines()
+
+        fields = ("type", "nxforms", "mean", "sigma")
+        for key in fields[partial * 2:]:
             label, valstring = lines.pop(0).split(" = ")
             assert label.strip() == key
 
-            val = np.genfromtxt([valstring.encode()], dtype=klass.dtype[key])
-            sa[key] = val.reshape(sa[key].shape)
+            val = np.genfromtxt([valstring.encode()], dtype=cls.dtype[key])
+            if key != "nxforms":
+                sa[key] = val.reshape(sa[key].shape)
+            else:
+                assert valstring.strip() == "1"
+
         assert lines.pop(0) == "1 4 4"  # xforms, shape + 1, shape + 1
         val = np.genfromtxt([valstring.encode() for valstring in lines[:4]], dtype="f4")
         sa["m_L"] = val
@@ -249,6 +268,31 @@ class LinearTransform(StringBasedStruct):
         lines = lines[8:]
         assert lines.pop(0) == "dst volume info"
         sa["dst"] = np.asanyarray(VolumeGeometry.from_string("\n".join(lines)))
+        return lt
+
+    @classmethod
+    def from_ras(cls, ras, moving=None, reference=None):
+        """Create an affine from a nitransform's RAS+ matrix."""
+        lt = cls()
+        sa = lt.structarr
+        sa["sigma"] = 1.0
+        sa["mean"] = np.zeros((3, 1), dtype="float")
+        sa["type"] = 1  # RAS2RAS
+        # Just for reference, nitransforms does not write VOX2VOX
+        # PLEASE NOTE THAT LTA USES THE "POINTS" CONVENTION, therefore
+        # the source is the reference (coordinates for which we need
+        # to find a projection) and destination is the moving image
+        # (from which data is pulled-back).
+        if reference is not None:
+            sa["src"] = np.asanyarray(VolumeGeometry.from_image(reference))
+
+        if moving is not None:
+            sa["dst"] = np.asanyarray(VolumeGeometry.from_image(moving))
+        # However, the affine needs to be inverted
+        # (i.e., it is not a pure "points" convention).
+        # This inversion is consistent with self.to_ras()
+        sa["m_L"] = np.linalg.inv(ras)
+        # to make LTA file format
         return lt
 
 
@@ -272,16 +316,20 @@ class LinearTransformArray(BaseLinearTransformList):
     def to_ras(self, moving=None, reference=None):
         """Set type to RAS2RAS and return the new matrix."""
         self.structarr["type"] = 1
-        return [xfm.to_ras() for xfm in self.xforms]
+        return [
+            xfm.to_ras(moving=moving, reference=reference)
+            for xfm in self.xforms
+        ]
 
     def to_string(self):
         """Convert this LTA into text format."""
         code = int(self["type"])
         header = [
+            "# LTA-array file created by NiTransforms",
             "type      = {} # {}".format(code, transform_codes.label[code]),
             "nxforms   = {}".format(self["nxforms"]),
         ]
-        xforms = [xfm.to_string() for xfm in self._xforms]
+        xforms = [xfm.to_string(partial=True) for xfm in self._xforms]
         footer = [
             "subject {}".format(self["subject"]),
             "fscale {:.6f}".format(float(self["fscale"])),
@@ -289,25 +337,26 @@ class LinearTransformArray(BaseLinearTransformList):
         return "\n".join(header + xforms + footer)
 
     @classmethod
-    def from_string(klass, string):
+    def from_string(cls, string):
         """Read this LTA from a text string."""
-        lta = klass()
+        lta = cls()
         sa = lta.structarr
-        lines = [
-            line.strip()
-            for line in string.splitlines()
-            if line.strip() and not line.strip().startswith("#")
-        ]
+
+        # Drop commented out lines
+        lines = _drop_comments(string).splitlines()
         if not lines or not lines[0].startswith("type"):
             raise TransformFileError("Invalid LTA format")
+
         for key in ("type", "nxforms"):
             label, valstring = lines.pop(0).split(" = ")
             assert label.strip() == key
 
-            val = np.genfromtxt([valstring.encode()], dtype=klass.dtype[key])
+            val = np.genfromtxt([valstring.encode()], dtype=cls.dtype[key])
             sa[key] = val.reshape(sa[key].shape) if val.size else ""
         for _ in range(sa["nxforms"]):
-            lta._xforms.append(klass._inner_type.from_string("\n".join(lines[:25])))
+            lta._xforms.append(
+                cls._inner_type.from_string("\n".join(lines[:25]), partial=True)
+            )
             lta._xforms[-1].structarr["type"] = sa["type"]
             lines = lines[25:]
         for key in ("subject", "fscale"):
@@ -321,8 +370,36 @@ class LinearTransformArray(BaseLinearTransformList):
             else:
                 assert label.strip() == key
 
-                val = np.genfromtxt([valstring.encode()], dtype=klass.dtype[key])
+                val = np.genfromtxt([valstring.encode()], dtype=cls.dtype[key])
                 sa[key] = val.reshape(sa[key].shape) if val.size else ""
 
         assert len(lta._xforms) == sa["nxforms"]
         return lta
+
+    @classmethod
+    def from_ras(cls, ras, moving=None, reference=None):
+        """Create an affine from a nitransform's RAS+ matrix."""
+        if ras.ndim == 2:
+            return cls._inner_type.from_ras(ras, moving=moving, reference=reference)
+
+        lt = cls()
+        sa = lt.structarr
+        sa["type"] = 1
+        sa["nxforms"] = ras.shape[0]
+        for i in range(sa["nxforms"]):
+            lt._xforms.append(cls._inner_type.from_ras(
+                ras[i, ...], moving=moving, reference=reference
+            ))
+
+        sa["subject"] = "unset"
+        sa["fscale"] = 0.0
+        return lt
+
+
+def _drop_comments(string):
+    """Drop comments."""
+    return "\n".join([
+        line.split("#")[0].strip()
+        for line in string.splitlines()
+        if line.split("#")[0].strip()
+    ])

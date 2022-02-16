@@ -190,49 +190,22 @@ should be (0, 0, 0, 1), got %s."""
             return filename
 
         # Rest of the formats peek into moving and reference image grids
-        if moving is not None:
-            moving = ImageGrid(moving)
-        else:
-            moving = self.reference
+        moving = ImageGrid(moving) if moving is not None else self.reference
 
-        if fmt.lower() == "afni":
-            afniobj = io.afni.AFNILinearTransform.from_ras(
-                self.matrix, moving=moving, reference=self.reference
-            )
-            afniobj.to_filename(filename)
-            return filename
+        _factory = {
+            "afni": io.afni.AFNILinearTransform,
+            "fsl": io.fsl.FSLLinearTransform,
+            "lta": io.lta.LinearTransform,
+            "fs": io.lta.LinearTransform,
+        }
 
-        if fmt.lower() == "fsl":
-            fslobj = io.fsl.FSLLinearTransform.from_ras(
-                self.matrix, moving=moving, reference=self.reference
-            )
-            fslobj.to_filename(filename)
-            return filename
+        if fmt not in _factory:
+            raise NotImplementedError(f"Unsupported format <{fmt}>")
 
-        if fmt.lower() == "fs":
-            # xform info
-            lt = io.LinearTransform()
-            lt["sigma"] = 1.0
-            # Just for reference, nitransforms does not write VOX2VOX
-            # PLEASE NOTE THAT LTA USES THE "POINTS" CONVENTION, therefore
-            # the source is the reference (coordinates for which we need
-            # to find a projection) and destination is the moving image
-            # (from which data is pulled-back).
-            lt["src"] = io.VolumeGeometry.from_image(self.reference)
-            lt["dst"] = io.VolumeGeometry.from_image(moving)
-            # However, the affine needs to be inverted
-            # (i.e., it is not a pure "points" convention).
-            lt["m_L"] = (~self).matrix
-            # to make LTA file format
-            lta = io.LinearTransformArray()
-            lta["type"] = 1  # RAS2RAS
-            lta["xforms"].append(lt)
-
-            with open(filename, "w") as f:
-                f.write(lta.to_string())
-            return filename
-
-        raise NotImplementedError
+        _factory[fmt].from_ras(
+            self.matrix, moving=moving, reference=self.reference
+        ).to_filename(filename)
+        return filename
 
     @classmethod
     def from_filename(cls, filename, fmt="X5", reference=None, moving=None):
@@ -240,7 +213,7 @@ should be (0, 0, 0, 1), got %s."""
         if fmt.lower() in ("itk", "ants", "elastix"):
             _factory = io.itk.ITKLinearTransformArray
         elif fmt.lower() in ("lta", "fs"):
-            _factory = io.LinearTransformArray
+            _factory = io.lta.LinearTransformArray
         elif fmt.lower() == "fsl":
             _factory = io.fsl.FSLLinearTransformArray
         elif fmt.lower() == "afni":
@@ -255,6 +228,9 @@ should be (0, 0, 0, 1), got %s."""
                 raise TypeError("Cannot load transform array '%s'" % filename)
             matrix = matrix[0]
         return cls(matrix, reference=reference)
+
+    def __repr__(self):
+        return repr(self.matrix)
 
 
 class LinearTransformsMapping(Affine):
@@ -375,39 +351,20 @@ class LinearTransformsMapping(Affine):
         else:
             moving = self.reference
 
-        if fmt.lower() == "afni":
-            afniobj = io.afni.AFNILinearTransformArray.from_ras(
-                self.matrix, moving=moving, reference=self.reference
-            )
-            afniobj.to_filename(filename)
-            return filename
+        _factory = {
+            "afni": io.afni.AFNILinearTransformArray,
+            "fsl": io.fsl.FSLLinearTransformArray,
+            "lta": io.lta.LinearTransformArray,
+            "fs": io.lta.LinearTransformArray,
+        }
 
-        if fmt.lower() == "fsl":
-            fslobj = io.fsl.FSLLinearTransformArray.from_ras(
-                self.matrix, moving=moving, reference=self.reference
-            )
-            fslobj.to_filename(filename)
-            return filename
+        if fmt not in _factory:
+            raise NotImplementedError(f"Unsupported format <{fmt}>")
 
-        if fmt.lower() in ("fs", "lta"):
-            # xform info
-            # to make LTA file format
-            lta = io.LinearTransformArray()
-            lta["type"] = 1  # RAS2RAS
-            for m in self.matrix:
-                lt = io.LinearTransform()
-                lt["sigma"] = 1.0
-                lt["m_L"] = m
-                # Just for reference, nitransforms does not write VOX2VOX
-                lt["src"] = io.VolumeGeometry.from_image(moving)
-                lt["dst"] = io.VolumeGeometry.from_image(self.reference)
-                lta["xforms"].append(lt)
-
-            with open(filename, "w") as f:
-                f.write(lta.to_string())
-            return filename
-
-        raise NotImplementedError
+        _factory[fmt].from_ras(
+            self.matrix, moving=moving, reference=self.reference
+        ).to_filename(filename)
+        return filename
 
     def apply(
         self,

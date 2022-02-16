@@ -15,6 +15,8 @@ from ..io import (
     fsl,
     lta as fs,
     itk,
+)
+from ..io.lta import (
     VolumeGeometry as VG,
     LinearTransform as LT,
     LinearTransformArray as LTA,
@@ -99,7 +101,7 @@ def test_LinearTransformArray(tmpdir, data_path):
     xform = lta["xforms"][0]
 
     assert np.allclose(
-        xform["m_L"], np.genfromtxt(test_lta, skip_header=5, skip_footer=20)
+        xform["m_L"], np.genfromtxt(test_lta, skip_header=6, skip_footer=20)
     )
 
     outlta = (tmpdir / "out.lta").strpath
@@ -175,7 +177,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
         xfm = factory.from_fileobj(f)
 
     # Test to_string
-    assert text == xfm.to_string()
+    assert fs._drop_comments(text) == fs._drop_comments(xfm.to_string())
 
     xfm.to_filename(fname)
     assert filecmp.cmp(fname, str((data_path / fname).resolve()))
