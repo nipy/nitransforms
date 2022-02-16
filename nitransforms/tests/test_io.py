@@ -18,8 +18,8 @@ from ..io import (
 )
 from ..io.lta import (
     VolumeGeometry as VG,
-    LinearTransform as LT,
-    LinearTransformArray as LTA,
+    FSLinearTransform as LT,
+    FSLinearTransformArray as LTA,
 )
 from ..io.base import _read_mat, LinearParameters, TransformFileError
 
@@ -161,7 +161,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
         factory = itk.ITKLinearTransform
     elif sw == "fs":
         ext = ".lta"
-        factory = fs.LinearTransformArray
+        factory = fs.FSLinearTransformArray
 
     with pytest.raises(TransformFileError):
         factory.from_string("")

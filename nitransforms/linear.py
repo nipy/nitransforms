@@ -195,8 +195,8 @@ should be (0, 0, 0, 1), got %s."""
         _factory = {
             "afni": io.afni.AFNILinearTransform,
             "fsl": io.fsl.FSLLinearTransform,
-            "lta": io.lta.LinearTransform,
-            "fs": io.lta.LinearTransform,
+            "lta": io.lta.FSLinearTransform,
+            "fs": io.lta.FSLinearTransform,
         }
 
         if fmt not in _factory:
@@ -213,7 +213,7 @@ should be (0, 0, 0, 1), got %s."""
         if fmt.lower() in ("itk", "ants", "elastix"):
             _factory = io.itk.ITKLinearTransformArray
         elif fmt.lower() in ("lta", "fs"):
-            _factory = io.lta.LinearTransformArray
+            _factory = io.lta.FSLinearTransformArray
         elif fmt.lower() == "fsl":
             _factory = io.fsl.FSLLinearTransformArray
         elif fmt.lower() == "afni":
@@ -354,8 +354,8 @@ class LinearTransformsMapping(Affine):
         _factory = {
             "afni": io.afni.AFNILinearTransformArray,
             "fsl": io.fsl.FSLLinearTransformArray,
-            "lta": io.lta.LinearTransformArray,
-            "fs": io.lta.LinearTransformArray,
+            "lta": io.lta.FSLinearTransformArray,
+            "fs": io.lta.FSLinearTransformArray,
         }
 
         if fmt not in _factory:
