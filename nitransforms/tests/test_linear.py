@@ -148,7 +148,11 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     img = get_testdata[image_orientation]
     # Generate test transform
     T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
-    xfm = nitl.Affine(T)
+    if sw_tool == "fs":
+        # Account for the fact that FS defines LTA transforms reversed
+        T = np.linalg.inv(T)
+
+    xfm = nitl.LinearTransformsMapping([T])
     xfm.reference = img
 
     ext = ""
