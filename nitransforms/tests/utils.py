@@ -24,4 +24,4 @@ def assert_affines_by_filename(affine1, affine2):
     else:
         xfm1 = np.loadtxt(str(affine1))
         xfm2 = np.loadtxt(str(affine2))
-        np.allclose(xfm1, xfm2, atol=1e-04)
+        assert np.allclose(xfm1, xfm2, atol=1e-04)
