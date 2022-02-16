@@ -230,6 +230,20 @@ should be (0, 0, 0, 1), got %s."""
         return cls(matrix, reference=reference)
 
     def __repr__(self):
+        """
+        Change representation to the internal matrix.
+
+        Example
+        -------
+        >>> Affine([
+        ...     [1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]
+        ... ])  # doctest: +NORMALIZE_WHITESPACE
+        array([[1, 0, 0, 4],
+               [0, 1, 0, 0],
+               [0, 0, 1, 0],
+               [0, 0, 0, 1]])
+
+        """
         return repr(self.matrix)
 
 
