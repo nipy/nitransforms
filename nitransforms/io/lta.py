@@ -224,19 +224,27 @@ class FSLinearTransform(LinearTransformStruct):
             "nxforms   = 1",
         ] if not partial else []
 
+        # Standard preamble
         lines += [
             "mean      = {:6.4f} {:6.4f} {:6.4f}".format(*sa["mean"].flatten()),
             "sigma     = {:6.4f}".format(float(sa["sigma"])),
             "1 4 4",
-            ("{:18.15e} " * 4).format(*sa["m_L"][0]),
-            ("{:18.15e} " * 4).format(*sa["m_L"][1]),
-            ("{:18.15e} " * 4).format(*sa["m_L"][2]),
-            ("{:18.15e} " * 4).format(*sa["m_L"][3]),
+        ]
+
+        # Format parameters matrix
+        lines += [
+            " ".join(f"{v:18.15e}" for v in sa["m_L"][i])
+            for i in range(4)
+        ]
+
+        lines += [
             "src volume info",
             str(self["src"]),
             "dst volume info",
             str(self["dst"]),
         ]
+
+        lines += [] if partial else [""]
         return "\n".join(lines)
 
     @classmethod
@@ -253,8 +261,8 @@ class FSLinearTransform(LinearTransformStruct):
             label, valstring = lines.pop(0).split(" = ")
             assert label.strip() == key
 
-            val = np.genfromtxt([valstring.encode()], dtype=cls.dtype[key])
             if key != "nxforms":
+                val = np.genfromtxt([valstring.encode()], dtype=cls.dtype[key])
                 sa[key] = val.reshape(sa[key].shape)
             else:
                 assert valstring.strip() == "1"
@@ -333,6 +341,7 @@ class FSLinearTransformArray(BaseLinearTransformList):
         footer = [
             "subject {}".format(self["subject"]),
             "fscale {:.6f}".format(float(self["fscale"])),
+            "",
         ]
         return "\n".join(header + xforms + footer)
 

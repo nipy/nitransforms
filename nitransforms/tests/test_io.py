@@ -80,6 +80,39 @@ def test_LinearTransform(tmpdir):
     for vol in ("src", "dst"):
         assert lt[vol]["valid"] == 0
 
+    lta_text = """\
+# LTA file created by NiTransforms
+type      = 1
+nxforms   = 1
+mean      = 0.0000 0.0000 0.0000
+sigma     = 1.0000
+1 4 4
+1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00
+0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00
+0.000000000000000e+00 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00
+0.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00 1.000000000000000e+00
+src volume info
+valid = 1  # volume info valid
+filename = file.nii.gz
+volume = 57 67 56
+voxelsize = 2.750000000000000e+00 2.750000000000000e+00 2.750000000000000e+00
+xras   = -1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00
+yras   = 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00
+zras   = 0.000000000000000e+00 0.000000000000000e+00 1.000000000000000e+00
+cras   = -2.375000000000000e+00 1.125000000000000e+00 -1.400000000000000e+01
+dst volume info
+valid = 1  # volume info valid
+filename = file.nii.gz
+volume = 57 67 56
+voxelsize = 2.750000000000000e+00 2.750000000000000e+00 2.750000000000000e+00
+xras   = -1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00
+yras   = 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00
+zras   = 0.000000000000000e+00 0.000000000000000e+00 1.000000000000000e+00
+cras   = -2.375000000000000e+00 1.125000000000000e+00 -1.400000000000000e+01
+"""
+    xfm = LT.from_string(lta_text)
+    assert xfm.to_string() == lta_text
+
 
 def test_LinearTransformArray(tmpdir, data_path):
     lta = LTA()
@@ -177,12 +210,10 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
         xfm = factory.from_fileobj(f)
 
     # Test to_string
-    if (sw, image_orientation) != ("fs", "oblique"):  # Rounding errors
-        assert fs._drop_comments(text) == fs._drop_comments(xfm.to_string())
+    assert fs._drop_comments(text) == fs._drop_comments(xfm.to_string())
 
     xfm.to_filename(fname)
-    if (sw, image_orientation) != ("fs", "oblique"):  # Rounding errors
-        assert filecmp.cmp(fname, str((data_path / fname).resolve()))
+    assert filecmp.cmp(fname, str((data_path / fname).resolve()))
 
     # Test from_ras
     RAS = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
