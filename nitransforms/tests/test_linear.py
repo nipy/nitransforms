@@ -139,11 +139,13 @@ def test_loadsave(tmp_path, data_path, testdata_path, fmt):
         assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
 
 
-@pytest.mark.xfail(reason="Not fully implemented")
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
 @pytest.mark.parametrize("sw_tool", ["itk", "fsl", "afni", "fs"])
 def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
+    if (image_orientation, sw_tool) == ("oblique", "afni"):
+        pytest.skip("AFNI Deoblique unsupported.")
+
     tmpdir.chdir()
     img = get_testdata[image_orientation]
     # Generate test transform

@@ -68,7 +68,6 @@ class FSLLinearTransform(LinearParameters):
         if not lines or len(lines) < 4:
             raise TransformFileError
 
-        print(lines)
         sa["parameters"] = np.genfromtxt(
             ["\n".join(lines)], dtype=cls.dtype["parameters"]
         )

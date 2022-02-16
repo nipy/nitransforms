@@ -165,7 +165,6 @@ def test_LT_conversions(data_path, fname):
     assert np.allclose(r2r_m, v2v_m, rtol=1e-04)
 
 
-@pytest.mark.xfail(raises=(FileNotFoundError, NotImplementedError))
 @pytest.mark.parametrize(
     "image_orientation",
     [
@@ -177,6 +176,9 @@ def test_LT_conversions(data_path, fname):
 )
 @pytest.mark.parametrize("sw", ["afni", "fsl", "fs", "itk"])
 def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
+    if (image_orientation, sw) == ("oblique", "afni"):
+        pytest.skip("AFNI Deoblique unsupported.")
+
     tmpdir.chdir()
 
     moving = get_testdata[image_orientation]
