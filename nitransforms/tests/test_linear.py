@@ -152,7 +152,7 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
         # Account for the fact that FS defines LTA transforms reversed
         T = np.linalg.inv(T)
 
-    xfm = nitl.LinearTransformsMapping([T])
+    xfm = nitl.Affine(T)
     xfm.reference = img
 
     ext = ""
