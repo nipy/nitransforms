@@ -147,6 +147,21 @@ class AFNIDisplacementsField(DisplacementsField):
 
 
 def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
+    """
+    Determine whether the dataset is oblique.
+
+    Examples
+    --------
+    >>> _is_oblique(np.eye(4))
+    False
+
+    >>> _is_oblique(nb.affines.from_matvec(
+    ...     nb.eulerangles.euler2mat(x=0.9, y=0.001, z=0.001),
+    ...     [4.0, 2.0, -1.0],
+    ... ))
+    True
+
+    """
     return (obliquity(affine).min() * 180 / pi) > thres
 
 
@@ -161,7 +176,8 @@ def _afni_warpdrive(oblique, shape, forward=True, ras=False):
     plumb : 4x4 numpy.array
         corresponding affine that is aligned to the cardinal axes.
     forward : :obj:`bool`
-        Transforms the affine of oblique into an AFNI's plumb (if ``True``)
+        Returns the forward transformation if True, i.e.,
+        the matrix to convert an oblique affine into an AFNI's plumb (if ``True``)
         or viceversa plumb -> oblique (if ``false``).
 
     Returns
@@ -177,21 +193,19 @@ def _afni_warpdrive(oblique, shape, forward=True, ras=False):
     plumb_r *= voxel_sizes(oblique)
     plumb = np.eye(4)
     plumb[:3, :3] = plumb_r
-    obliq_o = apply_affine(oblique, 0.5 * (shape - 1))
-    plumb_c = apply_affine(plumb, 0.5 * (shape - 1))
-    plumb[:3, 3] = -plumb_c + obliq_o
-    print(obliq_o, apply_affine(plumb, 0.5 * (shape - 1)))
-
+    obliq_c = oblique @ np.hstack((0.5 * shape, 1.0))
+    plumb_c = plumb @ np.hstack((0.5 * shape, 1.0))
+    plumb[:3, 3] = -plumb_c[:3] + obliq_c[:3]
     R = plumb @ np.linalg.inv(oblique)
+
     if not ras:
         # Change sign to match AFNI's warpdrive_matvec signs
-        B = np.ones((2, 2))
-        R *= np.block([[B, -1.0 * B], [-1.0 * B, B]])
+        R = LPS @ R @ LPS
 
     return R if forward else np.linalg.inv(R)
 
 
-def _afni_header(nii, field="WARPDRIVE_MATVEC_FOR_000000"):
+def _afni_header(nii, field="WARPDRIVE_MATVEC_FOR_000000", to_ras=False):
     from lxml import etree
     root = etree.fromstring(nii.header.extensions[0].get_content().decode())
     retval = np.fromstring(
@@ -200,6 +214,8 @@ def _afni_header(nii, field="WARPDRIVE_MATVEC_FOR_000000"):
         dtype="float32"
     )
     if retval.size == 12:
-        return np.vstack((retval.reshape((3, 4)), (0, 0, 0, 1)))
+        retval = np.vstack((retval.reshape((3, 4)), (0, 0, 0, 1)))
+        if to_ras:
+            retval = LPS @ retval @ LPS
 
     return retval
