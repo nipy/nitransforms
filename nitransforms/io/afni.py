@@ -12,7 +12,6 @@ from .base import (
     DisplacementsField,
     LinearParameters,
     TransformFileError,
-    _ensure_image,
 )
 
 LPS = np.diag([-1, -1, 1, 1])
