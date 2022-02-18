@@ -2,7 +2,6 @@
 from math import pi
 import numpy as np
 from nibabel.affines import (
-    apply_affine,
     obliquity,
     voxel_sizes,
 )
@@ -165,7 +164,57 @@ def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
     return (obliquity(affine).min() * 180 / pi) > thres
 
 
-def _afni_warpdrive(oblique, shape, forward=True, ras=False):
+def _afni_deobliqued_grid(oblique, shape):
+    """
+    Calculate AFNI's target deobliqued image grid.
+
+    Maps the eight images corners to the new coordinate system to ensure
+    coverage of the full extent after rotation, as AFNI does.
+
+    See also
+    --------
+    https://github.com/afni/afni/blob/75766463758e5806d938c8dd3bdcd4d56ab5a485/src/mri_warp3D.c#L941-L1010
+
+    Parameters
+    ----------
+    oblique : 4x4 numpy.array
+        affine that is not aligned to the cardinal axes.
+    shape : numpy.array
+        sizes of the (oblique) image grid
+
+    Returns
+    -------
+    affine : 4x4 numpy.array
+        plumb affine (i.e., aligned to the cardinal axes).
+    shape : numpy.array
+        sizes of the target, plumb image grid
+
+    """
+    shape = np.array(shape[:3])
+    vs = voxel_sizes(oblique)
+
+    # Calculate new shape of deobliqued grid
+    corners_ijk = np.array([
+        (i, j, k) for k in (0, shape[2]) for j in (0, shape[1]) for i in (0, shape[0])
+    ]) - 0.5
+    corners_xyz = oblique @ np.hstack((corners_ijk, np.ones((len(corners_ijk), 1)))).T
+    extent = corners_xyz.min(1)[:3], corners_xyz.max(1)[:3]
+    nshape = ((extent[1] - extent[0]) / vs + 0.999).astype(int)
+
+    # AFNI deobliqued target will be in LPS+ orientation
+    plumb = LPS * ([vs.min()] * 3 + [1.0])
+
+    # Coordinates of center voxel do not change
+    obliq_c = oblique @ np.hstack((0.5 * (shape - 1), 1.0))
+    plumb_c = plumb @ np.hstack((0.5 * (nshape - 1), 1.0))
+
+    # Rebase the origin of the new, plumb affine
+    plumb[:3, 3] -= plumb_c[:3] - obliq_c[:3]
+
+    return plumb, nshape
+
+
+def _afni_warpdrive(oblique, plumb, forward=True, ras=False):
     """
     Calculate AFNI's ``WARPDRIVE_MATVEC_FOR_000000`` (de)obliquing affine.
 
@@ -179,29 +228,26 @@ def _afni_warpdrive(oblique, shape, forward=True, ras=False):
         Returns the forward transformation if True, i.e.,
         the matrix to convert an oblique affine into an AFNI's plumb (if ``True``)
         or viceversa plumb -> oblique (if ``false``).
+    ras : :obj:`bool`
+        Whether output should be referrenced to AFNI's internal system (LPS+) or RAS+
 
     Returns
     -------
-    plumb_to_oblique : 4x4 numpy.array
-        the matrix that pre-pended to the plumb affine rotates it
-        to be oblique.
+    warpdrive : 4x4 numpy.array
+        AFNI's *warpdrive* forward or inverse matrix.
 
     """
-    shape = np.array(shape[:3])
+    # Rotate the oblique affine to align with imaging axes
+    # Calculate director cosines and project to closest canonical
     plumb_r = oblique[:3, :3] / np.abs(oblique[:3, :3]).max(0)
     plumb_r[np.abs(plumb_r) < 1.0] = 0
-    plumb_r *= voxel_sizes(oblique)
-    plumb = np.eye(4)
-    plumb[:3, :3] = plumb_r
-    obliq_c = oblique @ np.hstack((0.5 * shape, 1.0))
-    plumb_c = plumb @ np.hstack((0.5 * shape, 1.0))
-    plumb[:3, 3] = -plumb_c[:3] + obliq_c[:3]
+
+    # # Scale by min voxel size (AFNI's default)
+    # plumb_r *= vs.min()
+    # plumb = np.eye(4)
+    # plumb[:3, :3] = plumb_r
+
     R = plumb @ np.linalg.inv(oblique)
-
-    if not ras:
-        # Change sign to match AFNI's warpdrive_matvec signs
-        R = LPS @ R @ LPS
-
     return R if forward else np.linalg.inv(R)
 
 
