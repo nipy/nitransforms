@@ -171,9 +171,6 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     """Check implementation of exporting affines to formats."""
     tmpdir.chdir()
 
-    if (sw_tool, image_orientation) == ("afni", "oblique"):
-        pytest.skip("AFNI oblique transformations not supported yet.")
-
     img = get_testdata[image_orientation]
     msk = get_testmask[image_orientation]
 
@@ -211,9 +208,17 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
     sw_moved_mask = nb.load("resampled_brainmask.nii.gz")
+
+    # Change reference dataset for AFNI & oblique
+    if (sw_tool, image_orientation) == ("afni", "oblique"):
+        xfm.reference = "resampled_brainmask.nii.gz"
+
     nt_moved_mask = xfm.apply(msk, order=0)
     nt_moved_mask.set_data_dtype(msk.get_data_dtype())
+    nt_moved_mask.to_filename("nt_resampled_brainmask.nii.gz")
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
+
+    nt_moved_mask.__class__(diff, sw_moved_mask.affine, sw_moved_mask.header).to_filename("diff.nii.gz")
 
     assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
     brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
