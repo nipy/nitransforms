@@ -2,9 +2,6 @@
 from pathlib import Path
 import numpy as np
 from nibabel import load as loadimg
-from scipy.io.matlab.miobase import get_matfile_version
-from scipy.io.matlab.mio4 import MatFile4Reader
-from scipy.io.matlab.mio5 import MatFile5Reader
 
 from ..patched import LabeledWrapStruct
 
@@ -144,19 +141,6 @@ class DisplacementsField:
     def from_image(cls, imgobj):
         """Import a displacements field from a nibabel image object."""
         raise NotImplementedError
-
-
-def _read_mat(byte_stream):
-    mjv, _ = get_matfile_version(byte_stream)
-    if mjv == 0:
-        reader = MatFile4Reader(byte_stream)
-    elif mjv == 1:
-        reader = MatFile5Reader(byte_stream)
-    elif mjv == 2:
-        raise TransformFileError("Please use HDF reader for Matlab v7.3 files")
-    else:
-        raise TransformFileError("Not a Matlab file.")
-    return reader.get_variables()
 
 
 def _ensure_image(img):
