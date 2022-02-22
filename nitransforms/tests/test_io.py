@@ -9,7 +9,7 @@ import filecmp
 import nibabel as nb
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
-from scipy.io import loadmat, savemat
+from scipy.io import loadmat
 from ..io import (
     afni,
     fsl,
@@ -21,7 +21,7 @@ from ..io.lta import (
     FSLinearTransform as LT,
     FSLinearTransformArray as LTA,
 )
-from ..io.base import _read_mat, LinearParameters, TransformFileError
+from ..io.base import LinearParameters, TransformFileError
 
 LPS = np.diag([-1, -1, 1, 1])
 ITK_MAT = LPS.dot(np.ones((4, 4)).dot(LPS))
@@ -391,36 +391,6 @@ def test_LinearParameters(tmpdir):
 
     with pytest.raises(NotImplementedError):
         LinearParameters.from_fileobj(tmpdir.join("file.txt").open())
-
-
-@pytest.mark.parametrize("matlab_ver", ["4", "5"])
-def test_read_mat1(tmpdir, matlab_ver):
-    """Test read from matlab."""
-    tmpdir.chdir()
-
-    savemat("val.mat", {"val": np.ones((3,))}, format=matlab_ver)
-    with open("val.mat", "rb") as f:
-        mdict = _read_mat(f)
-
-    assert np.all(mdict["val"] == np.ones((3,)))
-
-
-@pytest.mark.parametrize("matlab_ver", [-1] + list(range(2, 7)))
-def test_read_mat2(tmpdir, monkeypatch, matlab_ver):
-    """Check read matlab raises adequate errors."""
-    from ..io import base
-
-    tmpdir.chdir()
-    savemat("val.mat", {"val": np.ones((3,))})
-
-    def _mockreturn(arg):
-        return (matlab_ver, 0)
-
-    with monkeypatch.context() as m:
-        m.setattr(base, "get_matfile_version", _mockreturn)
-        with pytest.raises(TransformFileError):
-            with open("val.mat", "rb") as f:
-                _read_mat(f)
 
 
 def test_afni_Displacements():

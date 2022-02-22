@@ -1,7 +1,7 @@
 """Read/write ITK transforms."""
 import warnings
 import numpy as np
-from scipy.io import savemat as _save_mat
+from scipy.io import loadmat as _read_mat, savemat as _save_mat
 from nibabel import Nifti1Header, Nifti1Image
 from nibabel.affines import from_matvec
 from .base import (
@@ -9,7 +9,6 @@ from .base import (
     DisplacementsField,
     LinearParameters,
     TransformFileError,
-    _read_mat,
 )
 
 LPS = np.diag([-1, -1, 1, 1])
