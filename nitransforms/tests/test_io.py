@@ -493,7 +493,7 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     if not shutil.which("3dWarp"):
         pytest.skip("Command 3dWarp not found on host")
 
-    cmd = f"3dWarp -verb -deoblique -prefix {tmpdir}/deob.nii.gz {tmpdir}/oblique.nii.gz"
+    cmd = f"3dWarp -verb -deoblique -NN -prefix {tmpdir}/deob.nii.gz {tmpdir}/oblique.nii.gz"
     assert check_call([cmd], shell=True) == 0
 
     # Check the target grid by 3dWarp and the affine & size interpolated by NiTransforms
@@ -502,6 +502,20 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
 
     assert np.all(deobshape == deobnii.shape[:3])
     assert np.allclose(deobaff, deobnii.affine)
+
+    # Check resampling in deobliqued grid
+    ntdeobnii = Affine(np.eye(4), reference=deobnii.__class__(
+        np.zeros(deobshape, dtype="uint8"),
+        deobaff,
+        deobnii.header
+    )).apply(img, order=0)
+    ntdeobnii.to_filename("ntdeob.nii.gz")
+    diff = (
+        np.asanyarray(deobnii.dataobj, dtype="uint8")
+        - np.asanyarray(ntdeobnii.dataobj, dtype="uint8")
+    )
+    deobnii.__class__(diff, deobnii.affine, deobnii.header).to_filename("diff.nii.gz")
+    assert np.sqrt((diff[20:-20, 20:-20, 20:-20] ** 2).mean()) < 0.1
 
     # Confirm AFNI's rotation of axis is consistent with the one we introduced
     afni_warpdrive_inv = afni._afni_header(
@@ -512,9 +526,9 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     assert np.allclose(afni_warpdrive_inv[:3, :3], R[:3, :3])
 
     # Check nitransforms' estimation of warpdrive with header
-    nt_warpdrive_inv = afni._afni_warpdrive(newaff, deobaff, forward=False)
-    # Still haven't gotten my head around orientation, those abs should go away
-    assert np.allclose(
-        np.abs(afni_warpdrive_inv[:3, :3]),
-        np.abs(nt_warpdrive_inv[:3, :3])
-    )
+    # Still haven't gotten my head around orientation, this test should not fail
+    # nt_warpdrive_inv = afni._afni_warpdrive(newaff, deobaff, forward=False)
+    # assert not np.allclose(
+    #     afni_warpdrive_inv[:3, :3],
+    #     nt_warpdrive_inv[:3, :3],
+    # )

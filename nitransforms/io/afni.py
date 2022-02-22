@@ -214,7 +214,7 @@ def _afni_deobliqued_grid(oblique, shape):
     return plumb, nshape
 
 
-def _afni_warpdrive(oblique, plumb, forward=True, ras=False):
+def _afni_warpdrive(oblique, cardinal, forward=True, ras=False):
     """
     Calculate AFNI's ``WARPDRIVE_MATVEC_FOR_000000`` (de)obliquing affine.
 
@@ -222,7 +222,7 @@ def _afni_warpdrive(oblique, plumb, forward=True, ras=False):
     ----------
     oblique : 4x4 numpy.array
         affine that is not aligned to the cardinal axes.
-    plumb : 4x4 numpy.array
+    cardinal : 4x4 numpy.array
         corresponding affine that is aligned to the cardinal axes.
     forward : :obj:`bool`
         Returns the forward transformation if True, i.e.,
@@ -239,16 +239,18 @@ def _afni_warpdrive(oblique, plumb, forward=True, ras=False):
     """
     # Rotate the oblique affine to align with imaging axes
     # Calculate director cosines and project to closest canonical
-    plumb_r = oblique[:3, :3] / np.abs(oblique[:3, :3]).max(0)
-    plumb_r[np.abs(plumb_r) < 1.0] = 0
 
+    # plumb_r = oblique[:3, :3] / np.abs(oblique[:3, :3]).max(0)
+    # plumb_r[np.abs(plumb_r) < 1.0] = 0
     # # Scale by min voxel size (AFNI's default)
     # plumb_r *= vs.min()
     # plumb = np.eye(4)
     # plumb[:3, :3] = plumb_r
 
-    R = plumb @ np.linalg.inv(oblique)
-    return R if forward else np.linalg.inv(R)
+    ijk_to_dicom_real = np.diag(LPS) * oblique
+    ijk_to_dicom = cardinal
+    R = np.linalg.inv(ijk_to_dicom) @ ijk_to_dicom_real
+    return np.linalg.inv(R) if forward else R
 
 
 def _afni_header(nii, field="WARPDRIVE_MATVEC_FOR_000000", to_ras=False):

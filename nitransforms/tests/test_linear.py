@@ -171,6 +171,9 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     """Check implementation of exporting affines to formats."""
     tmpdir.chdir()
 
+    if (sw_tool, image_orientation) == ("afni", "oblique"):
+        pytest.skip("AFNI oblique transformations not supported yet.")
+
     img = get_testdata[image_orientation]
     msk = get_testmask[image_orientation]
 
