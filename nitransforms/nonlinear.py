@@ -16,7 +16,7 @@ from nibabel.funcs import four_to_three
 from nibabel.loadsave import load as _nbload
 
 from . import io
-from .interp.bspline import grid_bspline_weights
+from .interp.bspline import grid_bspline_weights, _cubic_bspline
 from .base import (
     TransformBase,
     ImageGrid,
@@ -209,8 +209,17 @@ class BSplineFieldTransform(TransformBase):
         return moved
 
     def map(self, x, inverse=False):
-        raise NotImplementedError
+        """Apply :math:`y = f(x)`."""
 
-    def _map_voxel(self, index, moving=None):
-        """Apply ijk' = f_ijk((i, j, k)), equivalent to the above with indexes."""
-        raise NotImplementedError
+        ijk = (self._knots.inverse @ _as_homogeneous(x).squeeze())[:3]
+        w_start, w_end = np.ceil(ijk - 2).astype(int), np.floor(ijk + 2).astype(int)
+        nonzero_knots = tuple([
+            np.arange(start, end + 1) for start, end in zip(w_start, w_end)
+        ])
+        nonzero_knots = np.meshgrid(*nonzero_knots, indexing="ij")
+        window = np.array(nonzero_knots).reshape((self.reference.ndim, -1))
+        distance = window.T - ijk
+        unique_d, indices = np.unique(distance.reshape(-1), return_inverse=True)
+        tensor_bspline = _cubic_bspline(unique_d)[indices].reshape(distance.shape).prod(1)
+        coeffs = self._coeffs[nonzero_knots].reshape((-1, self._coeffs.shape[-1]))
+        return x + coeffs.T @ tensor_bspline
