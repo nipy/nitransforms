@@ -218,7 +218,9 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     nt_moved_mask.to_filename("nt_resampled_brainmask.nii.gz")
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
 
-    nt_moved_mask.__class__(diff, sw_moved_mask.affine, sw_moved_mask.header).to_filename("diff.nii.gz")
+    nt_moved_mask.__class__(
+        diff, sw_moved_mask.affine, sw_moved_mask.header
+    ).to_filename("diff.nii.gz")
 
     assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
     brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)

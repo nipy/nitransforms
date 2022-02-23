@@ -12,6 +12,7 @@ import nibabel as nb
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from scipy.io import loadmat
+from nitransforms.linear import Affine
 from ..io import (
     afni,
     fsl,
@@ -446,59 +447,36 @@ def test_regressions(file_type, test_file, data_path):
 @pytest.mark.parametrize("dir_y", (-1, 1))
 @pytest.mark.parametrize("dir_z", (1, -1))
 @pytest.mark.parametrize("swapaxes", [
-    None,  # (0, 1), (1, 2), (0, 2),
+    None, (0, 1), (1, 2), (0, 2),
 ])
 def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y, dir_z):
     tmpdir.chdir()
-    img = nb.load(testdata_path / "someones_anatomy.nii.gz")
-    shape = np.array(img.shape[:3])
-    hdr = img.header.copy()
-    aff = img.affine.copy()
-    data = np.asanyarray(img.dataobj, dtype="uint8")
+    img, R = _generate_reoriented(
+        testdata_path / "someones_anatomy.nii.gz",
+        (dir_x, dir_y, dir_z),
+        swapaxes,
+        parameters
+    )
+    img.to_filename("orig.nii.gz")
 
-    directions = (dir_x, dir_y, dir_z)
-    if directions != (1, 1, 1):
-        last_ijk = np.hstack((shape - 1, 1.0))
-        last_xyz = aff @ last_ijk
-        aff = np.diag((dir_x, dir_y, dir_z, 1)) @ aff
+    # Run AFNI's 3drefit -deoblique
+    if not shutil.which("3drefit"):
+        pytest.skip("Command 3drefit not found on host")
 
-        for ax in range(3):
-            if (directions[ax] == -1):
-                aff[ax, 3] = last_xyz[ax]
-                data = np.flip(data, ax)
-
-        hdr.set_qform(aff, code=1)
-        hdr.set_sform(aff, code=1)
-        img.__class__(data, aff, hdr).to_filename("flips.nii.gz")
-
-    if swapaxes is not None:
-        data = np.swapaxes(data, swapaxes[0], swapaxes[1])
-        aff[list(reversed(swapaxes)), :] = aff[(swapaxes), :]
-
-        hdr.set_qform(aff, code=1)
-        hdr.set_sform(aff, code=1)
-        img.__class__(data, aff, hdr).to_filename("swaps.nii.gz")
-
-    R = from_matvec(euler2mat(**parameters), [0.0, 0.0, 0.0])
-
-    # img_center = aff @ np.hstack((shape * 0.5, 1.0))
-    # R[:3, 3] += (img_center - (R @ aff @ np.hstack((shape * 0.5, 1.0))))[:3]
-    newaff = R @ aff
-    hdr.set_qform(newaff, code=1)
-    hdr.set_sform(newaff, code=1)
-    img = img.__class__(data, newaff, hdr)
-    img.to_filename("oblique.nii.gz")
-
-    # Run AFNI's 3dDeoblique
-    if not shutil.which("3dWarp"):
-        pytest.skip("Command 3dWarp not found on host")
-
-    cmd = f"3dWarp -verb -deoblique -NN -prefix {tmpdir}/deob.nii.gz {tmpdir}/oblique.nii.gz"
+    shutil.copy(f"{tmpdir}/orig.nii.gz", f"{tmpdir}/deob_3drefit.nii.gz")
+    cmd = f"3drefit -deoblique {tmpdir}/deob_3drefit.nii.gz"
     assert check_call([cmd], shell=True) == 0
 
+    # Check that nitransforms can make out the deoblique affine:
+    card_aff = afni._dicom_real_to_card(img.affine)
+    assert np.allclose(card_aff, nb.load("deob_3drefit.nii.gz").affine)
+
     # Check the target grid by 3dWarp and the affine & size interpolated by NiTransforms
-    deobaff, deobshape = afni._afni_deobliqued_grid(newaff, shape)
+    cmd = f"3dWarp -verb -deoblique -NN -prefix {tmpdir}/deob.nii.gz {tmpdir}/orig.nii.gz"
+    assert check_call([cmd], shell=True) == 0
+
     deobnii = nb.load("deob.nii.gz")
+    deobaff, deobshape = afni._afni_deobliqued_grid(img.affine, img.shape)
 
     assert np.all(deobshape == deobnii.shape[:3])
     assert np.allclose(deobaff, deobnii.affine)
@@ -509,13 +487,21 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
         deobaff,
         deobnii.header
     )).apply(img, order=0)
-    ntdeobnii.to_filename("ntdeob.nii.gz")
+
+    # Generate an internal box to exclude border effects
+    box = np.zeros(img.shape, dtype="uint8")
+    box[10:-10, 10:-10, 10:-10] = 1
+    ntdeobmask = Affine(np.eye(4), reference=ntdeobnii).apply(
+        nb.Nifti1Image(box, img.affine, img.header),
+        order=0,
+    )
+    mask = np.asanyarray(ntdeobmask.dataobj, dtype=bool)
+
     diff = (
         np.asanyarray(deobnii.dataobj, dtype="uint8")
         - np.asanyarray(ntdeobnii.dataobj, dtype="uint8")
     )
-    deobnii.__class__(diff, deobnii.affine, deobnii.header).to_filename("diff.nii.gz")
-    assert np.sqrt((diff[20:-20, 20:-20, 20:-20] ** 2).mean()) < 0.1
+    assert np.sqrt((diff[mask] ** 2).mean()) < 0.1
 
     # Confirm AFNI's rotation of axis is consistent with the one we introduced
     afni_warpdrive_inv = afni._afni_header(
@@ -526,9 +512,34 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     assert np.allclose(afni_warpdrive_inv[:3, :3], R[:3, :3])
 
     # Check nitransforms' estimation of warpdrive with header
-    # Still haven't gotten my head around orientation, this test should not fail
-    # nt_warpdrive_inv = afni._afni_warpdrive(newaff, deobaff, forward=False)
-    # assert not np.allclose(
-    #     afni_warpdrive_inv[:3, :3],
-    #     nt_warpdrive_inv[:3, :3],
-    # )
+    nt_warpdrive_inv = afni._afni_warpdrive(img.affine, forward=False)
+    assert not np.allclose(afni_warpdrive_inv, nt_warpdrive_inv)
+
+
+def _generate_reoriented(path, directions, swapaxes, parameters):
+    img = nb.load(path)
+    shape = np.array(img.shape[:3])
+    hdr = img.header.copy()
+    aff = img.affine.copy()
+    data = np.asanyarray(img.dataobj, dtype="uint8")
+
+    if directions != (1, 1, 1):
+        last_ijk = np.hstack((shape - 1, 1.0))
+        last_xyz = aff @ last_ijk
+        aff = np.diag((*directions, 1)) @ aff
+
+        for ax in range(3):
+            if (directions[ax] == -1):
+                aff[ax, 3] = last_xyz[ax]
+                data = np.flip(data, ax)
+
+    if swapaxes is not None:
+        data = np.swapaxes(data, swapaxes[0], swapaxes[1])
+        aff[list(reversed(swapaxes)), :] = aff[(swapaxes), :]
+
+    R = from_matvec(euler2mat(**parameters), [0.0, 0.0, 0.0])
+
+    newaff = R @ aff
+    hdr.set_qform(newaff, code=1)
+    hdr.set_sform(newaff, code=1)
+    return img.__class__(data, newaff, hdr), R
