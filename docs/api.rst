@@ -10,4 +10,5 @@ Information on specific functions, classes, and methods for developers.
    _api/linear
    _api/manip
    _api/nonlinear
+   _api/interp
    _api/patched
