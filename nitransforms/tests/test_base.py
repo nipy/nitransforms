@@ -88,19 +88,26 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     monkeypatch.setattr(TransformBase, "_to_hdf5", _to_hdf5)
     fname = testdata_path / "someones_anatomy.nii.gz"
 
+    img = nb.load(fname)
+    imgdata = np.asanyarray(img.dataobj, dtype=img.get_data_dtype())
+
     # Test identity transform
     xfm = TransformBase()
     xfm.reference = fname
     assert xfm.ndim == 3
     moved = xfm.apply(fname, order=0)
-    assert np.all(nb.load(str(fname)).get_fdata() == moved.get_fdata())
+    assert np.all(
+        imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
+    )
 
     # Test identity transform - setting reference
     xfm = TransformBase()
     xfm.reference = fname
     assert xfm.ndim == 3
     moved = xfm.apply(str(fname), reference=fname, order=0)
-    assert np.all(nb.load(str(fname)).get_fdata() == moved.get_fdata())
+    assert np.all(
+        imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
+    )
 
     # Test applying to Gifti
     gii = nb.gifti.GiftiImage(

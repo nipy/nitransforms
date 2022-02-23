@@ -11,7 +11,7 @@ import nibabel as nb
 from ..manip import load as _load, TransformChain
 from ..linear import Affine
 from .test_nonlinear import (
-    TESTS_BORDER_TOLERANCE,
+    RMSE_TOL,
     APPLY_NONLINEAR_CMD,
 )
 
@@ -38,7 +38,11 @@ def test_itk_h5(tmp_path, testdata_path):
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD["itk"](
-        transform=xfm_fname, reference=ref_fname, moving=img_fname
+        transform=xfm_fname,
+        reference=ref_fname,
+        moving=img_fname,
+        output="resampled.nii.gz",
+        extra="",
     )
 
     # skip test if command is not available on host
@@ -54,7 +58,7 @@ def test_itk_h5(tmp_path, testdata_path):
     nt_moved.to_filename("nt_resampled.nii.gz")
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders
-    assert (np.abs(diff) > 1e-3).sum() / diff.size < TESTS_BORDER_TOLERANCE
+    assert (np.abs(diff) > 1e-3).sum() / diff.size < RMSE_TOL
 
 
 @pytest.mark.parametrize("ext0", ["lta", "tfm"])
