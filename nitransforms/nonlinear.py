@@ -37,7 +37,7 @@ class DisplacementsFieldTransform(TransformBase):
         Example
         -------
         >>> DisplacementsFieldTransform(test_dir / "someones_displacement_field.nii.gz")
-        <(57, 67, 56) field of 3D displacements>
+        <DisplacementFieldTransform[3D] (57, 67, 56)>
 
         """
         super().__init__()
@@ -59,7 +59,7 @@ class DisplacementsFieldTransform(TransformBase):
 
     def __repr__(self):
         """Beautify the python representation."""
-        return f"<{self._field.shape[:3]} field of {self._field.shape[-1]}D displacements>"
+        return f"<DisplacementFieldTransform[{self._field.shape[-1]}D] {self._field.shape[:3]}>"
 
     def map(self, x, inverse=False):
         r"""
@@ -132,7 +132,7 @@ class BSplineFieldTransform(TransformBase):
         coefficients = _ensure_image(coefficients)
 
         self._coeffs = np.asanyarray(coefficients.dataobj)
-        self._knots = ImageGrid(four_to_three(coefficients)[0])
+        self._knots = ImageGrid(coefficients)
         self._weights = None
         if reference is not None:
             self.reference = reference
@@ -158,9 +158,11 @@ class BSplineFieldTransform(TransformBase):
         field = np.zeros((_ref.npoints, ndim))
 
         for d in range(ndim):
+            #  1 x Nvox :                          (1 x K) @ (K x Nvox)
             field[:, d] = self._coeffs[..., d].reshape(-1) @ self._weights
 
-        return field.astype(dtype)
+        return DisplacementsFieldTransform(
+            field.astype(dtype).reshape(*_ref.shape, -1), reference=_ref)
 
     def apply(
         self,
@@ -197,10 +199,7 @@ class BSplineFieldTransform(TransformBase):
             )
 
         # If locations to be interpolated are on a grid, generate a displacements field
-        return DisplacementsFieldTransform(
-            self.to_field().reshape((*(_ref.shape), -1)),
-            reference=_ref,
-        ).apply(
+        return self.to_field().apply(
             spatialimage,
             reference=reference,
             order=order,
@@ -216,7 +215,7 @@ class BSplineFieldTransform(TransformBase):
 
         .. math::
             \mathbf{y} = \mathbf{x} + \Psi^3(\mathbf{k}, \mathbf{x}),
-            \label{eq:2}\tag{2}
+            \label{eq:1}\tag{1}
 
         Parameters
         ----------

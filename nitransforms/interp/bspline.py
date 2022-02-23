@@ -75,12 +75,14 @@ def grid_bspline_weights(target_nii, ctrl_nii):
     shape = target_nii.shape[:3]
     ctrl_sp = nb.affines.voxel_sizes(ctrl_nii.affine)[:3]
     ras2ijk = np.linalg.inv(ctrl_nii.affine)
+    # IJK index in the control point image of the first index in the target image
     origin = nb.affines.apply_affine(ras2ijk, [tuple(target_nii.affine[:3, 3])])[0]
 
     wd = []
     for i, (o, n, sp) in enumerate(
         zip(origin, shape, nb.affines.voxel_sizes(target_nii.affine)[:3])
     ):
+        # Locations of voxels in target image in control point image
         locations = np.arange(0, n, dtype="float16") * sp / ctrl_sp[i] + o
         knots = np.arange(0, ctrl_nii.shape[i], dtype="float16")
         distance = np.abs(locations[np.newaxis, ...] - knots[..., np.newaxis])
