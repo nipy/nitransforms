@@ -31,10 +31,21 @@ class DisplacementsFieldTransform(TransformBase):
     __slots__ = ["_field"]
 
     def __init__(self, field, reference=None):
-        """Create a dense deformation field transform."""
+        """
+        Create a dense deformation field transform.
+
+        Example
+        -------
+        >>> DisplacementsFieldTransform(test_dir / "someones_displacement_field.nii.gz")
+        <(57, 67, 56) field of 3D displacements>
+
+        """
         super().__init__()
 
-        self._field = np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field
+        field = _ensure_image(field)
+        self._field = np.squeeze(
+            np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field
+        )
         self.reference = reference or field.__class__(
             np.zeros(self._field.shape[:-1]), field.affine, field.header
         )
@@ -45,6 +56,10 @@ class DisplacementsFieldTransform(TransformBase):
                 "The number of components of the displacements (%d) does not "
                 "the number of dimensions (%d)" % (self._field.shape[-1], ndim)
             )
+
+    def __repr__(self):
+        """Beautify the python representation."""
+        return f"<{self._field.shape[:3]} field of {self._field.shape[-1]}D displacements>"
 
     def map(self, x, inverse=False):
         r"""
@@ -71,15 +86,12 @@ class DisplacementsFieldTransform(TransformBase):
 
         Examples
         --------
-        >>> field = np.zeros((10, 10, 10, 3))
-        >>> field[..., 0] = 4.0
-        >>> fieldimg = nb.Nifti1Image(field, np.diag([2., 2., 2., 1.]))
-        >>> xfm = DisplacementsFieldTransform(fieldimg)
-        >>> xfm([4.0, 4.0, 4.0]).tolist()
-        [[8.0, 4.0, 4.0]]
+        >>> xfm = DisplacementsFieldTransform(test_dir / "someones_displacement_field.nii.gz")
+        >>> xfm.map([-6.5, -36., -19.5]).tolist()
+        [[-6.5, -36.475167989730835, -19.5]]
 
-        >>> xfm([[4.0, 4.0, 4.0], [8, 2, 10]]).tolist()
-        [[8.0, 4.0, 4.0], [12.0, 2.0, 10.0]]
+        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
+        [[-6.5, -36.475167989730835, -19.5], [-1.0, -42.038356602191925, -11.25]]
 
         """
         if inverse is True:
@@ -112,26 +124,31 @@ class BSplineFieldTransform(TransformBase):
 
     __slots__ = ['_coeffs', '_knots', '_weights', '_order', '_moving']
 
-    def __init__(self, reference, coefficients, order=3):
+    def __init__(self, coefficients, reference=None, order=3):
         """Create a smooth deformation field using B-Spline basis."""
         super(BSplineFieldTransform, self).__init__()
         self._order = order
-        self.reference = reference
 
         coefficients = _ensure_image(coefficients)
-        if coefficients.shape[-1] != self.ndim:
-            raise ValueError(
-                'Number of components of the coefficients does '
-                'not match the number of dimensions')
 
         self._coeffs = np.asanyarray(coefficients.dataobj)
         self._knots = ImageGrid(four_to_three(coefficients)[0])
         self._weights = None
+        if reference is not None:
+            self.reference = reference
 
-    def to_field(self, reference=None):
+            if coefficients.shape[-1] != self.ndim:
+                raise ValueError(
+                    'Number of components of the coefficients does '
+                    'not match the number of dimensions')
+
+    def to_field(self, reference=None, dtype="float32"):
         """Generate a displacements deformation field from this B-Spline field."""
         reference = _ensure_image(reference)
         _ref = self.reference if reference is None else SpatialReference.factory(reference)
+        if _ref is None:
+            raise ValueError("A reference must be defined")
+
         ndim = self._coeffs.shape[-1]
 
         # If locations to be interpolated are on a grid, use faster tensor-bspline calculation
@@ -143,7 +160,7 @@ class BSplineFieldTransform(TransformBase):
         for d in range(ndim):
             field[:, d] = self._coeffs[..., d].reshape(-1) @ self._weights
 
-        return field.astype("float32")
+        return field.astype(dtype)
 
     def apply(
         self,
@@ -215,15 +232,14 @@ class BSplineFieldTransform(TransformBase):
 
         Examples
         --------
-        >>> field = np.zeros((10, 10, 10, 3))
-        >>> field[..., 0] = 4.0
-        >>> fieldimg = nb.Nifti1Image(field, np.diag([2., 2., 2., 1.]))
-        >>> xfm = DisplacementsFieldTransform(fieldimg)
-        >>> xfm([4.0, 4.0, 4.0]).tolist()
-        [[8.0, 4.0, 4.0]]
+        >>> xfm = BSplineFieldTransform(test_dir / "someones_bspline_coefficients.nii.gz")
+        >>> xfm.reference = test_dir / "someones_anatomy.nii.gz"
+        >>> xfm.map([-6.5, -36., -19.5]).tolist()
+        [[-6.5, -31.476097418406784, -19.5]]
 
-        >>> xfm([[4.0, 4.0, 4.0], [8, 2, 10]]).tolist()
-        [[8.0, 4.0, 4.0], [12.0, 2.0, 10.0]]
+        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
+        [[-6.5, -31.476097418406784, -19.5], [-1.0, -3.8072675377121996, -11.25]]
+
         """
         vfunc = partial(
             _map_xyz,
@@ -231,7 +247,7 @@ class BSplineFieldTransform(TransformBase):
             knots=self._knots,
             coeffs=self._coeffs,
         )
-        return [vfunc(_x) for _x in np.atleast_2d(x)]
+        return np.array([vfunc(_x).tolist() for _x in np.atleast_2d(x)])
 
 
 def _map_xyz(x, reference, knots, coeffs):
