@@ -270,7 +270,10 @@ class TransformBase:
         if isinstance(spatialimage, (str, Path)):
             spatialimage = _nbload(str(spatialimage))
 
-        data = np.asanyarray(spatialimage.dataobj)
+        data = np.asanyarray(
+            spatialimage.dataobj,
+            dtype=spatialimage.get_data_dtype()
+        )
         output_dtype = output_dtype or data.dtype
         targets = ImageGrid(spatialimage).index(  # data should be an image
             _as_homogeneous(self.map(_ref.ndcoords.T), dim=_ref.ndim)
@@ -288,9 +291,11 @@ class TransformBase:
 
         if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
             moved = spatialimage.__class__(
-                resampled.reshape(_ref.shape), _ref.affine, spatialimage.header
+                resampled.reshape(_ref.shape).astype(output_dtype),
+                _ref.affine,
+                spatialimage.header
             )
-            moved.header.set_data_dtype(output_dtype)
+            moved.set_data_dtype(output_dtype)
             return moved
 
         return resampled
