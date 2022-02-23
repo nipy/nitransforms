@@ -8,16 +8,17 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Nonlinear transforms."""
 import warnings
+from functools import partial
 from pathlib import Path
 import numpy as np
-from scipy.sparse import vstack as sparse_vstack
 from scipy import ndimage as ndi
 from nibabel.funcs import four_to_three
 from nibabel.loadsave import load as _nbload
 
-from . import io
-from .interp.bspline import grid_bspline_weights, _cubic_bspline
-from .base import (
+from nitransforms import io
+from nitransforms.io.base import _ensure_image
+from nitransforms.interp.bspline import grid_bspline_weights, _cubic_bspline
+from nitransforms.base import (
     TransformBase,
     ImageGrid,
     SpatialReference,
@@ -33,7 +34,11 @@ class DisplacementsFieldTransform(TransformBase):
     def __init__(self, field, reference=None):
         """Create a dense deformation field transform."""
         super().__init__()
-        self._field = np.asanyarray(field.dataobj)
+
+        self._field = np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field
+        self.reference = reference or field.__class__(
+            np.zeros(self._field.shape[:-1]), field.affine, field.header
+        )
 
         ndim = self._field.ndim - 1
         if self._field.shape[-1] != ndim:
@@ -42,13 +47,16 @@ class DisplacementsFieldTransform(TransformBase):
                 "the number of dimensions (%d)" % (self._field.shape[-1], ndim)
             )
 
-        self.reference = field.__class__(
-            np.zeros(self._field.shape[:-1]), field.affine, field.header
-        )
-
     def map(self, x, inverse=False):
         r"""
-        Apply :math:`y = f(x)`.
+        Apply the transformation to a list of physical coordinate points.
+
+        .. math::
+            \mathbf{y} = \mathbf{x} + D(\mathbf{x}),
+            \label{eq:2}\tag{2}
+
+        where :math:`D(\mathbf{x})` is the value of the discrete field of displacements
+        :math:`D` interpolated at the location :math:`\mathbf{x}`.
 
         Parameters
         ----------
@@ -104,7 +112,6 @@ class BSplineFieldTransform(TransformBase):
     """Represent a nonlinear transform parameterized by BSpline basis."""
 
     __slots__ = ['_coeffs', '_knots', '_weights', '_order', '_moving']
-    __s = (slice(None), )
 
     def __init__(self, reference, coefficients, order=3):
         """Create a smooth deformation field using B-Spline basis."""
@@ -112,6 +119,7 @@ class BSplineFieldTransform(TransformBase):
         self._order = order
         self.reference = reference
 
+        coefficients = _ensure_image(coefficients)
         if coefficients.shape[-1] != self.ndim:
             raise ValueError(
                 'Number of components of the coefficients does '
@@ -120,6 +128,23 @@ class BSplineFieldTransform(TransformBase):
         self._coeffs = np.asanyarray(coefficients.dataobj)
         self._knots = ImageGrid(four_to_three(coefficients)[0])
         self._weights = None
+
+    def to_field(self, reference=None):
+        """Generate a displacements deformation field from this B-Spline field."""
+        reference = _ensure_image(reference)
+        _ref = self.reference if reference is None else SpatialReference.factory(reference)
+        ndim = self._coeffs.shape[-1]
+
+        # If locations to be interpolated are on a grid, use faster tensor-bspline calculation
+        if self._weights is None:
+            self._weights = grid_bspline_weights(_ref, self._knots)
+
+        field = np.zeros((_ref.npoints, ndim))
+
+        for d in range(ndim):
+            field[:, d] = self._coeffs[..., d].reshape(-1) @ self._weights
+
+        return field.astype("float32")
 
     def apply(
         self,
@@ -133,8 +158,8 @@ class BSplineFieldTransform(TransformBase):
     ):
         """Apply a B-Spline transform on input data."""
 
-        if reference is not None and isinstance(reference, (str, Path)):
-            reference = _nbload(str(reference))
+        if reference is not None:
+            reference = _ensure_image(reference)
 
         _ref = (
             self.reference if reference is None else SpatialReference.factory(reference)
@@ -143,6 +168,7 @@ class BSplineFieldTransform(TransformBase):
         if isinstance(spatialimage, (str, Path)):
             spatialimage = _nbload(str(spatialimage))
 
+        # If locations to be interpolated are not on a grid, run map()
         if not isinstance(_ref, ImageGrid):
             return super().apply(
                 spatialimage,
@@ -154,72 +180,85 @@ class BSplineFieldTransform(TransformBase):
                 output_dtype=output_dtype,
             )
 
-        # If locations to be interpolated are on a grid, use faster tensor-bspline calculation
-        if self._weights is None:
-            self._weights = grid_bspline_weights(_ref, self._knots)
-
-        ycoords = _ref.ndcoords.T + (
-            np.squeeze(np.hstack(self._coeffs).T) @ sparse_vstack(self._weights)
+        # If locations to be interpolated are on a grid, generate a displacements field
+        return DisplacementsFieldTransform(
+            self.to_field().reshape((*(_ref.shape), -1)),
+            reference=_ref,
+        ).apply(
+            spatialimage,
+            reference=reference,
+            order=order,
+            mode=mode,
+            cval=cval,
+            prefilter=prefilter,
+            output_dtype=output_dtype,
         )
-
-        data = np.squeeze(np.asanyarray(spatialimage.dataobj))
-        output_dtype = output_dtype or data.dtype
-        targets = ImageGrid(spatialimage).index(  # data should be an image
-            _as_homogeneous(np.vstack(ycoords), dim=_ref.ndim)
-        )
-
-        if data.ndim == 4:
-            if len(self) != data.shape[-1]:
-                raise ValueError(
-                    "Attempting to apply %d transforms on a file with "
-                    "%d timepoints" % (len(self), data.shape[-1])
-                )
-            targets = targets.reshape((len(self), -1, targets.shape[-1]))
-            resampled = np.stack(
-                [
-                    ndi.map_coordinates(
-                        data[..., t],
-                        targets[t, ..., : _ref.ndim].T,
-                        output=output_dtype,
-                        order=order,
-                        mode=mode,
-                        cval=cval,
-                        prefilter=prefilter,
-                    )
-                    for t in range(data.shape[-1])
-                ],
-                axis=0,
-            )
-        elif data.ndim in (2, 3):
-            resampled = ndi.map_coordinates(
-                data,
-                targets[..., : _ref.ndim].T,
-                output=output_dtype,
-                order=order,
-                mode=mode,
-                cval=cval,
-                prefilter=prefilter,
-            )
-
-        newdata = resampled.reshape((len(self), *_ref.shape))
-        moved = spatialimage.__class__(
-            np.moveaxis(newdata, 0, -1), _ref.affine, spatialimage.header
-        )
-        moved.header.set_data_dtype(output_dtype)
-        return moved
 
     def map(self, x, inverse=False):
-        """Apply :math:`y = f(x)`."""
+        r"""
+        Apply the transformation to a list of physical coordinate points.
 
-        ijk = (self._knots.inverse @ _as_homogeneous(x).squeeze())[:3]
-        w_start, w_end = np.ceil(ijk - 2).astype(int), np.floor(ijk + 2).astype(int)
-        nonzero_knots = tuple([
-            np.arange(start, end + 1) for start, end in zip(w_start, w_end)
-        ])
-        nonzero_knots = np.meshgrid(*nonzero_knots, indexing="ij")
-        window = np.array(nonzero_knots).reshape((self.reference.ndim, -1))
-        distance = window.T - ijk
-        unique_d, indices = np.unique(distance.reshape(-1), return_inverse=True)
-        tensor_bspline = _cubic_bspline(unique_d)[indices].reshape(distance.shape).prod(1)
-        coeffs = self._coeffs[nonzero_knots].reshape((-1, self._coeffs.shape[-1]))
-        return x + coeffs.T @ tensor_bspline
+        .. math::
+            \mathbf{y} = \mathbf{x} + \Psi^3(\mathbf{k}, \mathbf{x}),
+            \label{eq:2}\tag{2}
+
+        Parameters
+        ----------
+        x : N x D numpy.ndarray
+            Input RAS+ coordinates (i.e., physical coordinates).
+        inverse : bool
+            If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
+
+        Returns
+        -------
+        y : N x D numpy.ndarray
+            Transformed (mapped) RAS+ coordinates (i.e., physical coordinates).
+
+        Examples
+        --------
+        >>> field = np.zeros((10, 10, 10, 3))
+        >>> field[..., 0] = 4.0
+        >>> fieldimg = nb.Nifti1Image(field, np.diag([2., 2., 2., 1.]))
+        >>> xfm = DisplacementsFieldTransform(fieldimg)
+        >>> xfm([4.0, 4.0, 4.0]).tolist()
+        [[8.0, 4.0, 4.0]]
+
+        >>> xfm([[4.0, 4.0, 4.0], [8, 2, 10]]).tolist()
+        [[8.0, 4.0, 4.0], [12.0, 2.0, 10.0]]
+        """
+        vfunc = partial(
+            _map_xyz,
+            reference=self.reference,
+            knots=self._knots,
+            coeffs=self._coeffs,
+        )
+        return [vfunc(_x) for _x in np.atleast_2d(x)]
+
+
+def _map_xyz(x, reference, knots, coeffs):
+    """Apply the transformation to just one coordinate."""
+    ndim = len(x)
+    # Calculate the index coordinates of the point in the B-Spline grid
+    ijk = (knots.inverse @ _as_homogeneous(x).squeeze())[:ndim]
+
+    # Determine the window within distance 2.0 (where the B-Spline is nonzero)
+    # Probably this will change if the order of the B-Spline is different
+    w_start, w_end = np.ceil(ijk - 2).astype(int), np.floor(ijk + 2).astype(int)
+    # Generate a grid of indexes corresponding to the window
+    nonzero_knots = tuple([
+        np.arange(start, end + 1) for start, end in zip(w_start, w_end)
+    ])
+    nonzero_knots = tuple(np.meshgrid(*nonzero_knots, indexing="ij"))
+    window = np.array(nonzero_knots).reshape((ndim, -1))
+
+    # Calculate the distance of the location w.r.t. to all voxels in window
+    distance = window.T - ijk
+    # Since this is a grid, distance only takes a few float values
+    unique_d, indices = np.unique(distance.reshape(-1), return_inverse=True)
+    # Calculate the B-Spline weight corresponding to the distance.
+    # Then multiply the three weights of each knot (tensor-product B-Spline)
+    tensor_bspline = _cubic_bspline(unique_d)[indices].reshape(distance.shape).prod(1)
+    # Extract the values of the coefficients in the window
+    coeffs = coeffs[nonzero_knots].reshape((-1, ndim))
+    # Inference: the displacement is the product of coefficients x tensor-product B-Splines
+    return x + coeffs.T @ tensor_bspline

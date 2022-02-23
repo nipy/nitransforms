@@ -73,13 +73,13 @@ def grid_bspline_weights(target_nii, ctrl_nii):
 
     """
     shape = target_nii.shape[:3]
-    ctrl_sp = ctrl_nii.header.get_zooms()[:3]
+    ctrl_sp = nb.affines.voxel_sizes(ctrl_nii.affine)[:3]
     ras2ijk = np.linalg.inv(ctrl_nii.affine)
     origin = nb.affines.apply_affine(ras2ijk, [tuple(target_nii.affine[:3, 3])])[0]
 
     wd = []
     for i, (o, n, sp) in enumerate(
-        zip(origin, shape, target_nii.header.get_zooms()[:3])
+        zip(origin, shape, nb.affines.voxel_sizes(target_nii.affine)[:3])
     ):
         locations = np.arange(0, n, dtype="float16") * sp / ctrl_sp[i] + o
         knots = np.arange(0, ctrl_nii.shape[i], dtype="float16")
