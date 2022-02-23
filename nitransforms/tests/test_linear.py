@@ -216,6 +216,7 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
 
     assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
+    brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
 
     cmd = APPLY_LINEAR_CMD[sw_tool](
         transform=os.path.abspath(xfm_fname),
@@ -224,23 +225,25 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
         resampled=os.path.abspath("resampled.nii.gz"),
     )
 
-    brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
-
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
     sw_moved = nb.load("resampled.nii.gz")
     sw_moved.set_data_dtype(img.get_data_dtype())
 
     nt_moved = xfm.apply(img, order=0)
-    diff = (sw_moved.get_fdata() - nt_moved.get_fdata())
-    diff[~brainmask] = 0.0
-    diff[np.abs(diff) < 1e-3] = 0
+    diff = (
+        np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
+        - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
+    )
 
     # A certain tolerance is necessary because of resampling at borders
-    assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
+    assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL
 
     nt_moved = xfm.apply("img.nii.gz", order=0)
-    diff = sw_moved.get_fdata() - nt_moved.get_fdata()
+    diff = (
+        np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
+        - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
+    )
     # A certain tolerance is necessary because of resampling at borders
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL
 
