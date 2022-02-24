@@ -103,7 +103,7 @@ class ImageGrid(SampledSpatialData):
         self._shape = image.shape
 
         self._ndim = getattr(image, "ndim", len(image.shape))
-        if self._ndim == 4:
+        if self._ndim >= 4:
             self._shape = image.shape[:3]
             self._ndim = 3
 

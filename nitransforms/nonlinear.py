@@ -48,7 +48,9 @@ class DisplacementsFieldTransform(TransformBase):
         )
 
         try:
-            self.reference = reference if reference is not None else field
+            self.reference = ImageGrid(
+                reference if reference is not None else field
+            )
         except AttributeError:
             raise TransformError(
                 "Field must be a spatial image if reference is not provided"
@@ -100,6 +102,7 @@ class DisplacementsFieldTransform(TransformBase):
         [[-6.5, -36.475167989730835, -19.5], [-1.0, -42.038356602191925, -11.25]]
 
         """
+
         if inverse is True:
             raise NotImplementedError
         ijk = self.reference.index(x)

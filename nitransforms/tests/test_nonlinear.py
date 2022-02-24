@@ -8,8 +8,9 @@ import pytest
 
 import numpy as np
 import nibabel as nb
-from ..io.base import TransformFileError
-from ..nonlinear import (
+from nitransforms.base import TransformError
+from nitransforms.io.base import TransformFileError
+from nitransforms.nonlinear import (
     BSplineFieldTransform,
     DisplacementsFieldTransform,
     load as nlload,
@@ -43,7 +44,7 @@ def test_itk_disp_load(size):
 @pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 2, 3)])
 def test_displacements_bad_sizes(size):
     """Checks field sizes."""
-    with pytest.raises(ValueError):
+    with pytest.raises(TransformError):
         DisplacementsFieldTransform(nb.Nifti1Image(np.zeros(size), np.eye(4), None))
 
 
