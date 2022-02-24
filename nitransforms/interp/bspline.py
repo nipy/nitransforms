@@ -27,18 +27,18 @@ def _cubic_bspline(d, order=3):
     )
 
 
-def grid_bspline_weights(target_nii, ctrl_nii):
+def grid_bspline_weights(target_grid, ctrl_grid):
     r"""
     Evaluate tensor-product B-Spline weights on a grid.
 
-    For each of the *N* input samples :math:`(s_1, s_2, s_3)` and *K* control
-    points or *knots* :math:`\mathbf{k} =(k_1, k_2, k_3)`, the tensor-product
-    cubic B-Spline kernel weights are calculated:
+    For each of the :math:`N` input locations :math:`\mathbf{x} = (x_i, x_j, x_k)`
+    and :math:`K` control points or *knots* :math:`\mathbf{c} =(c_i, c_j, c_k)`,
+    the tensor-product cubic B-Spline kernel weights are calculated:
 
     .. math::
-        \Psi^3(\mathbf{k}, \mathbf{s}) =
-        \beta^3(s_1 - k_1) \cdot \beta^3(s_2 - k_2) \cdot \beta^3(s_3 - k_3),
-        \label{eq:1}\tag{1}
+        \Psi^3(\mathbf{x}, \mathbf{c}) =
+        \beta^3(x_i - c_i) \cdot \beta^3(x_j - c_j) \cdot \beta^3(x_k - c_k),
+        \label{eq:bspline_weights}\tag{1}
 
     where each :math:`\beta^3` represents the cubic B-Spline for one dimension.
     The 1D B-Spline kernel implementation uses :obj:`numpy.piecewise`, and is based on the
@@ -54,14 +54,10 @@ def grid_bspline_weights(target_nii, ctrl_nii):
 
     Parameters
     ----------
-    target_nii :  :obj:`nibabel.spatialimages`
-        An spatial image object (typically, a :obj:`~nibabel.nifti1.Nifti1Image`)
-        embedding the target EPI image to be corrected.
-        Provides the location of the *N* samples (total number of voxels) in the space.
-    ctrl_nii : :obj:`nibabel.spatialimages`
-        An spatial image object (typically, a :obj:`~nibabel.nifti1.Nifti1Image`)
-        embedding the location of the control points of the B-Spline grid.
-        The data array should contain a total of :math:`K` knots (control points).
+    target_grid : :obj:`~nitransforms.base.ImageGrid` or :obj:`nibabel.spatialimages`
+        Regular grid of :math:`N` locations at which tensor B-Spline basis will be evaluated.
+    ctrl_grid : :obj:`~nitransforms.base.ImageGrid` or :obj:`nibabel.spatialimages`
+        Regular grid of :math:`K` control points (knot) where B-Spline basis are defined.
 
     Returns
     -------
@@ -72,19 +68,19 @@ def grid_bspline_weights(target_nii, ctrl_nii):
         step of approximation/extrapolation.
 
     """
-    shape = target_nii.shape[:3]
-    ctrl_sp = nb.affines.voxel_sizes(ctrl_nii.affine)[:3]
-    ras2ijk = np.linalg.inv(ctrl_nii.affine)
+    shape = target_grid.shape[:3]
+    ctrl_sp = nb.affines.voxel_sizes(ctrl_grid.affine)[:3]
+    ras2ijk = np.linalg.inv(ctrl_grid.affine)
     # IJK index in the control point image of the first index in the target image
-    origin = nb.affines.apply_affine(ras2ijk, [tuple(target_nii.affine[:3, 3])])[0]
+    origin = nb.affines.apply_affine(ras2ijk, [tuple(target_grid.affine[:3, 3])])[0]
 
     wd = []
     for i, (o, n, sp) in enumerate(
-        zip(origin, shape, nb.affines.voxel_sizes(target_nii.affine)[:3])
+        zip(origin, shape, nb.affines.voxel_sizes(target_grid.affine)[:3])
     ):
         # Locations of voxels in target image in control point image
         locations = np.arange(0, n, dtype="float16") * sp / ctrl_sp[i] + o
-        knots = np.arange(0, ctrl_nii.shape[i], dtype="float16")
+        knots = np.arange(0, ctrl_grid.shape[i], dtype="float16")
         distance = np.abs(locations[np.newaxis, ...] - knots[..., np.newaxis])
 
         within_support = distance < 2.0

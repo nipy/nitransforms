@@ -11,7 +11,6 @@ import warnings
 from functools import partial
 from pathlib import Path
 import numpy as np
-from nibabel.funcs import four_to_three
 from nibabel.loadsave import load as _nbload
 
 from nitransforms import io
@@ -19,6 +18,7 @@ from nitransforms.io.base import _ensure_image
 from nitransforms.interp.bspline import grid_bspline_weights, _cubic_bspline
 from nitransforms.base import (
     TransformBase,
+    TransformError,
     ImageGrid,
     SpatialReference,
     _as_homogeneous,
@@ -46,13 +46,19 @@ class DisplacementsFieldTransform(TransformBase):
         self._field = np.squeeze(
             np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field
         )
-        self.reference = reference or field.__class__(
-            np.zeros(self._field.shape[:-1]), field.affine, field.header
-        )
+
+        try:
+            self.reference = reference if reference is not None else field
+        except AttributeError:
+            raise TransformError(
+                "Field must be a spatial image if reference is not provided"
+                if reference is None else
+                "Reference is not a spatial image"
+            )
 
         ndim = self._field.ndim - 1
         if self._field.shape[-1] != ndim:
-            raise ValueError(
+            raise TransformError(
                 "The number of components of the displacements (%d) does not "
                 "the number of dimensions (%d)" % (self._field.shape[-1], ndim)
             )
@@ -138,7 +144,7 @@ class BSplineFieldTransform(TransformBase):
             self.reference = reference
 
             if coefficients.shape[-1] != self.ndim:
-                raise ValueError(
+                raise TransformError(
                     'Number of components of the coefficients does '
                     'not match the number of dimensions')
 
