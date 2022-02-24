@@ -103,7 +103,7 @@ class ImageGrid(SampledSpatialData):
         self._shape = image.shape
 
         self._ndim = getattr(image, "ndim", len(image.shape))
-        if self._ndim == 4:
+        if self._ndim >= 4:
             self._shape = image.shape[:3]
             self._ndim = 3
 
@@ -266,6 +266,9 @@ class TransformBase:
         _ref = (
             self.reference if reference is None else SpatialReference.factory(reference)
         )
+
+        if _ref is None:
+            raise TransformError("Cannot apply transform without reference")
 
         if isinstance(spatialimage, (str, Path)):
             spatialimage = _nbload(str(spatialimage))
