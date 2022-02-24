@@ -41,7 +41,7 @@ def test_itk_disp_load(size):
         ITKDisplacementsField.from_image(nb.Nifti1Image(np.zeros(size), np.eye(4), None))
 
 
-@pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 2, 3)])
+@pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 2, 3), (20, 20, 20, 1, 4)])
 def test_displacements_bad_sizes(size):
     """Checks field sizes."""
     with pytest.raises(TransformError):
@@ -56,6 +56,48 @@ def test_itk_disp_load_intent():
         )
 
     assert field.header.get_intent()[0] == "vector"
+
+
+def test_displacements_init():
+    DisplacementsFieldTransform(
+        np.zeros((10, 10, 10, 3)),
+        reference=nb.Nifti1Image(np.zeros((10, 10, 10, 3)), np.eye(4), None),
+    )
+
+    with pytest.raises(TransformError):
+        DisplacementsFieldTransform(np.zeros((10, 10, 10, 3)))
+    with pytest.raises(TransformError):
+        DisplacementsFieldTransform(
+            np.zeros((10, 10, 10, 3)),
+            reference=np.zeros((10, 10, 10, 3)),
+        )
+
+
+def test_bsplines_init():
+    with pytest.raises(TransformError):
+        BSplineFieldTransform(
+            nb.Nifti1Image(np.zeros((10, 10, 10, 4)), np.eye(4), None),
+            reference=nb.Nifti1Image(np.zeros((10, 10, 10)), np.eye(4), None),
+        )
+
+
+def test_bsplines_references(testdata_path):
+    with pytest.raises(TransformError):
+        BSplineFieldTransform(
+            testdata_path / "someones_bspline_coefficients.nii.gz"
+        ).to_field()
+
+    with pytest.raises(TransformError):
+        BSplineFieldTransform(
+            testdata_path / "someones_bspline_coefficients.nii.gz"
+        ).apply(testdata_path / "someones_anatomy.nii.gz")
+
+    BSplineFieldTransform(
+        testdata_path / "someones_bspline_coefficients.nii.gz"
+    ).apply(
+        testdata_path / "someones_anatomy.nii.gz",
+        reference=testdata_path / "someones_anatomy.nii.gz"
+    )
 
 
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])

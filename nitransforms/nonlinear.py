@@ -9,9 +9,7 @@
 """Nonlinear transforms."""
 import warnings
 from functools import partial
-from pathlib import Path
 import numpy as np
-from nibabel.loadsave import load as _nbload
 
 from nitransforms import io
 from nitransforms.io.base import _ensure_image
@@ -153,14 +151,15 @@ class BSplineFieldTransform(TransformBase):
 
     def to_field(self, reference=None, dtype="float32"):
         """Generate a displacements deformation field from this B-Spline field."""
-        reference = _ensure_image(reference)
-        _ref = self.reference if reference is None else SpatialReference.factory(reference)
+        _ref = (
+            self.reference if reference is None else
+            ImageGrid(_ensure_image(reference))
+        )
         if _ref is None:
-            raise ValueError("A reference must be defined")
+            raise TransformError("A reference must be defined")
 
         ndim = self._coeffs.shape[-1]
 
-        # If locations to be interpolated are on a grid, use faster tensor-bspline calculation
         if self._weights is None:
             self._weights = grid_bspline_weights(_ref, self._knots)
 
@@ -185,21 +184,17 @@ class BSplineFieldTransform(TransformBase):
     ):
         """Apply a B-Spline transform on input data."""
 
-        if reference is not None:
-            reference = _ensure_image(reference)
-
         _ref = (
-            self.reference if reference is None else SpatialReference.factory(reference)
+            self.reference if reference is None else
+            SpatialReference.factory(_ensure_image(reference))
         )
-
-        if isinstance(spatialimage, (str, Path)):
-            spatialimage = _nbload(str(spatialimage))
+        spatialimage = _ensure_image(spatialimage)
 
         # If locations to be interpolated are not on a grid, run map()
         if not isinstance(_ref, ImageGrid):
             return super().apply(
                 spatialimage,
-                reference=reference,
+                reference=_ref,
                 order=order,
                 mode=mode,
                 cval=cval,
@@ -208,7 +203,7 @@ class BSplineFieldTransform(TransformBase):
             )
 
         # If locations to be interpolated are on a grid, generate a displacements field
-        return self.to_field().apply(
+        return self.to_field(reference=reference).apply(
             spatialimage,
             reference=reference,
             order=order,

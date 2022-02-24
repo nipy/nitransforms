@@ -267,6 +267,9 @@ class TransformBase:
             self.reference if reference is None else SpatialReference.factory(reference)
         )
 
+        if _ref is None:
+            raise TransformError("Cannot apply transform without reference")
+
         if isinstance(spatialimage, (str, Path)):
             spatialimage = _nbload(str(spatialimage))
 
