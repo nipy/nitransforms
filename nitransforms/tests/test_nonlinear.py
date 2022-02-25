@@ -112,6 +112,9 @@ def test_displacements_field1(
     axis,
 ):
     """Check a translation-only field on one or more axes, different image orientations."""
+    if (image_orientation, sw_tool) == ("oblique", "afni"):
+        pytest.skip("AFNI obliques are not yet implemented for displacements fields")
+
     os.chdir(str(tmp_path))
     nii = get_testdata[image_orientation]
     msk = get_testmask[image_orientation]

@@ -11,6 +11,7 @@ from .base import (
     DisplacementsField,
     LinearParameters,
     TransformFileError,
+    _ensure_image,
 )
 
 LPS = np.diag([-1, -1, 1, 1])
@@ -38,6 +39,15 @@ class AFNILinearTransform(LinearParameters):
     def from_ras(cls, ras, moving=None, reference=None):
         """Create an AFNI affine from a nitransform's RAS+ matrix."""
         # swapaxes is necessary, as axis 0 encodes series of transforms
+
+        reference = _ensure_image(reference)
+        if reference is not None and _is_oblique(reference.affine):
+            ras = ras @ _cardinal_rotation(reference.affine, False)
+
+        moving = _ensure_image(moving)
+        if moving is not None and _is_oblique(moving.affine):
+            ras = _cardinal_rotation(moving.affine, True) @ ras
+
         parameters = np.swapaxes(LPS @ ras @ LPS, 0, 1)
 
         tf = cls()
@@ -71,7 +81,16 @@ class AFNILinearTransform(LinearParameters):
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         # swapaxes is necessary, as axis 0 encodes series of transforms
-        return LPS @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ LPS
+        retval = LPS @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ LPS
+        reference = _ensure_image(reference)
+        if reference is not None and _is_oblique(reference.affine):
+            retval = retval @ _cardinal_rotation(reference.affine, True)
+
+        moving = _ensure_image(moving)
+        if moving is not None and _is_oblique(moving.affine):
+            retval = _cardinal_rotation(moving.affine, False) @ retval
+
+        return retval
 
 
 class AFNILinearTransformArray(BaseLinearTransformList):
@@ -242,6 +261,28 @@ def _dicom_real_to_card(oblique):
     # Once director cosines are calculated, scale by voxel sizes
     retval[:3, :3] = np.round(voxel_sizes(oblique), decimals=4) * cosines
     return retval
+
+
+def _cardinal_rotation(oblique, real_to_card=True):
+    """
+    Calculate the rotation matrix to undo AFNI's deoblique operation.
+
+    Parameters
+    ----------
+    oblique : 4x4 numpy.array
+        affine that may not be aligned to the cardinal axes ("IJK_DICOM_REAL" for AFNI).
+
+    Returns
+    -------
+    plumb : 4x4 numpy.array
+        affine aligned to the cardinal axes ("IJK_DICOM_CARD" for AFNI).
+
+    """
+    card = _dicom_real_to_card(oblique)
+    return (
+        card @ np.linalg.inv(oblique) if real_to_card else
+        oblique @ np.linalg.inv(card)
+    )
 
 
 def _afni_warpdrive(oblique, forward=True, ras=False):

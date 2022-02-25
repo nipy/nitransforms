@@ -471,6 +471,30 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     card_aff = afni._dicom_real_to_card(img.affine)
     assert np.allclose(card_aff, nb.load("deob_3drefit.nii.gz").affine)
 
+    # Check that nitransforms can emulate 3drefit -deoblique
+    nt3drefit = Affine(
+        afni._cardinal_rotation(img.affine, False),
+        reference="deob_3drefit.nii.gz",
+    ).apply("orig.nii.gz")
+
+    diff = (
+        np.asanyarray(img.dataobj, dtype="uint8")
+        - np.asanyarray(nt3drefit.dataobj, dtype="uint8")
+    )
+    assert np.sqrt((diff[10:-10, 10:-10, 10:-10] ** 2).mean()) < 0.1
+
+    # Check that nitransforms can revert 3drefit -deoblique
+    nt_undo3drefit = Affine(
+        afni._cardinal_rotation(img.affine, True),
+        reference="orig.nii.gz",
+    ).apply("deob_3drefit.nii.gz")
+
+    diff = (
+        np.asanyarray(img.dataobj, dtype="uint8")
+        - np.asanyarray(nt_undo3drefit.dataobj, dtype="uint8")
+    )
+    assert np.sqrt((diff[10:-10, 10:-10, 10:-10] ** 2).mean()) < 0.1
+
     # Check the target grid by 3dWarp and the affine & size interpolated by NiTransforms
     cmd = f"3dWarp -verb -deoblique -NN -prefix {tmpdir}/deob.nii.gz {tmpdir}/orig.nii.gz"
     assert check_call([cmd], shell=True) == 0
