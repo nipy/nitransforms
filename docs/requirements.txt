@@ -1,3 +1,4 @@
+ipython
 nbsphinx
 packaging
 pydot>=1.2.3
