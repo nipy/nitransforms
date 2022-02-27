@@ -285,7 +285,7 @@ def _cardinal_rotation(oblique, real_to_card=True):
     )
 
 
-def _afni_warpdrive(oblique, forward=True, ras=False):
+def _afni_warpdrive(oblique, forward=True):
     """
     Calculate AFNI's ``WARPDRIVE_MATVEC_FOR_000000`` (de)obliquing affine.
 
@@ -297,8 +297,6 @@ def _afni_warpdrive(oblique, forward=True, ras=False):
         Returns the forward transformation if True, i.e.,
         the matrix to convert an oblique affine into an AFNI's plumb (if ``True``)
         or viceversa plumb -> oblique (if ``false``).
-    ras : :obj:`bool`
-        Whether output should be referrenced to AFNI's internal system (LPS+) or RAS+
 
     Returns
     -------
