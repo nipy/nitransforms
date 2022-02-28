@@ -37,7 +37,32 @@ class AFNILinearTransform(LinearParameters):
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
-        """Create an AFNI affine from a nitransform's RAS+ matrix."""
+        """Create an AFNI affine from a nitransform's RAS+ matrix.
+
+        AFNI implicitly de-obliques image affine matrices before applying transforms, so
+        for consistency we update the transform to account for the obliquity of the images.
+
+        .. testsetup:
+            >>> import pytest
+            >>> pytest.skip()
+
+        >>> moving.affine == ras @ reference.affine
+
+        We can decompose the affines into oblique and de-obliqued components:
+
+        >>> moving.affine == m_obl @ m_deobl
+        >>> reference.affine == r_obl @ r_deobl
+
+        To generate an equivalent AFNI transform, we need an effective transform (``e_ras``):
+
+        >>> m_obl @ m_deobl == ras @ r_obl @ r_deobl
+        >>> m_deobl == inv(m_obl) @ ras @ r_obl @ r_deobl
+
+        Hence,
+
+        >>> m_deobl == e_ras @ r_deobl
+        >>> e_ras == inv(m_obl) @ ras @ r_obl
+        """
         # swapaxes is necessary, as axis 0 encodes series of transforms
 
         reference = _ensure_image(reference)
@@ -48,6 +73,7 @@ class AFNILinearTransform(LinearParameters):
         if moving is not None and _is_oblique(moving.affine):
             ras = _cardinal_rotation(moving.affine, True) @ ras
 
+        # AFNI represents affine transformations as LPS-to-LPS
         parameters = np.swapaxes(LPS @ ras @ LPS, 0, 1)
 
         tf = cls()
@@ -213,9 +239,17 @@ def _afni_deobliqued_grid(oblique, shape):
     vs = voxel_sizes(oblique)
 
     # Calculate new shape of deobliqued grid
-    corners_ijk = np.array([
-        (i, j, k) for k in (0, shape[2]) for j in (0, shape[1]) for i in (0, shape[0])
-    ]) - 0.5
+    corners_ijk = (
+        np.array(
+            [
+                (i, j, k)
+                for k in (0, shape[2])
+                for j in (0, shape[1])
+                for i in (0, shape[0])
+            ]
+        )
+        - 0.5
+    )
     corners_xyz = oblique @ np.hstack((corners_ijk, np.ones((len(corners_ijk), 1)))).T
     extent = corners_xyz.min(1)[:3], corners_xyz.max(1)[:3]
     nshape = ((extent[1] - extent[0]) / vs + 0.999).astype(int)
@@ -280,8 +314,7 @@ def _cardinal_rotation(oblique, real_to_card=True):
     """
     card = _dicom_real_to_card(oblique)
     return (
-        card @ np.linalg.inv(oblique) if real_to_card else
-        oblique @ np.linalg.inv(card)
+        card @ np.linalg.inv(oblique) if real_to_card else oblique @ np.linalg.inv(card)
     )
 
 
@@ -312,11 +345,10 @@ def _afni_warpdrive(oblique, forward=True):
 
 def _afni_header(nii, field="WARPDRIVE_MATVEC_FOR_000000", to_ras=False):
     from lxml import etree
+
     root = etree.fromstring(nii.header.extensions[0].get_content().decode())
     retval = np.fromstring(
-        root.find(f".//*[@atr_name='{field}']").text,
-        sep="\n",
-        dtype="float32"
+        root.find(f".//*[@atr_name='{field}']").text, sep="\n", dtype="float32"
     )
     if retval.size == 12:
         retval = np.vstack((retval.reshape((3, 4)), (0, 0, 0, 1)))
