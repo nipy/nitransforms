@@ -34,7 +34,7 @@ mri_vol2vol --mov {moving} --targ {reference} --lta {transform} \
 }
 
 
-@pytest.mark.parametrize("matrix", [[0.0], np.ones((3, 3, 3)), np.ones((3, 4)),])
+@pytest.mark.parametrize("matrix", [[0.0], np.ones((3, 3, 3)), np.ones((3, 4)), ])
 def test_linear_typeerrors1(matrix):
     """Exercise errors in Affine creation."""
     with pytest.raises(TypeError):
@@ -141,9 +141,6 @@ def test_loadsave(tmp_path, data_path, testdata_path, fmt):
 @pytest.mark.parametrize("sw_tool", ["itk", "fsl", "afni", "fs"])
 def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
-    if (image_orientation, sw_tool) == ("oblique", "afni"):
-        pytest.skip("AFNI Deoblique unsupported.")
-
     tmpdir.chdir()
     img = get_testdata[image_orientation]
     # Generate test transform
@@ -152,7 +149,14 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
         # Account for the fact that FS defines LTA transforms reversed
         T = np.linalg.inv(T)
 
-    xfm = nitl.Affine(T)
+    xfm = (
+        nitl.Affine(T) if (sw_tool, image_orientation) != ("afni", "oblique") else
+        # AFNI is special when moving or reference are oblique - let io do the magic
+        nitl.Affine(nitl.io.afni.AFNILinearTransform.from_ras(T).to_ras(
+            reference=img,
+            moving=img,
+        ))
+    )
     xfm.reference = img
 
     ext = ""
@@ -168,7 +172,7 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 
-@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", ])  # 'oblique',
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", 'oblique', ])
 @pytest.mark.parametrize("sw_tool", ["itk", "fsl", "afni", "fs"])
 def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orientation, sw_tool):
     """Check implementation of exporting affines to formats."""
@@ -193,7 +197,15 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
 
     # Write out transform file (software-dependent)
     xfm_fname = "M.%s%s" % (sw_tool, ext)
-    xfm.to_filename(xfm_fname, fmt=sw_tool)
+    # Change reference dataset for AFNI & oblique
+    if (sw_tool, image_orientation) == ("afni", "oblique"):
+        nitl.io.afni.AFNILinearTransform.from_ras(
+            T,
+            moving=img,
+            reference=img,
+        ).to_filename(xfm_fname)
+    else:
+        xfm.to_filename(xfm_fname, fmt=sw_tool)
 
     cmd = APPLY_LINEAR_CMD[sw_tool](
         transform=os.path.abspath(xfm_fname),
@@ -211,8 +223,10 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
     sw_moved_mask = nb.load("resampled_brainmask.nii.gz")
+
     nt_moved_mask = xfm.apply(msk, order=0)
     nt_moved_mask.set_data_dtype(msk.get_data_dtype())
+    nt_moved_mask.to_filename("ntmask.nii.gz")
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
 
     assert np.sqrt((diff ** 2).mean()) < RMSE_TOL

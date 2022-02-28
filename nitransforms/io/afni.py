@@ -1,9 +1,11 @@
 """Read/write AFNI's transforms."""
 from math import pi
 import numpy as np
-from nibabel.affines import obliquity, voxel_sizes
+from nibabel.affines import (
+    obliquity,
+    voxel_sizes,
+)
 
-from ..patched import shape_zoom_affine
 from .base import (
     BaseLinearTransformList,
     DisplacementsField,
@@ -35,34 +37,44 @@ class AFNILinearTransform(LinearParameters):
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
-        """Create an AFNI affine from a nitransform's RAS+ matrix."""
-        pre = LPS
-        post = LPS
+        """Create an AFNI affine from a nitransform's RAS+ matrix.
 
-        if reference is not None:
-            reference = _ensure_image(reference)
+        AFNI implicitly de-obliques image affine matrices before applying transforms, so
+        for consistency we update the transform to account for the obliquity of the images.
 
-        if reference is not None and _is_oblique(reference.affine):
-            print("Reference affine axes are oblique.")
-            M = reference.affine
-            A = shape_zoom_affine(
-                reference.shape, voxel_sizes(M), x_flip=False, y_flip=False
-            )
-            pre = M.dot(np.linalg.inv(A)).dot(LPS)
+        .. testsetup:
+            >>> import pytest
+            >>> pytest.skip()
 
-        if moving is not None:
-            moving = _ensure_image(moving)
+        >>> moving.affine == ras @ reference.affine
 
-        if moving is not None and _is_oblique(moving.affine):
-            print("Moving affine axes are oblique.")
-            M2 = moving.affine
-            A2 = shape_zoom_affine(
-                moving.shape, voxel_sizes(M2), x_flip=True, y_flip=True
-            )
-            post = A2.dot(np.linalg.inv(M2))
+        We can decompose the affines into oblique and de-obliqued components:
 
+        >>> moving.affine == m_obl @ m_deobl
+        >>> reference.affine == r_obl @ r_deobl
+
+        To generate an equivalent AFNI transform, we need an effective transform (``e_ras``):
+
+        >>> m_obl @ m_deobl == ras @ r_obl @ r_deobl
+        >>> m_deobl == inv(m_obl) @ ras @ r_obl @ r_deobl
+
+        Hence,
+
+        >>> m_deobl == e_ras @ r_deobl
+        >>> e_ras == inv(m_obl) @ ras @ r_obl
+        """
         # swapaxes is necessary, as axis 0 encodes series of transforms
-        parameters = np.swapaxes(post @ ras @ pre, 0, 1)
+
+        reference = _ensure_image(reference)
+        if reference is not None and _is_oblique(reference.affine):
+            ras = ras @ _cardinal_rotation(reference.affine, False)
+
+        moving = _ensure_image(moving)
+        if moving is not None and _is_oblique(moving.affine):
+            ras = _cardinal_rotation(moving.affine, True) @ ras
+
+        # AFNI represents affine transformations as LPS-to-LPS
+        parameters = np.swapaxes(LPS @ ras @ LPS, 0, 1)
 
         tf = cls()
         tf.structarr["parameters"] = parameters.T
@@ -76,7 +88,8 @@ class AFNILinearTransform(LinearParameters):
         lines = [
             line
             for line in string.splitlines()
-            if line.strip() and not (line.startswith("#") or "3dvolreg matrices" in line)
+            if line.strip()
+            and not (line.startswith("#") or "3dvolreg matrices" in line)
         ]
 
         if not lines:
@@ -93,23 +106,17 @@ class AFNILinearTransform(LinearParameters):
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
-        pre = LPS
-        post = LPS
-
-        if reference is not None:
-            reference = _ensure_image(reference)
-
-        if reference is not None and _is_oblique(reference.affine):
-            raise NotImplementedError
-
-        if moving is not None:
-            moving = _ensure_image(moving)
-
-        if moving is not None and _is_oblique(moving.affine):
-            raise NotImplementedError
-
         # swapaxes is necessary, as axis 0 encodes series of transforms
-        return post @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ pre
+        retval = LPS @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ LPS
+        reference = _ensure_image(reference)
+        if reference is not None and _is_oblique(reference.affine):
+            retval = retval @ _cardinal_rotation(reference.affine, True)
+
+        moving = _ensure_image(moving)
+        if moving is not None and _is_oblique(moving.affine):
+            retval = _cardinal_rotation(moving.affine, False) @ retval
+
+        return retval
 
 
 class AFNILinearTransformArray(BaseLinearTransformList):
@@ -184,4 +191,168 @@ class AFNIDisplacementsField(DisplacementsField):
 
 
 def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
+    """
+    Determine whether the dataset is oblique.
+
+    Examples
+    --------
+    >>> _is_oblique(np.eye(4))
+    False
+
+    >>> _is_oblique(nb.affines.from_matvec(
+    ...     nb.eulerangles.euler2mat(x=0.9, y=0.001, z=0.001),
+    ...     [4.0, 2.0, -1.0],
+    ... ))
+    True
+
+    """
     return (obliquity(affine).min() * 180 / pi) > thres
+
+
+def _afni_deobliqued_grid(oblique, shape):
+    """
+    Calculate AFNI's target deobliqued image grid.
+
+    Maps the eight images corners to the new coordinate system to ensure
+    coverage of the full extent after rotation, as AFNI does.
+
+    See also
+    --------
+    https://github.com/afni/afni/blob/75766463758e5806d938c8dd3bdcd4d56ab5a485/src/mri_warp3D.c#L941-L1010
+
+    Parameters
+    ----------
+    oblique : 4x4 numpy.array
+        affine that is not aligned to the cardinal axes.
+    shape : numpy.array
+        sizes of the (oblique) image grid
+
+    Returns
+    -------
+    affine : 4x4 numpy.array
+        plumb affine (i.e., aligned to the cardinal axes).
+    shape : numpy.array
+        sizes of the target, plumb image grid
+
+    """
+    shape = np.array(shape[:3])
+    vs = voxel_sizes(oblique)
+
+    # Calculate new shape of deobliqued grid
+    corners_ijk = (
+        np.array(
+            [
+                (i, j, k)
+                for k in (0, shape[2])
+                for j in (0, shape[1])
+                for i in (0, shape[0])
+            ]
+        )
+        - 0.5
+    )
+    corners_xyz = oblique @ np.hstack((corners_ijk, np.ones((len(corners_ijk), 1)))).T
+    extent = corners_xyz.min(1)[:3], corners_xyz.max(1)[:3]
+    nshape = ((extent[1] - extent[0]) / vs + 0.999).astype(int)
+
+    # AFNI deobliqued target will be in LPS+ orientation
+    plumb = LPS * ([vs.min()] * 3 + [1.0])
+
+    # Coordinates of center voxel do not change
+    obliq_c = oblique @ np.hstack((0.5 * (shape - 1), 1.0))
+    plumb_c = plumb @ np.hstack((0.5 * (nshape - 1), 1.0))
+
+    # Rebase the origin of the new, plumb affine
+    plumb[:3, 3] -= plumb_c[:3] - obliq_c[:3]
+
+    return plumb, nshape
+
+
+def _dicom_real_to_card(oblique):
+    """
+    Calculate the corresponding "DICOM cardinal" for "DICOM real" (AFNI jargon).
+
+    Implements the internal "deobliquing" operation of ``3drefit`` and other tools, which
+    just *drop* the obliquity from the input affine.
+
+    Parameters
+    ----------
+    oblique : 4x4 numpy.array
+        affine that may not be aligned to the cardinal axes ("IJK_DICOM_REAL" for AFNI).
+
+    Returns
+    -------
+    plumb : 4x4 numpy.array
+        affine aligned to the cardinal axes ("IJK_DICOM_CARD" for AFNI).
+
+    """
+    # Origin is kept from input
+    retval = np.eye(4)
+    retval[:3, 3] = oblique[:3, 3]
+
+    # Calculate director cosines and project to closest canonical
+    cosines = oblique[:3, :3] / np.abs(oblique[:3, :3]).max(0)
+    cosines[np.abs(cosines) < 1.0] = 0
+    # Once director cosines are calculated, scale by voxel sizes
+    retval[:3, :3] = np.round(voxel_sizes(oblique), decimals=4) * cosines
+    return retval
+
+
+def _cardinal_rotation(oblique, real_to_card=True):
+    """
+    Calculate the rotation matrix to undo AFNI's deoblique operation.
+
+    Parameters
+    ----------
+    oblique : 4x4 numpy.array
+        affine that may not be aligned to the cardinal axes ("IJK_DICOM_REAL" for AFNI).
+
+    Returns
+    -------
+    plumb : 4x4 numpy.array
+        affine aligned to the cardinal axes ("IJK_DICOM_CARD" for AFNI).
+
+    """
+    card = _dicom_real_to_card(oblique)
+    return (
+        card @ np.linalg.inv(oblique) if real_to_card else oblique @ np.linalg.inv(card)
+    )
+
+
+def _afni_warpdrive(oblique, forward=True):
+    """
+    Calculate AFNI's ``WARPDRIVE_MATVEC_FOR_000000`` (de)obliquing affine.
+
+    Parameters
+    ----------
+    oblique : 4x4 numpy.array
+        affine that is not aligned to the cardinal axes.
+    forward : :obj:`bool`
+        Returns the forward transformation if True, i.e.,
+        the matrix to convert an oblique affine into an AFNI's plumb (if ``True``)
+        or viceversa plumb -> oblique (if ``false``).
+
+    Returns
+    -------
+    warpdrive : 4x4 numpy.array
+        AFNI's *warpdrive* forward or inverse matrix.
+
+    """
+    ijk_to_dicom_real = np.diag(LPS) * oblique
+    ijk_to_dicom = _dicom_real_to_card(oblique)
+    R = np.linalg.inv(ijk_to_dicom) @ ijk_to_dicom_real
+    return np.linalg.inv(R) if forward else R
+
+
+def _afni_header(nii, field="WARPDRIVE_MATVEC_FOR_000000", to_ras=False):
+    from lxml import etree
+
+    root = etree.fromstring(nii.header.extensions[0].get_content().decode())
+    retval = np.fromstring(
+        root.find(f".//*[@atr_name='{field}']").text, sep="\n", dtype="float32"
+    )
+    if retval.size == 12:
+        retval = np.vstack((retval.reshape((3, 4)), (0, 0, 0, 1)))
+        if to_ras:
+            retval = LPS @ retval @ LPS
+
+    return retval

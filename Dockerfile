@@ -111,6 +111,7 @@ RUN conda install -y -c anaconda -c conda-forge \
                      python=3.7 \
                      libxml2=2.9 \
                      libxslt=1.1 \
+                     lxml \
                      mkl \
                      mkl-service \
                      numpy=1.20 \
