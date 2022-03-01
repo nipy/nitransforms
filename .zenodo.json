@@ -33,6 +33,14 @@
       "orcid": "0000-0001-8435-6191"
     }
   ],
+  "contributors": [
+    {
+      "affiliation": "Charite Universitatsmedizin Berlin, Germany",
+      "name": "Waller, Lea",
+      "orcid": "0000-0002-3239-6957",
+      "type": "Researcher"
+    }
+  ],
   "keywords": [
     "neuroimaging",
     "spatial normalization"
