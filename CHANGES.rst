@@ -1,3 +1,24 @@
+22.0.0 (February 28, 2022)
+==========================
+The first stable release of *NiTransforms* in 2022.
+Contains all the new bug-fixes, features, and maintenance executed within the
+context of the NiBabel EOSS4 grant from the CZI Foundation.
+
+  * FIX: Implement AFNI's deoblique operations (#117)
+  * FIX: Ensure input dtype is kept after resampling (#153)
+  * FIX: Replace deprecated ``_read_mat`` with ``scipy.io.loadmat`` (#151)
+  * FIX: Add FSL-LTA-FSL regression tests (#146)
+  * FIX: Increase FSL serialization precision (#144)
+  * FIX: Refactor of LTA implementation (#145)
+  * FIX: Load arrays of linear transforms from AFNI files (#143)
+  * FIX: Load arrays of linear transforms from FSL files (#142)
+  * FIX: Double-check dtypes within tests and increase RMSE tolerance (#141)
+  * ENH: Base implementation of B-Spline transforms (#138)
+  * ENH: I/O of FSL displacements fields (#51)
+  * MAINT: Fix path to test summaries in CircleCI (#148)
+  * MAINT: Move testdata on to gin.g-node.org & datalad (#140)
+  * MAINT: scipy-1.8, numpy-1.22 require python 3.8 (#139)
+
 21.0.0 (September 10, 2021)
 ===========================
 A first release of *NiTransforms*.
