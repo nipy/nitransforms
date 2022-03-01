@@ -14,14 +14,14 @@ from scipy import ndimage as ndi
 
 from nibabel.loadsave import load as _nbload
 
-from .base import (
+from nitransforms.base import (
     ImageGrid,
     TransformBase,
     SpatialReference,
     _as_homogeneous,
     EQUALITY_TOL,
 )
-from . import io
+from nitransforms.io import get_linear_factory, TransformFileError
 
 
 class Affine(TransformBase):
@@ -183,51 +183,40 @@ should be (0, 0, 0, 1), got %s."""
             self.reference._to_hdf5(x5_root.create_group("Reference"))
 
     def to_filename(self, filename, fmt="X5", moving=None):
-        """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-        if fmt.lower() in ["itk", "ants", "elastix"]:
-            itkobj = io.itk.ITKLinearTransform.from_ras(self.matrix)
-            itkobj.to_filename(filename)
-            return filename
+        """Store the transform in the requested output format."""
+        writer = get_linear_factory(fmt, is_array=False)
 
-        # Rest of the formats peek into moving and reference image grids
-        moving = ImageGrid(moving) if moving is not None else self.reference
-
-        _factory = {
-            "afni": io.afni.AFNILinearTransform,
-            "fsl": io.fsl.FSLLinearTransform,
-            "lta": io.lta.FSLinearTransform,
-            "fs": io.lta.FSLinearTransform,
-        }
-
-        if fmt not in _factory:
-            raise NotImplementedError(f"Unsupported format <{fmt}>")
-
-        _factory[fmt].from_ras(
-            self.matrix, moving=moving, reference=self.reference
-        ).to_filename(filename)
+        if fmt.lower() in ("itk", "ants", "elastix"):
+            writer.from_ras(self.matrix).to_filename(filename)
+        else:
+            # Rest of the formats peek into moving and reference image grids
+            writer.from_ras(
+                self.matrix,
+                reference=self.reference,
+                moving=ImageGrid(moving) if moving is not None else self.reference,
+            ).to_filename(filename)
         return filename
 
     @classmethod
-    def from_filename(cls, filename, fmt="X5", reference=None, moving=None):
+    def from_filename(cls, filename, fmt=None, reference=None, moving=None):
         """Create an affine from a transform file."""
-        if fmt.lower() in ("itk", "ants", "elastix"):
-            _factory = io.itk.ITKLinearTransformArray
-        elif fmt.lower() in ("lta", "fs"):
-            _factory = io.lta.FSLinearTransformArray
-        elif fmt.lower() == "fsl":
-            _factory = io.fsl.FSLLinearTransformArray
-        elif fmt.lower() == "afni":
-            _factory = io.afni.AFNILinearTransformArray
-        else:
-            raise NotImplementedError
+        fmtlist = [fmt] if fmt is not None else ("itk", "lta", "afni", "fsl")
 
-        struct = _factory.from_filename(filename)
-        matrix = struct.to_ras(reference=reference, moving=moving)
-        if cls == Affine:
-            if np.shape(matrix)[0] != 1:
-                raise TypeError("Cannot load transform array '%s'" % filename)
-            matrix = matrix[0]
-        return cls(matrix, reference=reference)
+        for potential_fmt in fmtlist:
+            try:
+                struct = get_linear_factory(potential_fmt).from_filename(filename)
+                matrix = struct.to_ras(reference=reference, moving=moving)
+                if cls == Affine:
+                    if np.shape(matrix)[0] != 1:
+                        raise TypeError("Cannot load transform array '%s'" % filename)
+                    matrix = matrix[0]
+                return cls(matrix, reference=reference)
+            except TransformFileError:
+                continue
+
+        raise TransformFileError(
+            f"Could not open <{filename}> (formats tried: {', '.join(fmtlist)}."
+        )
 
     def __repr__(self):
         """
@@ -353,31 +342,18 @@ class LinearTransformsMapping(Affine):
         return np.swapaxes(affine.dot(coords), 1, 2)
 
     def to_filename(self, filename, fmt="X5", moving=None):
-        """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
+        """Store the transform in the requested output format."""
+        writer = get_linear_factory(fmt, is_array=True)
+
         if fmt.lower() in ("itk", "ants", "elastix"):
-            itkobj = io.itk.ITKLinearTransformArray.from_ras(self.matrix)
-            itkobj.to_filename(filename)
-            return filename
-
-        # Rest of the formats peek into moving and reference image grids
-        if moving is not None:
-            moving = ImageGrid(moving)
+            writer.from_ras(self.matrix).to_filename(filename)
         else:
-            moving = self.reference
-
-        _factory = {
-            "afni": io.afni.AFNILinearTransformArray,
-            "fsl": io.fsl.FSLLinearTransformArray,
-            "lta": io.lta.FSLinearTransformArray,
-            "fs": io.lta.FSLinearTransformArray,
-        }
-
-        if fmt not in _factory:
-            raise NotImplementedError(f"Unsupported format <{fmt}>")
-
-        _factory[fmt].from_ras(
-            self.matrix, moving=moving, reference=self.reference
-        ).to_filename(filename)
+            # Rest of the formats peek into moving and reference image grids
+            writer.from_ras(
+                self.matrix,
+                reference=self.reference,
+                moving=ImageGrid(moving) if moving is not None else self.reference,
+            ).to_filename(filename)
         return filename
 
     def apply(
@@ -486,7 +462,7 @@ class LinearTransformsMapping(Affine):
         return resampled
 
 
-def load(filename, fmt="X5", reference=None, moving=None):
+def load(filename, fmt=None, reference=None, moving=None):
     """
     Load a linear transform file.
 
