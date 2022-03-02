@@ -1,12 +1,14 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """I/O test cases."""
+import os
 from subprocess import check_call
 from io import StringIO
 import filecmp
 import shutil
 import numpy as np
 import pytest
+from h5py import File as H5File
 
 import nibabel as nb
 from nibabel.eulerangles import euler2mat
@@ -408,7 +410,7 @@ def test_afni_Displacements():
         afni.AFNIDisplacementsField.from_image(field)
 
 
-def test_itk_h5(testdata_path):
+def test_itk_h5(tmpdir, testdata_path):
     """Test displacements fields."""
     assert (
         len(
@@ -429,6 +431,21 @@ def test_itk_h5(testdata_path):
                 / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.x5"
             )
         )
+
+    tmpdir.chdir()
+    shutil.copy(
+        testdata_path / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+        "test.h5",
+    )
+    os.chmod("test.h5", 0o666)
+
+    with H5File("test.h5", "r+") as h5file:
+        h5group = h5file["TransformGroup"]
+        xfm = h5group[list(h5group.keys())[1]]
+        xfm["TransformType"][0] = b"InventTransform"
+
+    with pytest.raises(TransformIOError):
+        itk.ITKCompositeH5.from_filename("test.h5")
 
 
 @pytest.mark.parametrize(
