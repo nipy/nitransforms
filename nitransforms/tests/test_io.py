@@ -24,7 +24,7 @@ from ..io.lta import (
     FSLinearTransform as LT,
     FSLinearTransformArray as LTA,
 )
-from ..io.base import LinearParameters, TransformFileError
+from ..io.base import LinearParameters, TransformIOError, TransformFileError
 
 LPS = np.diag([-1, -1, 1, 1])
 ITK_MAT = LPS.dot(np.ones((4, 4)).dot(LPS))
@@ -224,7 +224,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
 
     # Test without images
     if sw == "fsl":
-        with pytest.raises(ValueError):
+        with pytest.raises(TransformIOError):
             factory.from_ras(RAS)
     else:
         xfm = factory.from_ras(RAS)
@@ -422,7 +422,7 @@ def test_itk_h5(testdata_path):
         == 2
     )
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(TransformFileError):
         list(
             itk.ITKCompositeH5.from_filename(
                 testdata_path

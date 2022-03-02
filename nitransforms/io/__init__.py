@@ -2,7 +2,7 @@
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """Read and write transforms."""
 from nitransforms.io import afni, fsl, itk, lta
-from nitransforms.io.base import TransformFileError
+from nitransforms.io.base import TransformIOError, TransformFileError
 
 __all__ = [
     "afni",
@@ -11,6 +11,7 @@ __all__ = [
     "lta",
     "get_linear_factory",
     "TransformFileError",
+    "TransformIOError",
 ]
 
 _IO_TYPES = {

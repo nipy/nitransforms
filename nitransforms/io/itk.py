@@ -8,6 +8,7 @@ from .base import (
     BaseLinearTransformList,
     DisplacementsField,
     LinearParameters,
+    TransformIOError,
     TransformFileError,
 )
 
@@ -306,7 +307,7 @@ class ITKCompositeH5:
         from h5py import File as H5File
 
         if not str(filename).endswith(".h5"):
-            raise RuntimeError("Extension is not .h5")
+            raise TransformFileError("Extension is not .h5")
 
         with H5File(str(filename)) as f:
             return cls.from_h5obj(f)
@@ -355,7 +356,7 @@ class ITKCompositeH5:
                 )
                 continue
 
-            raise NotImplementedError(
+            raise TransformIOError(
                 f"Unsupported transform type {xfm['TransformType'][0]}"
             )
 

@@ -211,11 +211,11 @@ should be (0, 0, 0, 1), got %s."""
                         raise TypeError("Cannot load transform array '%s'" % filename)
                     matrix = matrix[0]
                 return cls(matrix, reference=reference)
-            except TransformFileError:
+            except (TransformFileError, FileNotFoundError):
                 continue
 
         raise TransformFileError(
-            f"Could not open <{filename}> (formats tried: {', '.join(fmtlist)}."
+            f"Could not open <{filename}> (formats tried: {', '.join(fmtlist)})."
         )
 
     def __repr__(self):
@@ -468,11 +468,11 @@ def load(filename, fmt=None, reference=None, moving=None):
 
     Examples
     --------
-    >>> xfm = load(regress_dir / "affine-LAS.itk.tfm", fmt="itk")
+    >>> xfm = load(regress_dir / "affine-LAS.itk.tfm")
     >>> isinstance(xfm, Affine)
     True
 
-    >>> xfm = load(regress_dir / "itktflist.tfm", fmt="itk")
+    >>> xfm = load(regress_dir / "itktflist.tfm")
     >>> isinstance(xfm, LinearTransformsMapping)
     True
 
