@@ -342,16 +342,15 @@ class ITKCompositeH5:
                 directions = _fixed[9:].astype("float").reshape((3, 3))
                 affine = from_matvec(directions * zooms, offset)
                 field = np.asanyarray(xfm[f"{typo_fallback}Parameters"]).reshape(
-                    tuple(shape + [1, -1])
+                    (*shape, 1, -1)
                 )
+                field[..., (0, 1)] *= -1.0
                 hdr = Nifti1Header()
                 hdr.set_intent("vector")
                 hdr.set_data_dtype("float")
 
                 xfm_list.append(
-                    ITKDisplacementsField.from_image(
-                        Nifti1Image(field.astype("float"), affine, hdr)
-                    )
+                    Nifti1Image(field.astype("float"), LPS @ affine @ LPS, hdr)
                 )
                 continue
 
