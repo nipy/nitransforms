@@ -337,7 +337,7 @@ class ITKCompositeH5:
             if xfm["TransformType"][0].startswith(b"DisplacementFieldTransform"):
                 _fixed = np.asanyarray(xfm[f"{typo_fallback}FixedParameters"])
                 shape = _fixed[:3].astype("uint16").tolist()
-                offset = _fixed[3:6].astype("uint16")
+                offset = _fixed[3:6].astype("float")
                 zooms = _fixed[6:9].astype("float")
                 directions = _fixed[9:].astype("float").reshape((3, 3))
                 affine = from_matvec(directions * zooms, offset)
