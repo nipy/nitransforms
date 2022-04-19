@@ -231,7 +231,7 @@ nbsphinx_prolog = """
 
     <div class="admonition note">
       This page was generated from
-      <a class="reference external" href="https://github.com/poldracklab/nitransforms/blob/master\
+      <a class="reference external" href="https://github.com/nipy/nitransforms/blob/master\
 /{{ docname|e }}">{{ docname|e }}</a>.
       <script>
         if (document.location.host) {
