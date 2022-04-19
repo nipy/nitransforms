@@ -8,7 +8,7 @@ within your Python distribution with::
 Alternatively, you can install the bleeding-edge version of the software
 directly from the GitHub repo with::
 
-  python -m pip install git+https://github.com/poldracklab/nitransforms.git@master
+  python -m pip install git+https://github.com/nipy/nitransforms.git@master
 
 To verify the installation, you can run the following command::
 
@@ -21,7 +21,7 @@ Developers
 Advanced users and developers who plan to contribute with bugfixes, documentation,
 etc. can first clone our Git repository::
 
-  git clone https://github.com/poldracklab/nitransforms.git
+  git clone https://github.com/nipy/nitransforms.git
 
 
 and install the tool in *editable* mode::

@@ -11,4 +11,4 @@ These guidelines are designed to make it as easy as possible to get
 involved. If you have any questions that aren’t discussed in our
 documentation, or it’s difficult to find what you’re looking for, please
 let us know by opening an
-`issue <https://github.com/poldracklab/fmriprep/issues>`__!
+`issue <https://github.com/nipy/nitransforms/issues>`__!

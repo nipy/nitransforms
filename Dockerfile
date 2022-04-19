@@ -154,6 +154,6 @@ ARG VCS_REF
 ARG VERSION
 LABEL org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.name="nitransforms" \
-      org.label-schema.vcs-url="https://github.com/poldracklab/nitransforms" \
+      org.label-schema.vcs-url="https://github.com/nipy/nitransforms" \
       org.label-schema.version=$VERSION \
       org.label-schema.schema-version="1.0"

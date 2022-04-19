@@ -8,20 +8,20 @@ A development repo for `nipy/nibabel#656 <https://github.com/nipy/nibabel/pull/6
   :target: https://pypi.python.org/pypi/nitransforms/
   :alt: Latest Version
 
-.. image:: https://codecov.io/gh/poldracklab/nitransforms/branch/master/graph/badge.svg
-  :target: https://codecov.io/gh/poldracklab/nitransforms
+.. image:: https://codecov.io/gh/nipy/nitransforms/branch/master/graph/badge.svg
+  :target: https://codecov.io/gh/nipy/nitransforms
 
-.. image:: https://circleci.com/gh/poldracklab/nitransforms.svg?style=svg
-    :target: https://circleci.com/gh/poldracklab/nitransforms
+.. image:: https://circleci.com/gh/nipy/nitransforms.svg?style=svg
+    :target: https://circleci.com/gh/nipy/nitransforms
 
-.. image:: https://github.com/poldracklab/nitransforms/actions/workflows/travis.yml/badge.svg
-    :target: https://github.com/poldracklab/nitransforms/actions
+.. image:: https://github.com/nipy/nitransforms/actions/workflows/travis.yml/badge.svg
+    :target: https://github.com/nipy/nitransforms/actions
 
 .. image:: https://img.shields.io/badge/doi-10.31219%2Fosf.io%2F8aq7b-blue.svg
     :target: https://doi.org/10.31219/osf.io/8aq7b
 
 .. image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/poldracklab/nitransforms/master?filepath=docs%2Fnotebooks%2F
+    :target: https://mybinder.org/v2/gh/nipy/nitransforms/master?filepath=docs%2Fnotebooks%2F
 
 About
 -----

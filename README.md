@@ -1,10 +1,10 @@
 # NiTransforms
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03459/status.svg)](https://doi.org/10.21105/joss.03459)
 [![ISBI2020](https://img.shields.io/badge/doi-10.31219%2Fosf.io%2F8aq7b-blue.svg)](https://doi.org/10.31219/osf.io/8aq7b)
-[![Deps & CI](https://github.com/poldracklab/nitransforms/actions/workflows/travis.yml/badge.svg)](https://github.com/poldracklab/nitransforms/actions/workflows/travis.yml)
-[![CircleCI](https://circleci.com/gh/poldracklab/nitransforms.svg?style=svg)](https://circleci.com/gh/poldracklab/nitransforms)
-[![codecov](https://codecov.io/gh/poldracklab/nitransforms/branch/master/graph/badge.svg)](https://codecov.io/gh/poldracklab/nitransforms)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/poldracklab/nitransforms/master?filepath=docs%2Fnotebooks%2F)
+[![Deps & CI](https://github.com/nipy/nitransforms/actions/workflows/travis.yml/badge.svg)](https://github.com/nipy/nitransforms/actions/workflows/travis.yml)
+[![CircleCI](https://circleci.com/gh/nipy/nitransforms.svg?style=svg)](https://circleci.com/gh/nipy/nitransforms)
+[![codecov](https://codecov.io/gh/nipy/nitransforms/branch/master/graph/badge.svg)](https://codecov.io/gh/nipy/nitransforms)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/nipy/nitransforms/master?filepath=docs%2Fnotebooks%2F)
 [![Docs](https://readthedocs.org/projects/nitransforms/badge/?version=latest)](http://nitransforms.readthedocs.io/en/latest/?badge=latest)
 
 A development repo for [nipy/nibabel#656](https://github.com/nipy/nibabel/pull/656)

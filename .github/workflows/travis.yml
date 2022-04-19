@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build-linux:
-    if: "!contains(github.event.head_commit.message, '[skip ci]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != 'poldracklab/nitransforms'))"
+    if: "!contains(github.event.head_commit.message, '[skip ci]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != 'nipy/nitransforms'))"
     runs-on: ubuntu-latest
     env:
       TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests

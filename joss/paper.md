@@ -75,7 +75,7 @@ An example of image fusion application would be the alignment of functional data
 Therefore, "applying a transform" entails two operations (\autoref{fig:resampling}): first, transforming the coordinates of the samples in the reference image $R$ to find their mapping $\vec{x}'$ on $M$ via $T\{\cdot\}$, and second an interpolation step, as $\vec{x}'$ will likely fall off-the-grid of the moving image $M$.
 These two operations are confusing because, while the spatial transformation projects from $R$ to $M$, the data flows in reversed way after the interpolation of the values of $M$ at the mapped coordinates $\vec{x}'$.
 
-![Resampling a 3D image via a spatial transform to fuse the information of one into another image. \label{fig:resampling}](https://github.com/poldracklab/nitransforms/raw/master/docs/_static/figure1-joss.png)
+![Resampling a 3D image via a spatial transform to fuse the information of one into another image. \label{fig:resampling}](https://github.com/nipy/nitransforms/raw/master/docs/_static/figure1-joss.png)
 
 ## Software Architecture
 
