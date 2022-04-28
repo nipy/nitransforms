@@ -11,7 +11,8 @@ import h5py
 import nibabel as nb
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
-from .. import linear as nitl
+from nitransforms import linear as nitl
+from nitransforms import io
 from .utils import assert_affines_by_filename
 
 RMSE_TOL = 0.1
@@ -53,6 +54,18 @@ def test_linear_valueerror():
         nitl.Affine(np.ones((4, 4)))
 
 
+def test_linear_load_unsupported(data_path):
+    """Exercise loading transform without I/O implementation."""
+    with pytest.raises(TypeError):
+        nitl.load(data_path / "itktflist2.tfm", fmt="X5")
+
+
+def test_linear_load_mistaken(data_path):
+    """Exercise loading transform without I/O implementation."""
+    with pytest.raises(io.TransformFileError):
+        nitl.load(data_path / "itktflist2.tfm", fmt="afni")
+
+
 def test_loadsave_itk(tmp_path, data_path, testdata_path):
     """Test idempotency."""
     ref_file = testdata_path / "someones_anatomy.nii.gz"
@@ -72,9 +85,13 @@ def test_loadsave_itk(tmp_path, data_path, testdata_path):
     )
 
 
+@pytest.mark.parametrize("autofmt", (False, True))
 @pytest.mark.parametrize("fmt", ["itk", "fsl", "afni", "lta"])
-def test_loadsave(tmp_path, data_path, testdata_path, fmt):
+def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
     """Test idempotency."""
+    supplied_fmt = None if autofmt else fmt
+
+    # Load reference transform
     ref_file = testdata_path / "someones_anatomy.nii.gz"
     xfm = nitl.load(data_path / "itktflist2.tfm", fmt="itk")
     xfm.reference = ref_file
@@ -84,33 +101,33 @@ def test_loadsave(tmp_path, data_path, testdata_path, fmt):
 
     if fmt == "fsl":
         # FSL should not read a transform without reference
-        with pytest.raises(ValueError):
-            nitl.load(fname, fmt=fmt)
-            nitl.load(fname, fmt=fmt, moving=ref_file)
+        with pytest.raises(io.TransformIOError):
+            nitl.load(fname, fmt=supplied_fmt)
+            nitl.load(fname, fmt=supplied_fmt, moving=ref_file)
 
         with pytest.warns(UserWarning):
             assert np.allclose(
                 xfm.matrix,
-                nitl.load(fname, fmt=fmt, reference=ref_file).matrix,
+                nitl.load(fname, fmt=supplied_fmt, reference=ref_file).matrix,
             )
 
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
         )
     else:
-        assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+        assert xfm == nitl.load(fname, fmt=supplied_fmt, reference=ref_file)
 
     xfm.to_filename(fname, fmt=fmt, moving=ref_file)
 
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
-        assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+        assert xfm == nitl.load(fname, fmt=supplied_fmt, reference=ref_file)
 
     ref_file = testdata_path / "someones_anatomy.nii.gz"
     xfm = nitl.load(data_path / "affine-LAS.itk.tfm", fmt="itk")
@@ -120,21 +137,21 @@ def test_loadsave(tmp_path, data_path, testdata_path, fmt):
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
-        assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+        assert xfm == nitl.load(fname, fmt=supplied_fmt, reference=ref_file)
 
     xfm.to_filename(fname, fmt=fmt, moving=ref_file)
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
-        assert xfm == nitl.load(fname, fmt=fmt, reference=ref_file)
+        assert xfm == nitl.load(fname, fmt=supplied_fmt, reference=ref_file)
 
 
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
@@ -152,7 +169,7 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     xfm = (
         nitl.Affine(T) if (sw_tool, image_orientation) != ("afni", "oblique") else
         # AFNI is special when moving or reference are oblique - let io do the magic
-        nitl.Affine(nitl.io.afni.AFNILinearTransform.from_ras(T).to_ras(
+        nitl.Affine(io.afni.AFNILinearTransform.from_ras(T).to_ras(
             reference=img,
             moving=img,
         ))
@@ -199,7 +216,7 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     xfm_fname = "M.%s%s" % (sw_tool, ext)
     # Change reference dataset for AFNI & oblique
     if (sw_tool, image_orientation) == ("afni", "oblique"):
-        nitl.io.afni.AFNILinearTransform.from_ras(
+        io.afni.AFNILinearTransform.from_ras(
             T,
             moving=img,
             reference=img,

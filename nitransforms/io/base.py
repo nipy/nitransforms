@@ -6,8 +6,12 @@ from nibabel import load as loadimg
 from ..patched import LabeledWrapStruct
 
 
-class TransformFileError(Exception):
-    """A custom exception for transform files."""
+class TransformIOError(IOError):
+    """General I/O exception while reading/writing transforms."""
+
+
+class TransformFileError(TransformIOError):
+    """Specific I/O exception when a file does not meet the expected format."""
 
 
 class StringBasedStruct(LabeledWrapStruct):

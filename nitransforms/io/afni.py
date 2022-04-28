@@ -95,12 +95,16 @@ class AFNILinearTransform(LinearParameters):
         if not lines:
             raise TransformFileError
 
-        parameters = np.vstack(
-            (
-                np.genfromtxt([lines[0].encode()], dtype="f8").reshape((3, 4)),
-                (0.0, 0.0, 0.0, 1.0),
+        try:
+            parameters = np.vstack(
+                (
+                    np.genfromtxt([lines[0].encode()], dtype="f8").reshape((3, 4)),
+                    (0.0, 0.0, 0.0, 1.0),
+                )
             )
-        )
+        except ValueError as e:
+            raise TransformFileError from e
+
         sa["parameters"] = parameters
         return tf
 

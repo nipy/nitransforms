@@ -10,6 +10,7 @@ from .base import (
     BaseLinearTransformList,
     LinearParameters,
     DisplacementsField,
+    TransformIOError,
     TransformFileError,
     _ensure_image,
 )
@@ -40,7 +41,7 @@ class FSLLinearTransform(LinearParameters):
             moving = reference
 
         if reference is None:
-            raise ValueError("Cannot build FSL linear transform without a reference")
+            raise TransformIOError("Cannot build FSL linear transform without a reference")
 
         reference = _ensure_image(reference)
         moving = _ensure_image(moving)
@@ -77,7 +78,7 @@ class FSLLinearTransform(LinearParameters):
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         if reference is None:
-            raise ValueError("Cannot build FSL linear transform without a reference")
+            raise TransformIOError("Cannot build FSL linear transform without a reference")
 
         if moving is None:
             warnings.warn(
