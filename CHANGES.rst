@@ -1,3 +1,13 @@
+22.0.1 (April 28, 2022)
+=======================
+A patch release after migration into the NiPy organization.
+This release is aliased as 21.0.1 to flexibilize dependency resolution.
+
+  * FIX: Orientation of displacements field and header when reading ITK's h5 (#162)
+  * FIX: Wrong datatype used for offset when reading ITK's h5 fields. (#161)
+  * ENH: Guess open linear transform formats (#160)
+  * MAINT: Conclude migration ``poldracklab`` -> ``nipy`` (#163)
+
 22.0.0 (February 28, 2022)
 ==========================
 The first stable release of *NiTransforms* in 2022.
