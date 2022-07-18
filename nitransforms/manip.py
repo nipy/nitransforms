@@ -74,8 +74,8 @@ class TransformChain(TransformBase):
     @transforms.setter
     def transforms(self, value):
         self._transforms = _as_chain(value)
-        if self.transforms[-1].reference:
-            self.reference = self.transforms[-1].reference
+        if self.transforms[0].reference:
+            self.reference = self.transforms[0].reference
 
     def append(self, x):
         """
