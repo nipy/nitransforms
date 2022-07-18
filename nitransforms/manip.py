@@ -8,6 +8,7 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
 from collections.abc import Iterable
+import numpy as np
 
 from .base import (
     TransformBase,
@@ -139,10 +140,19 @@ class TransformChain(TransformBase):
 
         return x
 
-    def asaffine(self):
-        """Combine a succession of linear transforms into one."""
-        retval = self.transforms[-1]
-        for xfm in self.transforms[:-1][::-1]:
+    def asaffine(self, indices=None):
+        """
+        Combine a succession of linear transforms into one.
+
+        Parameters
+        ----------
+        indices : :obj:`numpy.array_like`
+            The indices of the values to extract.
+
+        """
+        affines = self.transforms if indices is None else np.take(self.transforms, indices)
+        retval = affines[0]
+        for xfm in affines[1:]:
             retval @= xfm
         return retval
 
