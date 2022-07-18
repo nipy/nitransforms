@@ -144,6 +144,18 @@ class TransformChain(TransformBase):
         """
         Combine a succession of linear transforms into one.
 
+        Example
+        ------
+        >>> chain = TransformChain(transforms=[
+        ...     Affine.from_matvec(vec=(2, -10, 3)),
+        ...     Affine.from_matvec(vec=(-2, 10, -3)),
+        ... ])
+        >>> chain.asaffine()
+        array([[1., 0., 0., 0.],
+               [0., 1., 0., 0.],
+               [0., 0., 1., 0.],
+               [0., 0., 0., 1.]])
+
         Parameters
         ----------
         indices : :obj:`numpy.array_like`

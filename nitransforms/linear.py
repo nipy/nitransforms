@@ -13,6 +13,7 @@ from pathlib import Path
 from scipy import ndimage as ndi
 
 from nibabel.loadsave import load as _nbload
+from nibabel.affines import from_matvec
 
 from nitransforms.base import (
     ImageGrid,
@@ -217,6 +218,24 @@ should be (0, 0, 0, 1), got %s."""
         raise TransformFileError(
             f"Could not open <{filename}> (formats tried: {', '.join(fmtlist)})."
         )
+
+    @classmethod
+    def from_matvec(cls, mat=None, vec=None, reference=None):
+        """
+        Create an affine from a matrix and translation pair.
+
+        Example
+        -------
+        >>> Affine.from_matvec(vec=(4, 0, 0))  # doctest: +NORMALIZE_WHITESPACE
+        array([[1., 0., 0., 4.],
+               [0., 1., 0., 0.],
+               [0., 0., 1., 0.],
+               [0., 0., 0., 1.]])
+
+        """
+        mat = mat if mat is not None else np.eye(3)
+        vec = vec if vec is not None else np.zeros((3,))
+        return cls(from_matvec(mat, vector=vec), reference=reference)
 
     def __repr__(self):
         """
