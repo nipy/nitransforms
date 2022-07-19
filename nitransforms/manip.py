@@ -15,7 +15,7 @@ from .base import (
     TransformError,
 )
 from .linear import Affine
-from .nonlinear import DisplacementsFieldTransform
+from .nonlinear import DenseFieldTransform
 
 
 class TransformChain(TransformBase):
@@ -197,7 +197,7 @@ class TransformChain(TransformBase):
                 if isinstance(xfmobj, itk.ITKLinearTransform):
                     retval.insert(0, Affine(xfmobj.to_ras(), reference=reference))
                 else:
-                    retval.insert(0, DisplacementsFieldTransform(xfmobj))
+                    retval.insert(0, DenseFieldTransform(xfmobj))
 
             return TransformChain(retval)
 

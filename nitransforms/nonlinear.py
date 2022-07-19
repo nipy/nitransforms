@@ -20,31 +20,43 @@ from nitransforms.base import (
     ImageGrid,
     SpatialReference,
     _as_homogeneous,
-    EQUALITY_TOL,
 )
 
 
-class DeformationFieldTransform(TransformBase):
-    """Represents a dense field of deformed locations (corresponding to each voxel)."""
+class DenseFieldTransform(TransformBase):
+    """Represents dense field (voxel-wise) transforms."""
 
-    __slots__ = ["_field"]
+    __slots__ = ("_field", "_displacements")
 
-    def __init__(self, field, reference=None):
+    def __init__(self, field=None, displacements=True, reference=None):
         """
-        Create a dense deformation field transform.
+        Create a dense field transform.
+
+        Converting to a field of deformations is straightforward by just adding the corresponding
+        displacement to the :math:`(x, y, z)` coordinates of each voxel.
+        Numerically, deformation fields are less susceptible to rounding errors
+        than displacements fields.
+        SPM generally prefers deformations for that reason.
 
         Example
         -------
-        >>> DeformationFieldTransform(test_dir / "someones_displacement_field.nii.gz")
-        <DeformationFieldTransform[3D] (57, 67, 56)>
+        >>> DenseFieldTransform(test_dir / "someones_displacement_field.nii.gz")
+        <DenseFieldTransform[3D] (57, 67, 56)>
 
         """
+        if field is None and reference is None:
+            raise TransformError("DenseFieldTransforms require a spatial reference")
+
         super().__init__()
 
-        field = _ensure_image(field)
-        self._field = np.squeeze(
-            np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field
-        )
+        if field is not None:
+            field = _ensure_image(field)
+            self._field = np.squeeze(
+                np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field
+            )
+        else:
+            self._field = np.zeros((*reference.shape, reference.ndim), dtype="float32")
+            displacements = True
 
         try:
             self.reference = ImageGrid(
@@ -63,6 +75,12 @@ class DeformationFieldTransform(TransformBase):
                 "The number of components of the displacements (%d) does not match "
                 "the number of dimensions (%d)" % (self._field.shape[-1], ndim)
             )
+
+        if displacements:
+            self._displacements = self._field
+            # Convert from displacements to deformations fields
+            # (just add the origin to the displacements vector)
+            self._field += self.reference.ndcoords.T.reshape(self._field.shape)
 
     def __repr__(self):
         """Beautify the python representation."""
@@ -93,12 +111,22 @@ class DeformationFieldTransform(TransformBase):
 
         Examples
         --------
-        >>> xfm = DeformationFieldTransform(test_dir / "someones_displacement_field.nii.gz")
+        >>> xfm = DenseFieldTransform(
+        ...     test_dir / "someones_displacement_field.nii.gz",
+        ...     displacements=False,
+        ... )
         >>> xfm.map([-6.5, -36., -19.5]).tolist()
         [[0.0, -0.47516798973083496, 0.0]]
 
         >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
         [[0.0, -0.47516798973083496, 0.0], [0.0, -0.538356602191925, 0.0]]
+
+        >>> xfm = DenseFieldTransform(
+        ...     test_dir / "someones_displacement_field.nii.gz",
+        ...     displacements=True,
+        ... )
+        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
+        [[-6.5, -36.47516632080078, -19.5], [-1.0, -42.03835678100586, -11.25]]
 
         """
 
@@ -117,16 +145,24 @@ class DeformationFieldTransform(TransformBase):
 
         Examples
         --------
-        >>> xfm = DeformationFieldTransform(test_dir / "someones_displacement_field.nii.gz")
-        >>> xfm2 = xfm @ TransformBase()
-        >>> xfm == xfm2
+        >>> deff = DenseFieldTransform(
+        ...     test_dir / "someones_displacement_field.nii.gz",
+        ...     displacements=False,
+        ... )
+        >>> deff2 = deff @ TransformBase()
+        >>> deff == deff2
+        True
+
+        >>> disp = DenseFieldTransform(test_dir / "someones_displacement_field.nii.gz")
+        >>> disp2 = disp @ TransformBase()
+        >>> disp == disp2
         True
 
         """
         retval = b.map(
             self._field.reshape((-1, self._field.shape[-1]))
         ).reshape(self._field.shape)
-        return DeformationFieldTransform(retval, reference=self.reference)
+        return DenseFieldTransform(retval, displacements=False, reference=self.reference)
 
     def __eq__(self, other):
         """
@@ -134,8 +170,8 @@ class DeformationFieldTransform(TransformBase):
 
         Examples
         --------
-        >>> xfm1 = DeformationFieldTransform(test_dir / "someones_displacement_field.nii.gz")
-        >>> xfm2 = DeformationFieldTransform(test_dir / "someones_displacement_field.nii.gz")
+        >>> xfm1 = DenseFieldTransform(test_dir / "someones_displacement_field.nii.gz")
+        >>> xfm2 = DenseFieldTransform(test_dir / "someones_displacement_field.nii.gz")
         >>> xfm1 == xfm2
         True
 
@@ -144,41 +180,6 @@ class DeformationFieldTransform(TransformBase):
         if _eq and self._reference != other._reference:
             warnings.warn("Fields are equal, but references do not match.")
         return _eq
-
-
-class DisplacementsFieldTransform(DeformationFieldTransform):
-    """
-    Represents a dense field of displacements (one vector per voxel).
-
-    Converting to a field of deformations is straightforward by just adding the corresponding
-    displacement to the :math:`(x, y, z)` coordinates of each voxel.
-    Numerically, deformation fields are less susceptible to rounding errors
-    than displacements fields.
-    SPM generally prefers deformations for that reason.
-
-    """
-
-    __slots__ = ["_displacements"]
-
-    def __init__(self, field, reference=None):
-        """
-        Create a transform supported by a field of voxel-wise displacements.
-
-        Example
-        -------
-        >>> xfm = DisplacementsFieldTransform(test_dir / "someones_displacement_field.nii.gz")
-        >>> xfm
-        <DisplacementsFieldTransform[3D] (57, 67, 56)>
-
-        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
-        [[-6.5, -36.47516632080078, -19.5], [-1.0, -42.03835678100586, -11.25]]
-
-        """
-        super().__init__(field, reference=reference)
-        self._displacements = self._field
-        # Convert from displacements to deformations fields
-        # (just add the origin to the displacements vector)
-        self._field += self.reference.ndcoords.T.reshape(self._field.shape)
 
     @classmethod
     def from_filename(cls, filename, fmt="X5"):
@@ -193,7 +194,7 @@ class DisplacementsFieldTransform(DeformationFieldTransform):
         return cls(_factory[fmt].from_filename(filename))
 
 
-load = DisplacementsFieldTransform.from_filename
+load = DenseFieldTransform.from_filename
 
 
 class BSplineFieldTransform(TransformBase):
@@ -239,8 +240,9 @@ class BSplineFieldTransform(TransformBase):
             #  1 x Nvox :                          (1 x K) @ (K x Nvox)
             field[:, d] = self._coeffs[..., d].reshape(-1) @ self._weights
 
-        return DisplacementsFieldTransform(
-            field.astype(dtype).reshape(*_ref.shape, -1), reference=_ref)
+        return DenseFieldTransform(
+            field.astype(dtype).reshape(*_ref.shape, -1), reference=_ref
+        )
 
     def apply(
         self,

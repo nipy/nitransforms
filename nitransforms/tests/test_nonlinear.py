@@ -12,7 +12,7 @@ from nitransforms.base import TransformError
 from nitransforms.io.base import TransformFileError
 from nitransforms.nonlinear import (
     BSplineFieldTransform,
-    DisplacementsFieldTransform,
+    DenseFieldTransform,
     load as nlload,
 )
 from ..io.itk import ITKDisplacementsField
@@ -45,7 +45,7 @@ def test_itk_disp_load(size):
 def test_displacements_bad_sizes(size):
     """Checks field sizes."""
     with pytest.raises(TransformError):
-        DisplacementsFieldTransform(nb.Nifti1Image(np.zeros(size), np.eye(4), None))
+        DenseFieldTransform(nb.Nifti1Image(np.zeros(size), np.eye(4), None))
 
 
 def test_itk_disp_load_intent():
@@ -59,15 +59,15 @@ def test_itk_disp_load_intent():
 
 
 def test_displacements_init():
-    DisplacementsFieldTransform(
+    DenseFieldTransform(
         np.zeros((10, 10, 10, 3)),
         reference=nb.Nifti1Image(np.zeros((10, 10, 10, 3)), np.eye(4), None),
     )
 
     with pytest.raises(TransformError):
-        DisplacementsFieldTransform(np.zeros((10, 10, 10, 3)))
+        DenseFieldTransform(np.zeros((10, 10, 10, 3)))
     with pytest.raises(TransformError):
-        DisplacementsFieldTransform(
+        DenseFieldTransform(
             np.zeros((10, 10, 10, 3)),
             reference=np.zeros((10, 10, 10, 3)),
         )
@@ -237,7 +237,7 @@ def test_bspline(tmp_path, testdata_path):
     bs_name = testdata_path / "someones_bspline_coefficients.nii.gz"
 
     bsplxfm = BSplineFieldTransform(bs_name, reference=img_name)
-    dispxfm = DisplacementsFieldTransform(disp_name)
+    dispxfm = DenseFieldTransform(disp_name)
 
     out_disp = dispxfm.apply(img_name)
     out_bspl = bsplxfm.apply(img_name)

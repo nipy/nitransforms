@@ -18,7 +18,7 @@ Geometric transforms.
 """
 from . import linear, manip, nonlinear
 from .linear import Affine, LinearTransformsMapping
-from .nonlinear import DisplacementsFieldTransform
+from .nonlinear import DenseFieldTransform
 from .manip import TransformChain
 
 try:
@@ -42,7 +42,7 @@ __all__ = [
     "nonlinear",
     "Affine",
     "LinearTransformsMapping",
-    "DisplacementsFieldTransform",
+    "DenseFieldTransform",
     "TransformChain",
     "__copyright__",
     "__packagename__",
