@@ -69,14 +69,14 @@ def test_collapse_affines(tmp_path, data_path, ext0, ext1, ext2):
     chain = TransformChain(
         [
             Affine.from_filename(
-                data_path / "regressions" / f"from-scanner_to-bold_mode-image.{ext1}",
-                fmt=f"{FMT[ext1]}",
-            ),
-            Affine.from_filename(
                 data_path
                 / "regressions"
                 / f"from-fsnative_to-scanner_mode-image.{ext0}",
                 fmt=f"{FMT[ext0]}",
+            ),
+            Affine.from_filename(
+                data_path / "regressions" / f"from-scanner_to-bold_mode-image.{ext1}",
+                fmt=f"{FMT[ext1]}",
             ),
         ]
     )

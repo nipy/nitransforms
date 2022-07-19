@@ -136,7 +136,7 @@ class TransformChain(TransformBase):
             transforms = list(reversed(self.transforms))
 
         for xfm in transforms:
-            x = xfm(x, inverse=inverse)
+            x = xfm.map(x, inverse=inverse)
 
         return x
 
@@ -156,6 +156,22 @@ class TransformChain(TransformBase):
                [0., 0., 1., 0.],
                [0., 0., 0., 1.]])
 
+        >>> chain = TransformChain(transforms=[
+        ...     Affine.from_matvec(vec=(1, 2, 3)),
+        ...     Affine.from_matvec(mat=[[0, 1, 0], [0, 0, 1], [1, 0, 0]]),
+        ... ])
+        >>> chain.asaffine()
+        array([[0., 1., 0., 2.],
+               [0., 0., 1., 3.],
+               [1., 0., 0., 1.],
+               [0., 0., 0., 1.]])
+
+        >>> np.allclose(
+        ...     chain.map((4, -2, 1)),
+        ...     chain.asaffine().map((4, -2, 1)),
+        ... )
+        True
+
         Parameters
         ----------
         indices : :obj:`numpy.array_like`
@@ -165,7 +181,7 @@ class TransformChain(TransformBase):
         affines = self.transforms if indices is None else np.take(self.transforms, indices)
         retval = affines[0]
         for xfm in affines[1:]:
-            retval @= xfm
+            retval = xfm @ retval
         return retval
 
     @classmethod
