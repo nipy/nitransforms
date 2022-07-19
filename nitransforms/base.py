@@ -303,6 +303,10 @@ class TransformBase:
 
         return resampled
 
+    def __matmul__(self, b):
+        """Compose with a transform on the right."""
+        return b
+
     def map(self, x, inverse=False):
         r"""
         Apply :math:`y = f(x)`.
