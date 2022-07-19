@@ -59,11 +59,19 @@ def test_itk_disp_load_intent():
 
 
 def test_displacements_init():
-    DenseFieldTransform(
+    identity1 = DenseFieldTransform(
         np.zeros((10, 10, 10, 3)),
         reference=nb.Nifti1Image(np.zeros((10, 10, 10, 3)), np.eye(4), None),
     )
+    identity2 = DenseFieldTransform(
+        reference=nb.Nifti1Image(np.zeros((10, 10, 10)), np.eye(4), None),
+    )
 
+    assert np.array_equal(identity1._field, identity2._field)
+    assert np.array_equal(identity1._displacements, identity2._displacements)
+
+    with pytest.raises(TransformError):
+        DenseFieldTransform()
     with pytest.raises(TransformError):
         DenseFieldTransform(np.zeros((10, 10, 10, 3)))
     with pytest.raises(TransformError):
