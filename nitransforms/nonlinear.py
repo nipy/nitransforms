@@ -21,6 +21,7 @@ from nitransforms.base import (
     SpatialReference,
     _as_homogeneous,
 )
+from scipy.ndimage import map_coordinates
 
 
 class DenseFieldTransform(TransformBase):
@@ -145,10 +146,19 @@ class DenseFieldTransform(TransformBase):
             raise NotImplementedError
         ijk = self.reference.index(x)
         indexes = np.round(ijk).astype("int")
-        if np.any(np.abs(ijk - indexes) > 0.05):
-            warnings.warn("Some coordinates are off-grid of the field.")
-        indexes = tuple(tuple(i) for i in indexes.T)
-        return self._field[indexes]
+
+        if np.all(np.abs(ijk - indexes) < 1e-3):
+            indexes = tuple(tuple(i) for i in indexes.T)
+            return self._field[indexes]
+
+        return map_coordinates(
+            self._field,
+            ijk,
+            order=3,
+            mode="constant",
+            cval=np.zeros(self.reference.ndim),
+            prefilter=True,
+        )
 
     def __matmul__(self, b):
         """
