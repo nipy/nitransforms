@@ -140,7 +140,7 @@ class DeformationFieldTransform(TransformBase):
         True
 
         """
-        _eq = np.allclose(self._field, other._field, rtol=EQUALITY_TOL)
+        _eq = np.array_equal(self._field, other._field)
         if _eq and self._reference != other._reference:
             warnings.warn("Fields are equal, but references do not match.")
         return _eq
