@@ -26,9 +26,9 @@ from nitransforms.base import (
 class DenseFieldTransform(TransformBase):
     """Represents dense field (voxel-wise) transforms."""
 
-    __slots__ = ("_field", "_displacements")
+    __slots__ = ("_field", "_deltas")
 
-    def __init__(self, field=None, displacements=True, reference=None):
+    def __init__(self, field=None, is_deltas=True, reference=None):
         """
         Create a dense field transform.
 
@@ -37,6 +37,17 @@ class DenseFieldTransform(TransformBase):
         Numerically, deformation fields are less susceptible to rounding errors
         than displacements fields.
         SPM generally prefers deformations for that reason.
+
+        Parameters
+        ----------
+        field : :obj:`numpy.array_like` or :obj:`nibabel.SpatialImage`
+            The field of deformations or displacements (*deltas*). If given as a data array,
+            then the reference **must** be given.
+        is_deltas : :obj:`bool`
+            Whether this is a displacements (deltas) field (default), or deformations.
+        reference : :obj:`ImageGrid`
+            Defines the domain of the transform. If not provided, the domain is defined from
+            the ``field`` input.
 
         Example
         -------
@@ -56,7 +67,7 @@ class DenseFieldTransform(TransformBase):
             )
         else:
             self._field = np.zeros((*reference.shape, reference.ndim), dtype="float32")
-            displacements = True
+            is_deltas = True
 
         try:
             self.reference = ImageGrid(
@@ -72,14 +83,14 @@ class DenseFieldTransform(TransformBase):
         ndim = self._field.ndim - 1
         if self._field.shape[-1] != ndim:
             raise TransformError(
-                "The number of components of the displacements (%d) does not match "
+                "The number of components of the field (%d) does not match "
                 "the number of dimensions (%d)" % (self._field.shape[-1], ndim)
             )
 
-        if displacements:
-            self._displacements = self._field
-            # Convert from displacements to deformations fields
-            # (just add the origin to the displacements vector)
+        if is_deltas:
+            self._deltas = self._field
+            # Convert from displacements (deltas) to deformations fields
+            # (just add its origin to each delta vector)
             self._field += self.reference.ndcoords.T.reshape(self._field.shape)
 
     def __repr__(self):
@@ -91,29 +102,29 @@ class DenseFieldTransform(TransformBase):
         Apply the transformation to a list of physical coordinate points.
 
         .. math::
-            \mathbf{y} = \mathbf{x} + D(\mathbf{x}),
+            \mathbf{y} = \mathbf{x} + \Delta(\mathbf{x}),
             \label{eq:2}\tag{2}
 
-        where :math:`D(\mathbf{x})` is the value of the discrete field of displacements
-        :math:`D` interpolated at the location :math:`\mathbf{x}`.
+        where :math:`\Delta(\mathbf{x})` is the value of the discrete field of displacements
+        :math:`\Delta` interpolated at the location :math:`\mathbf{x}`.
 
         Parameters
         ----------
-        x : N x D numpy.ndarray
+        x : N x D :obj:`numpy.array_like`
             Input RAS+ coordinates (i.e., physical coordinates).
-        inverse : bool
+        inverse : :obj:`bool`
             If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
 
         Returns
         -------
-        y : N x D numpy.ndarray
+        y : N x D :obj:`numpy.array_like`
             Transformed (mapped) RAS+ coordinates (i.e., physical coordinates).
 
         Examples
         --------
         >>> xfm = DenseFieldTransform(
         ...     test_dir / "someones_displacement_field.nii.gz",
-        ...     displacements=False,
+        ...     is_deltas=False,
         ... )
         >>> xfm.map([-6.5, -36., -19.5]).tolist()
         [[0.0, -0.47516798973083496, 0.0]]
@@ -123,7 +134,7 @@ class DenseFieldTransform(TransformBase):
 
         >>> xfm = DenseFieldTransform(
         ...     test_dir / "someones_displacement_field.nii.gz",
-        ...     displacements=True,
+        ...     is_deltas=True,
         ... )
         >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
         [[-6.5, -36.47516632080078, -19.5], [-1.0, -42.03835678100586, -11.25]]
@@ -135,7 +146,7 @@ class DenseFieldTransform(TransformBase):
         ijk = self.reference.index(x)
         indexes = np.round(ijk).astype("int")
         if np.any(np.abs(ijk - indexes) > 0.05):
-            warnings.warn("Some coordinates are off-grid of the displacements field.")
+            warnings.warn("Some coordinates are off-grid of the field.")
         indexes = tuple(tuple(i) for i in indexes.T)
         return self._field[indexes]
 
@@ -147,7 +158,7 @@ class DenseFieldTransform(TransformBase):
         --------
         >>> deff = DenseFieldTransform(
         ...     test_dir / "someones_displacement_field.nii.gz",
-        ...     displacements=False,
+        ...     is_deltas=False,
         ... )
         >>> deff2 = deff @ TransformBase()
         >>> deff == deff2
@@ -162,7 +173,7 @@ class DenseFieldTransform(TransformBase):
         retval = b.map(
             self._field.reshape((-1, self._field.shape[-1]))
         ).reshape(self._field.shape)
-        return DenseFieldTransform(retval, displacements=False, reference=self.reference)
+        return DenseFieldTransform(retval, is_deltas=False, reference=self.reference)
 
     def __eq__(self, other):
         """

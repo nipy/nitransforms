@@ -68,7 +68,7 @@ def test_displacements_init():
     )
 
     assert np.array_equal(identity1._field, identity2._field)
-    assert np.array_equal(identity1._displacements, identity2._displacements)
+    assert np.array_equal(identity1._deltas, identity2._deltas)
 
     with pytest.raises(TransformError):
         DenseFieldTransform()
