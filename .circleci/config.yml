@@ -138,7 +138,7 @@ jobs:
           command: |
               mkdir -p /tmp/fslicense
               cd /tmp/fslicense
-              echo "cHJpbnRmICJrcnp5c3p0b2YuZ29yZ29sZXdza2lAZ21haWwuY29tXG41MTcyXG4gKkN2dW12RVYzelRmZ1xuRlM1Si8yYzFhZ2c0RVxuIiA+IGxpY2Vuc2UudHh0Cg==" | base64 -d | sh
+              echo "${FS_LICENSE_CONTENT}" | base64 -d > license.txt
       - run:
           name: Get codecov
           command: python -m pip install codecov
@@ -174,7 +174,10 @@ jobs:
 
   test_package:
     docker:
-      - image: circleci/python:3.7.4
+      - image: cimg/python:3.9
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PAT
     working_directory: /tmp/src/nitransforms
     steps:
       - checkout
@@ -224,6 +227,9 @@ jobs:
   deploy_pypi:
     docker:
       - image: circleci/python:3.7.4
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PAT
     working_directory: /tmp/src/nitransforms
     steps:
       - attach_workspace:
