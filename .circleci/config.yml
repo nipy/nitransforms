@@ -174,7 +174,7 @@ jobs:
 
   test_package:
     docker:
-      - image: circleci/python:3.7.4
+      - image: cimg/python:3.9
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PAT
