@@ -138,7 +138,7 @@ jobs:
           command: |
               mkdir -p /tmp/fslicense
               cd /tmp/fslicense
-              echo "${FS_LICENSE_CONTENT}" | base64 -d | sh
+              echo "${FS_LICENSE_CONTENT}" | base64 -d > license.txt
       - run:
           name: Get codecov
           command: python -m pip install codecov
