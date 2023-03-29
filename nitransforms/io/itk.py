@@ -2,6 +2,7 @@
 import warnings
 import numpy as np
 from scipy.io import loadmat as _read_mat, savemat as _save_mat
+from h5py import File as H5File
 from nibabel import Nifti1Header, Nifti1Image
 from nibabel.affines import from_matvec
 from .base import (
@@ -112,6 +113,9 @@ class ITKLinearTransform(LinearParameters):
         if str(filename).endswith(".mat"):
             with open(str(filename), "rb") as fileobj:
                 return cls.from_binary(fileobj)
+        elif str(filename).endswith(".h5"):
+            with H5File(str(filename)) as f:
+                return cls.from_h5obj(f)
 
         with open(str(filename)) as fileobj:
             return cls.from_string(fileobj.read())
@@ -121,6 +125,10 @@ class ITKLinearTransform(LinearParameters):
         """Read the struct from a file object."""
         if fileobj.name.endswith(".mat"):
             return cls.from_binary(fileobj)
+        elif fileobj.name.endswith(".h5"):
+            with H5File(fileobj) as f:
+                return cls.from_h5obj(f)
+
         return cls.from_string(fileobj.read())
 
     @classmethod
@@ -144,6 +152,11 @@ class ITKLinearTransform(LinearParameters):
         sa["parameters"] = parameters
         sa["offset"] = mdict["fixed"].flatten()
         return tf
+
+    @classmethod
+    def from_h5obj(cls, fileobj, check=True):
+        """Read the struct from a file object."""
+        raise NotImplementedError
 
     @classmethod
     def from_ras(cls, ras, index=0, moving=None, reference=None):
@@ -225,6 +238,9 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         if str(filename).endswith(".mat"):
             with open(str(filename), "rb") as f:
                 return cls.from_binary(f)
+        elif str(filename).endswith(".h5"):
+            with H5File(str(filename)) as f:
+                return cls.from_h5obj(f)
 
         with open(str(filename)) as f:
             string = f.read()
@@ -235,6 +251,10 @@ class ITKLinearTransformArray(BaseLinearTransformList):
         """Read the struct from a file object."""
         if fileobj.name.endswith(".mat"):
             return cls.from_binary(fileobj)
+
+        elif fileobj.name.endswith(".h5"):
+            with H5File(fileobj) as f:
+                return cls.from_h5obj(f)
         return cls.from_string(fileobj.read())
 
     @classmethod
@@ -272,6 +292,31 @@ class ITKLinearTransformArray(BaseLinearTransformList):
             _self.xforms.append(cls._inner_type.from_string("#%s" % xfm))
         return _self
 
+    @classmethod
+    def from_h5obj(cls, fileobj, check=True):
+        """Read the struct from a file object."""
+        h5group = fileobj["TransformGroup"]
+        typo_fallback = "Transform"
+        try:
+            h5group["1"][f"{typo_fallback}Parameters"]
+        except KeyError:
+            typo_fallback = "Tranform"
+
+        _self = cls()
+        _self.xforms = []
+        for xfm in list(h5group.values())[1:]:
+            if xfm["TransformType"][0].startswith(b"AffineTransform"):
+                _params = np.asanyarray(xfm[f"{typo_fallback}Parameters"])
+                _self.xforms.append(
+                    ITKLinearTransform(
+                        parameters=from_matvec(
+                            _params[:-3].reshape(3, 3), _params[-3:]
+                        ),
+                        offset=np.asanyarray(xfm[f"{typo_fallback}FixedParameters"]),
+                    )
+                )
+        return _self
+
 
 class ITKDisplacementsField(DisplacementsField):
     """A data structure representing displacements fields."""
@@ -304,8 +349,6 @@ class ITKCompositeH5:
     @classmethod
     def from_filename(cls, filename):
         """Read the struct from a file given its path."""
-        from h5py import File as H5File
-
         if not str(filename).endswith(".h5"):
             raise TransformFileError("Extension is not .h5")
 
