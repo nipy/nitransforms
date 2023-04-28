@@ -156,7 +156,23 @@ class ITKLinearTransform(LinearParameters):
     @classmethod
     def from_h5obj(cls, fileobj, check=True):
         """Read the struct from a file object."""
-        raise NotImplementedError
+
+        _xfm = ITKCompositeH5.from_h5obj(
+            fileobj,
+            check=check,
+            only_linear=True,
+        )
+
+        if not _xfm:
+            raise TransformIOError(
+                "Composite transform file does not contain at least one linear transform"
+            )
+        elif len(_xfm) > 1:
+            raise TransformIOError(
+                "Composite transform file contains more than one linear transform"
+            )
+
+        return _xfm[0]
 
     @classmethod
     def from_ras(cls, ras, index=0, moving=None, reference=None):
@@ -295,26 +311,13 @@ class ITKLinearTransformArray(BaseLinearTransformList):
     @classmethod
     def from_h5obj(cls, fileobj, check=True):
         """Read the struct from a file object."""
-        h5group = fileobj["TransformGroup"]
-        typo_fallback = "Transform"
-        try:
-            h5group["1"][f"{typo_fallback}Parameters"]
-        except KeyError:
-            typo_fallback = "Tranform"
 
         _self = cls()
-        _self.xforms = []
-        for xfm in list(h5group.values())[1:]:
-            if xfm["TransformType"][0].startswith(b"AffineTransform"):
-                _params = np.asanyarray(xfm[f"{typo_fallback}Parameters"])
-                _self.xforms.append(
-                    ITKLinearTransform(
-                        parameters=from_matvec(
-                            _params[:-3].reshape(3, 3), _params[-3:]
-                        ),
-                        offset=np.asanyarray(xfm[f"{typo_fallback}FixedParameters"]),
-                    )
-                )
+        _self.xforms = ITKCompositeH5.from_h5obj(
+            fileobj,
+            check=check,
+            only_linear=True,
+        )
         return _self
 
 
@@ -347,16 +350,16 @@ class ITKCompositeH5:
     """A data structure for ITK's HDF5 files."""
 
     @classmethod
-    def from_filename(cls, filename):
+    def from_filename(cls, filename, only_linear=False):
         """Read the struct from a file given its path."""
         if not str(filename).endswith(".h5"):
             raise TransformFileError("Extension is not .h5")
 
         with H5File(str(filename)) as f:
-            return cls.from_h5obj(f)
+            return cls.from_h5obj(f, only_linear=only_linear)
 
     @classmethod
-    def from_h5obj(cls, fileobj, check=True):
+    def from_h5obj(cls, fileobj, check=True, only_linear=False):
         """Read the struct from a file object."""
         xfm_list = []
         h5group = fileobj["TransformGroup"]
@@ -379,6 +382,8 @@ class ITKCompositeH5:
                 )
                 continue
             if xfm["TransformType"][0].startswith(b"DisplacementFieldTransform"):
+                if only_linear:
+                    continue
                 _fixed = np.asanyarray(xfm[f"{typo_fallback}FixedParameters"])
                 shape = _fixed[:3].astype("uint16").tolist()
                 offset = _fixed[3:6].astype("float")
