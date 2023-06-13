@@ -9,6 +9,7 @@ import tempfile
 _data = None
 _brainmask = None
 _testdir = Path(os.getenv("TEST_DATA_HOME", "~/.nitransforms/testdata")).expanduser()
+_datadir = Path(__file__).parent / "tests" / "data"
 
 
 @pytest.fixture(autouse=True)
@@ -18,7 +19,7 @@ def doctest_autoimport(doctest_namespace):
     doctest_namespace["nb"] = nb
     doctest_namespace["os"] = os
     doctest_namespace["Path"] = Path
-    doctest_namespace["regress_dir"] = Path(__file__).parent / "tests" / "data"
+    doctest_namespace["regress_dir"] = _datadir
     doctest_namespace["test_dir"] = _testdir
 
     tmpdir = tempfile.TemporaryDirectory()
@@ -35,7 +36,7 @@ def doctest_autoimport(doctest_namespace):
 @pytest.fixture
 def data_path():
     """Return the test data folder."""
-    return Path(__file__).parent / "tests" / "data"
+    return _datadir
 
 
 @pytest.fixture
