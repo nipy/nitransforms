@@ -113,7 +113,8 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     gii = nb.gifti.GiftiImage(
         darrays=[
             nb.gifti.GiftiDataArray(
-                data=xfm.reference.ndcoords, intent=nb.nifti1.intent_codes["pointset"]
+                data=xfm.reference.ndcoords.astype("float32"),
+                intent=nb.nifti1.intent_codes["pointset"],
             )
         ]
     )
