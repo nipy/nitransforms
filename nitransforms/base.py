@@ -11,7 +11,6 @@ from pathlib import Path
 import numpy as np
 import h5py
 import warnings
-from collections import namedtuple
 from nibabel.loadsave import load as _nbload
 from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
