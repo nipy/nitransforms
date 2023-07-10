@@ -53,6 +53,12 @@ def test_linear_filenotfound(data_path):
     with pytest.raises(FileNotFoundError):
         nitl.Affine.from_filename("doesnotexist.tfm", fmt="itk")
 
+    with pytest.raises(FileNotFoundError):
+        nitl.LinearTransformsMapping.from_filename("doesnotexist.tfm", fmt="itk")
+
+    with pytest.raises(FileNotFoundError):
+        nitl.LinearTransformsMapping.from_filename("doesnotexist.mat", fmt="fsl")
+
 
 def test_linear_valueerror():
     """Exercise errors in Affine creation."""
