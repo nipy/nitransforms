@@ -5,7 +5,7 @@ from scipy.io import loadmat as _read_mat, savemat as _save_mat
 from h5py import File as H5File
 from nibabel import Nifti1Header, Nifti1Image
 from nibabel.affines import from_matvec
-from .base import (
+from nitransforms.io.base import (
     BaseLinearTransformList,
     DisplacementsField,
     LinearParameters,
@@ -204,7 +204,14 @@ class ITKLinearTransform(LinearParameters):
         parameters[:3, :3] = vals[:-3].reshape((3, 3))
         parameters[:3, 3] = vals[-3:]
         sa["parameters"] = parameters
-        return tf
+
+        # Try to double-dip and see if there are more transforms
+        try:
+            cls.from_string("\n".join(lines[4:8]))
+        except TransformFileError:
+            return tf
+        else:
+            raise TransformFileError("More than one linear transform found.")
 
 
 class ITKLinearTransformArray(BaseLinearTransformList):

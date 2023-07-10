@@ -203,17 +203,34 @@ should be (0, 0, 0, 1), got %s."""
         """Create an affine from a transform file."""
         fmtlist = [fmt] if fmt is not None else ("itk", "lta", "afni", "fsl")
 
+        if fmt is not None and not Path(filename).exists():
+            if fmt != "fsl":
+                raise FileNotFoundError(
+                    f"[Errno 2] No such file or directory: '{filename}'"
+                )
+            elif not Path(f"{filename}.000").exists():
+                raise FileNotFoundError(
+                    f"[Errno 2] No such file or directory: '{filename}[.000]'"
+                )
+
+        is_array = cls != Affine
+        errors = []
         for potential_fmt in fmtlist:
+            if (potential_fmt == "itk" and Path(filename).suffix == ".mat"):
+                is_array = False
+                cls = Affine
+
             try:
-                struct = get_linear_factory(potential_fmt).from_filename(filename)
-                matrix = struct.to_ras(reference=reference, moving=moving)
-                if cls == Affine:
-                    if np.shape(matrix)[0] != 1:
-                        raise TypeError("Cannot load transform array '%s'" % filename)
-                    matrix = matrix[0]
-                return cls(matrix, reference=reference)
-            except (TransformFileError, FileNotFoundError):
+                struct = get_linear_factory(
+                    potential_fmt,
+                    is_array=is_array
+                ).from_filename(filename)
+            except (TransformFileError, FileNotFoundError) as err:
+                errors.append((potential_fmt, err))
                 continue
+
+            matrix = struct.to_ras(reference=reference, moving=moving)
+            return cls(matrix, reference=reference)
 
         raise TransformFileError(
             f"Could not open <{filename}> (formats tried: {', '.join(fmtlist)})."
@@ -499,6 +516,8 @@ def load(filename, fmt=None, reference=None, moving=None):
     xfm = LinearTransformsMapping.from_filename(
         filename, fmt=fmt, reference=reference, moving=moving
     )
-    if len(xfm) == 1:
-        return xfm[0]
+
+    if isinstance(xfm, LinearTransformsMapping) and len(xfm) == 1:
+        xfm = xfm[0]
+
     return xfm

@@ -44,8 +44,20 @@ def test_linear_typeerrors1(matrix):
 
 def test_linear_typeerrors2(data_path):
     """Exercise errors in Affine creation."""
-    with pytest.raises(TypeError):
+    with pytest.raises(io.TransformFileError):
         nitl.Affine.from_filename(data_path / "itktflist.tfm", fmt="itk")
+
+
+def test_linear_filenotfound(data_path):
+    """Exercise errors in Affine creation."""
+    with pytest.raises(FileNotFoundError):
+        nitl.Affine.from_filename("doesnotexist.tfm", fmt="itk")
+
+    with pytest.raises(FileNotFoundError):
+        nitl.LinearTransformsMapping.from_filename("doesnotexist.tfm", fmt="itk")
+
+    with pytest.raises(FileNotFoundError):
+        nitl.LinearTransformsMapping.from_filename("doesnotexist.mat", fmt="fsl")
 
 
 def test_linear_valueerror():
@@ -83,6 +95,38 @@ def test_loadsave_itk(tmp_path, data_path, testdata_path):
     assert single_xfm == nitl.Affine.from_filename(
         data_path / "affine-LAS.itk.tfm", fmt="itk"
     )
+
+
+@pytest.mark.parametrize(
+    "image_orientation",
+    [
+        "RAS",
+        "LAS",
+        "LPS",
+        "oblique",
+    ],
+)
+def test_itkmat_loadsave(tmpdir, data_path, image_orientation):
+    tmpdir.chdir()
+
+    io.itk.ITKLinearTransform.from_filename(
+        data_path / f"affine-{image_orientation}.itk.tfm"
+    ).to_filename(f"affine-{image_orientation}.itk.mat")
+
+    xfm = nitl.load(data_path / f"affine-{image_orientation}.itk.tfm", fmt="itk")
+    mat1 = nitl.load(f"affine-{image_orientation}.itk.mat", fmt="itk")
+
+    assert xfm == mat1
+
+    mat2 = nitl.Affine.from_filename(f"affine-{image_orientation}.itk.mat", fmt="itk")
+
+    assert xfm == mat2
+
+    mat3 = nitl.LinearTransformsMapping.from_filename(
+        f"affine-{image_orientation}.itk.mat", fmt="itk"
+    )
+
+    assert xfm == mat3
 
 
 @pytest.mark.parametrize("autofmt", (False, True))

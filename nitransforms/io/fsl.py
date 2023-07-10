@@ -109,9 +109,7 @@ class FSLLinearTransformArray(BaseLinearTransformList):
         output_dir = Path(filename).parent
         output_dir.mkdir(exist_ok=True, parents=True)
         for i, xfm in enumerate(self.xforms):
-            (output_dir / ".".join((str(filename), "%03d" % i))).write_text(
-                xfm.to_string()
-            )
+            (output_dir / f"{filename}.{i:03d}").write_text(str(xfm))
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
