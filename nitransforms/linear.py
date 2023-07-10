@@ -230,13 +230,6 @@ should be (0, 0, 0, 1), got %s."""
                 continue
 
             matrix = struct.to_ras(reference=reference, moving=moving)
-
-            # Process matrix
-            if not is_array and np.ndim(matrix) == 3:
-                if np.shape(matrix)[0] != 1:
-                    raise TypeError("Cannot load transform array '%s'" % filename)
-                matrix = matrix[0]
-
             return cls(matrix, reference=reference)
 
         raise TransformFileError(
