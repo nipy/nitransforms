@@ -1,3 +1,14 @@
+23.0.1 (July 10, 2023)
+======================
+Hotfix release addressing two issues.
+
+CHANGES
+-------
+
+* FIX: Load ITK's ``.mat`` files with ``Affine``'s loaders (#179)
+* FIX: numpy deprecation errors after 1.22 (#180)
+
+
 23.0.0 (June 13, 2023)
 ======================
 A new major release preparing for the finalization of the package and migration into
