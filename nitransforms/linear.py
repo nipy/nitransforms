@@ -203,8 +203,17 @@ should be (0, 0, 0, 1), got %s."""
         """Create an affine from a transform file."""
         fmtlist = [fmt] if fmt is not None else ("itk", "lta", "afni", "fsl")
 
-        is_array = cls != Affine
+        if fmt is not None and not Path(filename).exists():
+            if fmt != "fsl":
+                raise FileNotFoundError(
+                    f"[Errno 2] No such file or directory: '{filename}'"
+                )
+            elif not Path(f"{filename}.000").exists():
+                raise FileNotFoundError(
+                    f"[Errno 2] No such file or directory: '{filename}[.000]'"
+                )
 
+        is_array = cls != Affine
         errors = []
         for potential_fmt in fmtlist:
             if (potential_fmt == "itk" and Path(filename).suffix == ".mat"):

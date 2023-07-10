@@ -5,7 +5,7 @@ from scipy.io import loadmat as _read_mat, savemat as _save_mat
 from h5py import File as H5File
 from nibabel import Nifti1Header, Nifti1Image
 from nibabel.affines import from_matvec
-from .base import (
+from nitransforms.io.base import (
     BaseLinearTransformList,
     DisplacementsField,
     LinearParameters,
