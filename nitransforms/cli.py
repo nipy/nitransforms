@@ -45,7 +45,7 @@ def cli_apply(pargs):
         cval=pargs.cval,
         prefilter=pargs.prefilter,
     )
-    moved.to_filename(pargs.out or "nt_{}".format(os.path.basename(pargs.moving)))
+    moved.to_filename(pargs.out or f"nt_{os.path.basename(pargs.moving)}")
 
 
 def get_parser():

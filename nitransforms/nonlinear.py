@@ -241,7 +241,7 @@ class BSplineFieldTransform(TransformBase):
 
     def __init__(self, coefficients, reference=None, order=3):
         """Create a smooth deformation field using B-Spline basis."""
-        super(BSplineFieldTransform, self).__init__()
+        super().__init__()
         self._order = order
 
         coefficients = _ensure_image(coefficients)
