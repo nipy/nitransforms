@@ -44,7 +44,7 @@ def test_linear_typeerrors1(matrix):
 
 def test_linear_typeerrors2(data_path):
     """Exercise errors in Affine creation."""
-    with pytest.raises(TypeError):
+    with pytest.raises(io.TransformFileError):
         nitl.Affine.from_filename(data_path / "itktflist.tfm", fmt="itk")
 
 

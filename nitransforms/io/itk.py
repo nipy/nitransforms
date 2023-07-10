@@ -204,7 +204,14 @@ class ITKLinearTransform(LinearParameters):
         parameters[:3, :3] = vals[:-3].reshape((3, 3))
         parameters[:3, 3] = vals[-3:]
         sa["parameters"] = parameters
-        return tf
+
+        # Try to double-dip and see if there are more transforms
+        try:
+            cls.from_string("\n".join(lines[4:8]))
+        except TransformFileError:
+            return tf
+        else:
+            raise TransformFileError("More than one linear transform found.")
 
 
 class ITKLinearTransformArray(BaseLinearTransformList):
