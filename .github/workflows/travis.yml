@@ -33,7 +33,7 @@ jobs:
           python-${{ matrix.python-version }}-
     - name: Install DataLad
       run: |
-        $CONDA/bin/conda install -c conda-forge git-annex datalad pip codecov pytest
+        $CONDA/bin/conda install -c conda-forge git-annex datalad pip pytest
         $CONDA/bin/python -m pip install datalad-osf
 
     - uses: actions/cache@v3
@@ -62,5 +62,6 @@ jobs:
         $CONDA/bin/pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
 
     - name: Submit code coverage
-      run: |
-        $CONDA/bin/python -m codecov --flags travis --file cov.xml -e $GITHUB_RUN_NUMBER
+      uses: codecov/codecov-action@v3
+      with:
+        files: cov.xml
