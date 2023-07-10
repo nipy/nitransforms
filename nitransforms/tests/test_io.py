@@ -204,7 +204,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     with pytest.raises(TransformFileError):
         factory.from_string("")
 
-    fname = "affine-%s.%s%s" % (image_orientation, sw, ext)
+    fname = f"affine-{image_orientation}.{sw}{ext}"
 
     # Test the transform loaders are implemented
     xfm = factory.from_filename(data_path / fname)
@@ -262,7 +262,7 @@ def test_LinearList_common(tmpdir, data_path, sw, image_orientation, get_testdat
 
     tflist1 = factory(mats)
 
-    fname = "affine-%s.%s%s" % (image_orientation, sw, ext)
+    fname = f"affine-{image_orientation}.{sw}{ext}"
 
     with pytest.raises(FileNotFoundError):
         factory.from_filename(fname)
@@ -305,7 +305,7 @@ def test_ITKLinearTransform(tmpdir, testdata_path):
 
     # Test to_filename(textfiles)
     itkxfm.to_filename("textfile.tfm")
-    with open("textfile.tfm", "r") as f:
+    with open("textfile.tfm") as f:
         itkxfm2 = itk.ITKLinearTransform.from_fileobj(f)
     assert np.allclose(itkxfm["parameters"], itkxfm2["parameters"])
 

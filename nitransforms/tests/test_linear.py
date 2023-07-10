@@ -226,7 +226,7 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     elif sw_tool == "fs":
         ext = ".lta"
 
-    xfm_fname1 = "M.%s%s" % (sw_tool, ext)
+    xfm_fname1 = f"M.{sw_tool}{ext}"
     xfm.to_filename(xfm_fname1, fmt=sw_tool)
 
     xfm_fname2 = str(data_path / "affine-%s.%s%s") % (image_orientation, sw_tool, ext)
@@ -257,7 +257,7 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     msk.to_filename("mask.nii.gz")
 
     # Write out transform file (software-dependent)
-    xfm_fname = "M.%s%s" % (sw_tool, ext)
+    xfm_fname = f"M.{sw_tool}{ext}"
     # Change reference dataset for AFNI & oblique
     if (sw_tool, image_orientation) == ("afni", "oblique"):
         io.afni.AFNILinearTransform.from_ras(
@@ -278,7 +278,7 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     # skip test if command is not available on host
     exe = cmd.split(" ", 1)[0]
     if not shutil.which(exe):
-        pytest.skip("Command {} not found on host".format(exe))
+        pytest.skip(f"Command {exe} not found on host")
 
     # resample mask
     exit_code = check_call([cmd], shell=True)

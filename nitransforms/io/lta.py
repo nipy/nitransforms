@@ -176,7 +176,7 @@ class FSLinearTransform(LinearTransformStruct):
             return
 
         raise NotImplementedError(
-            "Converting {0} to {1} is not yet available".format(
+            "Converting {} to {} is not yet available".format(
                 transform_codes.label[current], transform_codes.label[new_type]
             )
         )
@@ -334,7 +334,7 @@ class FSLinearTransformArray(BaseLinearTransformList):
         code = int(self["type"])
         header = [
             "# LTA-array file created by NiTransforms",
-            "type      = {} # {}".format(code, transform_codes.label[code]),
+            f"type      = {code} # {transform_codes.label[code]}",
             "nxforms   = {}".format(self["nxforms"]),
         ]
         xforms = [xfm.to_string(partial=True) for xfm in self._xforms]
