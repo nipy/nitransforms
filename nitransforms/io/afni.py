@@ -193,6 +193,17 @@ class AFNIDisplacementsField(DisplacementsField):
 
         return imgobj.__class__(field, imgobj.affine, hdr)
 
+    @classmethod
+    def to_image(cls, imgobj):
+        """Export a displacements field from a nibabel object."""
+
+        hdr = imgobj.header.copy()
+
+        warp_data = imgobj.get_fdata().reshape(imgobj.shape[:3] + (1, imgobj.shape[-1]))
+        warp_data[..., (0, 1)] *= -1
+
+        return imgobj.__class__(warp_data, imgobj.affine, hdr)
+
 
 def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
     """
