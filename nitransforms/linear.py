@@ -458,7 +458,7 @@ class LinearTransformsMapping(Affine):
         output_dtype = output_dtype or input_dtype
 
         # Prepare physical coordinates of input (grid, points)
-        xcoords = _ref.ndcoords.astype("f4")
+        xcoords = _ref.ndcoords.astype("f4").T
 
         # Invert target's (moving) affine once
         ras2vox = ~Affine(spatialimage.affine)
@@ -472,7 +472,7 @@ class LinearTransformsMapping(Affine):
         # Order F ensures individual volumes are contiguous in memory
         # Also matches NIfTI, making final save more efficient
         resampled = np.zeros(
-            (xcoords.T.shape[0], len(self)), dtype=output_dtype, order="F"
+            (xcoords.shape[0], len(self)), dtype=output_dtype, order="F"
         )
 
         dataobj = (
@@ -483,7 +483,7 @@ class LinearTransformsMapping(Affine):
 
         for t, xfm_t in enumerate(self):
             # Map the input coordinates on to timepoint t of the target (moving)
-            ycoords = xfm_t.map(xcoords.T)[..., : _ref.ndim]
+            ycoords = xfm_t.map(xcoords)[..., : _ref.ndim]
 
             # Calculate corresponding voxel coordinates
             yvoxels = ras2vox.map(ycoords)[..., : _ref.ndim]
