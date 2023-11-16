@@ -111,20 +111,16 @@ class AFNILinearTransform(LinearParameters):
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         # swapaxes is necessary, as axis 0 encodes series of transforms
+        retval = LPS @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ LPS
+        reference = _ensure_image(reference)
+        if reference is not None and _is_oblique(reference.affine):
+            retval = retval @ _cardinal_rotation(reference.affine, True)
 
-        pre_rotation = post_rotation = np.eye(4)
-        if reference is not None and _is_oblique(ref_aff := _ensure_image(reference).affine):
-            pre_rotation = _cardinal_rotation(ref_aff, True)
-        if moving is not None and _is_oblique(mov_aff := _ensure_image(moving).affine):
-            post_rotation = _cardinal_rotation(mov_aff, True)
+        moving = _ensure_image(moving)
+        if moving is not None and _is_oblique(moving.affine):
+            retval = _cardinal_rotation(moving.affine, False) @ retval
 
-        return (
-            post_rotation
-            @ LPS
-            @ np.swapaxes(self.structarr["parameters"].T, 0, 1)
-            @ LPS
-            @ pre_rotation
-        )
+        return retval
 
 
 class AFNILinearTransformArray(BaseLinearTransformList):
