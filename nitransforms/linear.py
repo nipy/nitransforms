@@ -14,6 +14,7 @@ from scipy import ndimage as ndi
 
 from nibabel.loadsave import load as _nbload
 from nibabel.affines import from_matvec
+from nibabel.arrayproxy import get_obj_dtype
 
 from nitransforms.base import (
     ImageGrid,
@@ -448,7 +449,7 @@ class LinearTransformsMapping(Affine):
             spatialimage = _nbload(str(spatialimage))
 
         # Avoid opening the data array just yet
-        input_dtype = nb.arrayproxy.get_obj_dtype(spatialimage.dataobj)
+        input_dtype = get_obj_dtype(spatialimage.dataobj)
         output_dtype = output_dtype or input_dtype
 
         # Prepare physical coordinates of input (grid, points)
