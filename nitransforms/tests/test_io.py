@@ -208,9 +208,6 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
 
     fname = f"affine-{image_orientation}.{sw}{ext}"
 
-    if sw == "afni-array":
-        fname.replace(image_orientation, "RAS")
-
     # Test the transform loaders are implemented
     xfm = factory.from_filename(data_path / fname)
 
@@ -228,7 +225,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     # Test from_ras
     RAS = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
     if sw == "afni-array":
-        RAS = [RAS, RAS]
+        RAS = np.array([RAS, RAS])
 
     xfm = factory.from_ras(RAS, reference=reference, moving=moving)
     assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
