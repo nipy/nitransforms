@@ -108,26 +108,23 @@ class AFNILinearTransform(LinearParameters):
         sa["parameters"] = parameters
         return tf
 
-    def to_ras(self, moving=None, reference=None, pre_rotation=None, post_rotation=None):
+    def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         # swapaxes is necessary, as axis 0 encodes series of transforms
-        retval = LPS @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ LPS
 
-        if pre_rotation is None and reference is not None:
-            ref_aff = _ensure_image(reference).affine
-            pre_rotation = _cardinal_rotation(ref_aff, True) if _is_oblique(ref_aff) else None
+        pre_rotation = post_rotation = np.eye(4)
+        if reference is not None and _is_oblique(ref_aff := _ensure_image(reference).affine):
+            pre_rotation = _cardinal_rotation(ref_aff, True)
+        if moving is not None and _is_oblique(mov_aff := _ensure_image(moving).affine):
+            post_rotation = _cardinal_rotation(mov_aff, True)
 
-        if pre_rotation is not None:
-            retval = retval @ pre_rotation
-
-        if post_rotation is None and reference is not None:
-            mov_aff = _ensure_image(moving).affine
-            post_rotation = _cardinal_rotation(mov_aff, True) if _is_oblique(mov_aff) else None
-
-        if post_rotation is not None:
-            retval = post_rotation @ retval
-
-        return retval
+        return (
+            post_rotation
+            @ LPS
+            @ np.swapaxes(self.structarr["parameters"].T, 0, 1)
+            @ LPS
+            @ pre_rotation
+        )
 
 
 class AFNILinearTransformArray(BaseLinearTransformList):
@@ -139,7 +136,6 @@ class AFNILinearTransformArray(BaseLinearTransformList):
         """Return a nitransforms' internal RAS matrix."""
 
         pre_rotation = post_rotation = np.eye(4)
-        
         if reference is not None and _is_oblique(ref_aff := _ensure_image(reference).affine):
             pre_rotation = _cardinal_rotation(ref_aff, True)
         if moving is not None and _is_oblique(mov_aff := _ensure_image(moving).affine):
