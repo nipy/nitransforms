@@ -492,7 +492,7 @@ class LinearTransformsMapping(Affine):
                 (
                     dataobj
                     if dataobj is not None
-                    else np.asanyarray(spatialimage.dataobj[..., t], dtype=input_dtype)
+                    else spatialimage.dataobj[..., t].astype(input_dtype, copy=False)
                 ),
                 yvoxels.T,
                 output=output_dtype,
