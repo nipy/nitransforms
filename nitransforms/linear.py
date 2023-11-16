@@ -448,7 +448,7 @@ class LinearTransformsMapping(Affine):
             spatialimage = _nbload(str(spatialimage))
 
         # Avoid opening the data array just yet
-        input_dtype = spatialimage.header.get_data_dtype()
+        input_dtype = nb.arrayproxy.get_obj_dtype(spatialimage.dataobj)
         output_dtype = output_dtype or input_dtype
 
         # Prepare physical coordinates of input (grid, points)
