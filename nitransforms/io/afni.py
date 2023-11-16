@@ -108,17 +108,24 @@ class AFNILinearTransform(LinearParameters):
         sa["parameters"] = parameters
         return tf
 
-    def to_ras(self, moving=None, reference=None):
+    def to_ras(self, moving=None, reference=None, pre_rotation=None, post_rotation=None):
         """Return a nitransforms internal RAS+ matrix."""
         # swapaxes is necessary, as axis 0 encodes series of transforms
         retval = LPS @ np.swapaxes(self.structarr["parameters"].T, 0, 1) @ LPS
-        reference = _ensure_image(reference)
-        if reference is not None and _is_oblique(reference.affine):
-            retval = retval @ _cardinal_rotation(reference.affine, True)
 
-        moving = _ensure_image(moving)
-        if moving is not None and _is_oblique(moving.affine):
-            retval = _cardinal_rotation(moving.affine, False) @ retval
+        if pre_rotation is None and reference is not None:
+            ref_aff = _ensure_image(reference).affine
+            pre_rotation = _cardinal_rotation(ref_aff, True) if _is_oblique(ref_aff) else None
+
+        if pre_rotation is not None:
+            retval = retval @ pre_rotation
+
+        if post_rotation is None and reference is not None:
+            mov_aff = _ensure_image(moving).affine
+            post_rotation = _cardinal_rotation(mov_aff, True) if _is_oblique(mov_aff) else None
+
+        if post_rotation is not None:
+            retval = post_rotation @ retval
 
         return retval
 
@@ -130,9 +137,21 @@ class AFNILinearTransformArray(BaseLinearTransformList):
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
-        return np.stack(
-            [xfm.to_ras(moving=moving, reference=reference) for xfm in self.xforms]
-        )
+
+        pre_rotation = None
+        if reference is not None:
+            ref_aff = _ensure_image(reference).affine
+            pre_rotation = _cardinal_rotation(ref_aff, True) if _is_oblique(ref_aff) else None
+
+        post_rotation = None
+        if moving is not None:
+            mov_aff = _ensure_image(moving).affine
+            post_rotation = _cardinal_rotation(mov_aff, True) if _is_oblique(mov_aff) else None
+
+        return np.stack([
+            xfm.to_ras(pre_rotation=pre_rotation, post_rotation=post_rotation)
+            for xfm in self.xforms
+        ])
 
     def to_string(self):
         """Convert to a string directly writeable to file."""
