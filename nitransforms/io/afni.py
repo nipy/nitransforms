@@ -130,9 +130,17 @@ class AFNILinearTransformArray(BaseLinearTransformList):
 
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
-        return np.stack(
-            [xfm.to_ras(moving=moving, reference=reference) for xfm in self.xforms]
-        )
+
+        pre_rotation = post_rotation = np.eye(4)
+        if reference is not None and _is_oblique(ref_aff := _ensure_image(reference).affine):
+            pre_rotation = _cardinal_rotation(ref_aff, True)
+        if moving is not None and _is_oblique(mov_aff := _ensure_image(moving).affine):
+            post_rotation = _cardinal_rotation(mov_aff, False)
+
+        return np.stack([
+            post_rotation @ (xfm.to_ras() @ pre_rotation)
+            for xfm in self.xforms
+        ])
 
     def to_string(self):
         """Convert to a string directly writeable to file."""
@@ -144,14 +152,22 @@ class AFNILinearTransformArray(BaseLinearTransformList):
                 if line.strip()
             ]
             strings += lines
-        return "\n".join(strings)
+        return "\n".join(strings + [""])
 
     @classmethod
     def from_ras(cls, ras, moving=None, reference=None):
         """Create an ITK affine from a nitransform's RAS+ matrix."""
         _self = cls()
+
+        pre_rotation = post_rotation = np.eye(4)
+
+        if reference is not None and _is_oblique(ref_aff := _ensure_image(reference).affine):
+            pre_rotation = _cardinal_rotation(ref_aff, False)
+        if moving is not None and _is_oblique(mov_aff := _ensure_image(moving).affine):
+            post_rotation = _cardinal_rotation(mov_aff, True)
+
         _self.xforms = [
-            cls._inner_type.from_ras(ras[i, ...], moving=moving, reference=reference)
+            cls._inner_type.from_ras(post_rotation @ ras[i, ...] @ pre_rotation)
             for i in range(ras.shape[0])
         ]
         return _self

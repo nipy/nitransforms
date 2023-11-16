@@ -180,7 +180,7 @@ def test_LT_conversions(data_path, fname):
         "oblique",
     ],
 )
-@pytest.mark.parametrize("sw", ["afni", "fsl", "fs", "itk"])
+@pytest.mark.parametrize("sw", ["afni", "fsl", "fs", "itk", "afni-array"])
 def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     tmpdir.chdir()
 
@@ -190,6 +190,8 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     ext = ""
     if sw == "afni":
         factory = afni.AFNILinearTransform
+    elif sw == "afni-array":
+        factory = afni.AFNILinearTransformArray
     elif sw == "fsl":
         factory = fsl.FSLLinearTransform
     elif sw == "itk":
@@ -222,6 +224,9 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
 
     # Test from_ras
     RAS = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+    if sw == "afni-array":
+        RAS = np.array([RAS, RAS])
+
     xfm = factory.from_ras(RAS, reference=reference, moving=moving)
     assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
 
