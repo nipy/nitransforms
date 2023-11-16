@@ -138,18 +138,15 @@ class AFNILinearTransformArray(BaseLinearTransformList):
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms' internal RAS matrix."""
 
-        pre_rotation = None
-        if reference is not None:
-            ref_aff = _ensure_image(reference).affine
-            pre_rotation = _cardinal_rotation(ref_aff, True) if _is_oblique(ref_aff) else None
-
-        post_rotation = None
-        if moving is not None:
-            mov_aff = _ensure_image(moving).affine
-            post_rotation = _cardinal_rotation(mov_aff, True) if _is_oblique(mov_aff) else None
+        pre_rotation = post_rotation = np.eye(4)
+        
+        if reference is not None and _is_oblique(ref_aff := _ensure_image(reference).affine):
+            pre_rotation = _cardinal_rotation(ref_aff, True)
+        if moving is not None and _is_oblique(mov_aff := _ensure_image(moving).affine):
+            post_rotation = _cardinal_rotation(mov_aff, True)
 
         return np.stack([
-            xfm.to_ras(pre_rotation=pre_rotation, post_rotation=post_rotation)
+            post_rotation @ xfm.to_ras() @ pre_rotation
             for xfm in self.xforms
         ])
 
