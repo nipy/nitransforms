@@ -317,6 +317,11 @@ class LinearTransformsMapping(Affine):
         )
         self._inverse = np.linalg.inv(self._matrix)
 
+    def __iter__(self):
+        """Enable iterating over the series of transforms."""
+        for _m in self.matrix:
+            yield Affine(_m, reference=self._reference)
+
     def __getitem__(self, i):
         """Enable indexed access to the series of matrices."""
         return Affine(self.matrix[i, ...], reference=self._reference)
@@ -458,42 +463,37 @@ class LinearTransformsMapping(Affine):
         # Invert target's (moving) affine once
         ras2vox = ~Affine(spatialimage.affine)
 
-        if spatialimage.ndim == 4:
-            if len(self) != spatialimage.shape[-1]:
-                raise ValueError(
-                    "Attempting to apply %d transforms on a file with "
-                    "%d timepoints" % (len(self), spatialimage.shape[-1])
-                )
-
-            # Order F ensures individual volumes are contiguous in memory
-            # Also matches NIfTI, making final save more efficient
-            resampled = np.zeros(
-                (xcoords.T.shape[0], ) + spatialimage.shape[-1:], dtype=output_dtype, order="F"
+        if spatialimage.ndim == 4 and (len(self) != spatialimage.shape[-1]):
+            raise ValueError(
+                "Attempting to apply %d transforms on a file with "
+                "%d timepoints" % (len(self), spatialimage.shape[-1])
             )
 
-            for t in range(spatialimage.shape[-1]):
-                # Map the input coordinates on to timepoint t of the target (moving)
-                ycoords = Affine(self.matrix[t]).map(xcoords.T)[..., : _ref.ndim]
+        # Order F ensures individual volumes are contiguous in memory
+        # Also matches NIfTI, making final save more efficient
+        resampled = np.zeros(
+            (xcoords.T.shape[0], len(self)), dtype=output_dtype, order="F"
+        )
 
-                # Calculate corresponding voxel coordinates
-                yvoxels = ras2vox.map(ycoords)[..., : _ref.ndim]
+        dataobj = (
+            np.asanyarray(spatialimage.dataobj, dtype=input_dtype)
+            if spatialimage.ndim in (2, 3)
+            else None
+        )
 
-                # Interpolate
-                resampled[..., t] = ndi.map_coordinates(
-                    spatialimage.dataobj[..., t].astype(input_dtype, copy=False),
-                    yvoxels.T,
-                    output=output_dtype,
-                    order=order,
-                    mode=mode,
-                    cval=cval,
-                    prefilter=prefilter,
-                )
-        elif spatialimage.ndim in (2, 3):
-            ycoords = self.map(xcoords.T)[..., : _ref.ndim]
+        for t, xfm_t in enumerate(self):
+            # Map the input coordinates on to timepoint t of the target (moving)
+            ycoords = xfm_t.map(xcoords.T)[..., : _ref.ndim]
+
+            # Calculate corresponding voxel coordinates
             yvoxels = ras2vox.map(ycoords)[..., : _ref.ndim]
 
-            resampled = ndi.map_coordinates(
-                spatialimage.dataobj.astype(input_dtype, copy=False),
+            # Interpolate
+            resampled[..., t] = ndi.map_coordinates(
+                (
+                    dataobj if dataobj is not None 
+                    else np.asanyarray(spatialimage.dataobj[..., t], dtype=input_dtype)
+                ),
                 yvoxels.T,
                 output=output_dtype,
                 order=order,
@@ -503,9 +503,9 @@ class LinearTransformsMapping(Affine):
             )
 
         if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
-            newdata = resampled.reshape((len(self), *_ref.shape))
+            newdata = resampled.reshape(_ref.shape + (len(self), ))
             moved = spatialimage.__class__(
-                np.moveaxis(newdata, 0, -1), _ref.affine, spatialimage.header
+                newdata, _ref.affine, spatialimage.header
             )
             moved.header.set_data_dtype(output_dtype)
             return moved
