@@ -190,6 +190,8 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     ext = ""
     if sw == "afni":
         factory = afni.AFNILinearTransform
+    elif sw == "afni-array":
+        factory = afni.AFNILinearTransformArray
     elif sw == "fsl":
         factory = fsl.FSLLinearTransform
     elif sw == "itk":
