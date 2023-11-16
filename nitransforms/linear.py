@@ -217,14 +217,13 @@ should be (0, 0, 0, 1), got %s."""
         is_array = cls != Affine
         errors = []
         for potential_fmt in fmtlist:
-            if (potential_fmt == "itk" and Path(filename).suffix == ".mat"):
+            if potential_fmt == "itk" and Path(filename).suffix == ".mat":
                 is_array = False
                 cls = Affine
 
             try:
                 struct = get_linear_factory(
-                    potential_fmt,
-                    is_array=is_array
+                    potential_fmt, is_array=is_array
                 ).from_filename(filename)
             except (TransformFileError, FileNotFoundError) as err:
                 errors.append((potential_fmt, err))
@@ -491,7 +490,8 @@ class LinearTransformsMapping(Affine):
             # Interpolate
             resampled[..., t] = ndi.map_coordinates(
                 (
-                    dataobj if dataobj is not None 
+                    dataobj
+                    if dataobj is not None
                     else np.asanyarray(spatialimage.dataobj[..., t], dtype=input_dtype)
                 ),
                 yvoxels.T,
@@ -503,10 +503,8 @@ class LinearTransformsMapping(Affine):
             )
 
         if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
-            newdata = resampled.reshape(_ref.shape + (len(self), ))
-            moved = spatialimage.__class__(
-                newdata, _ref.affine, spatialimage.header
-            )
+            newdata = resampled.reshape(_ref.shape + (len(self),))
+            moved = spatialimage.__class__(newdata, _ref.affine, spatialimage.header)
             moved.header.set_data_dtype(output_dtype)
             return moved
 
