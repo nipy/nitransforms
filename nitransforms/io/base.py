@@ -146,6 +146,17 @@ class DisplacementsField:
         """Import a displacements field from a nibabel image object."""
         raise NotImplementedError
 
+    @classmethod
+    def to_filename(cls, img, filename):
+        """Export a displacements field to a NIfTI file."""
+        imgobj = cls.to_image(img)
+        imgobj.to_filename(filename)
+
+    @classmethod
+    def to_image(cls, imgobj):
+        """Export a displacements field image from a nitransforms image object."""
+        raise NotImplementedError
+
 
 def _ensure_image(img):
     if isinstance(img, (str, Path)):
