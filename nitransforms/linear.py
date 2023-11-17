@@ -14,6 +14,7 @@ from scipy import ndimage as ndi
 
 from nibabel.loadsave import load as _nbload
 from nibabel.affines import from_matvec
+from nibabel.arrayproxy import get_obj_dtype
 
 from nitransforms.base import (
     ImageGrid,
@@ -216,14 +217,13 @@ should be (0, 0, 0, 1), got %s."""
         is_array = cls != Affine
         errors = []
         for potential_fmt in fmtlist:
-            if (potential_fmt == "itk" and Path(filename).suffix == ".mat"):
+            if potential_fmt == "itk" and Path(filename).suffix == ".mat":
                 is_array = False
                 cls = Affine
 
             try:
                 struct = get_linear_factory(
-                    potential_fmt,
-                    is_array=is_array
+                    potential_fmt, is_array=is_array
                 ).from_filename(filename)
             except (TransformFileError, FileNotFoundError) as err:
                 errors.append((potential_fmt, err))
@@ -315,6 +315,11 @@ class LinearTransformsMapping(Affine):
             axis=0,
         )
         self._inverse = np.linalg.inv(self._matrix)
+
+    def __iter__(self):
+        """Enable iterating over the series of transforms."""
+        for _m in self.matrix:
+            yield Affine(_m, reference=self._reference)
 
     def __getitem__(self, i):
         """Enable indexed access to the series of matrices."""
@@ -436,6 +441,7 @@ class LinearTransformsMapping(Affine):
             The data imaged after resampling to reference space.
 
         """
+
         if reference is not None and isinstance(reference, (str, Path)):
             reference = _nbload(str(reference))
 
@@ -446,40 +452,49 @@ class LinearTransformsMapping(Affine):
         if isinstance(spatialimage, (str, Path)):
             spatialimage = _nbload(str(spatialimage))
 
-        data = np.squeeze(np.asanyarray(spatialimage.dataobj))
-        output_dtype = output_dtype or data.dtype
+        # Avoid opening the data array just yet
+        input_dtype = get_obj_dtype(spatialimage.dataobj)
+        output_dtype = output_dtype or input_dtype
 
-        ycoords = self.map(_ref.ndcoords.T)
-        targets = ImageGrid(spatialimage).index(  # data should be an image
-            _as_homogeneous(np.vstack(ycoords), dim=_ref.ndim)
+        # Prepare physical coordinates of input (grid, points)
+        xcoords = _ref.ndcoords.astype("f4").T
+
+        # Invert target's (moving) affine once
+        ras2vox = ~Affine(spatialimage.affine)
+
+        if spatialimage.ndim == 4 and (len(self) != spatialimage.shape[-1]):
+            raise ValueError(
+                "Attempting to apply %d transforms on a file with "
+                "%d timepoints" % (len(self), spatialimage.shape[-1])
+            )
+
+        # Order F ensures individual volumes are contiguous in memory
+        # Also matches NIfTI, making final save more efficient
+        resampled = np.zeros(
+            (xcoords.shape[0], len(self)), dtype=output_dtype, order="F"
         )
 
-        if data.ndim == 4:
-            if len(self) != data.shape[-1]:
-                raise ValueError(
-                    "Attempting to apply %d transforms on a file with "
-                    "%d timepoints" % (len(self), data.shape[-1])
-                )
-            targets = targets.reshape((len(self), -1, targets.shape[-1]))
-            resampled = np.stack(
-                [
-                    ndi.map_coordinates(
-                        data[..., t],
-                        targets[t, ..., : _ref.ndim].T,
-                        output=output_dtype,
-                        order=order,
-                        mode=mode,
-                        cval=cval,
-                        prefilter=prefilter,
-                    )
-                    for t in range(data.shape[-1])
-                ],
-                axis=0,
-            )
-        elif data.ndim in (2, 3):
-            resampled = ndi.map_coordinates(
-                data,
-                targets[..., : _ref.ndim].T,
+        dataobj = (
+            np.asanyarray(spatialimage.dataobj, dtype=input_dtype)
+            if spatialimage.ndim in (2, 3)
+            else None
+        )
+
+        for t, xfm_t in enumerate(self):
+            # Map the input coordinates on to timepoint t of the target (moving)
+            ycoords = xfm_t.map(xcoords)[..., : _ref.ndim]
+
+            # Calculate corresponding voxel coordinates
+            yvoxels = ras2vox.map(ycoords)[..., : _ref.ndim]
+
+            # Interpolate
+            resampled[..., t] = ndi.map_coordinates(
+                (
+                    dataobj
+                    if dataobj is not None
+                    else spatialimage.dataobj[..., t].astype(input_dtype, copy=False)
+                ),
+                yvoxels.T,
                 output=output_dtype,
                 order=order,
                 mode=mode,
@@ -488,10 +503,8 @@ class LinearTransformsMapping(Affine):
             )
 
         if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
-            newdata = resampled.reshape((len(self), *_ref.shape))
-            moved = spatialimage.__class__(
-                np.moveaxis(newdata, 0, -1), _ref.affine, spatialimage.header
-            )
+            newdata = resampled.reshape(_ref.shape + (len(self),))
+            moved = spatialimage.__class__(newdata, _ref.affine, spatialimage.header)
             moved.header.set_data_dtype(output_dtype)
             return moved
 
