@@ -226,7 +226,7 @@ def _is_oblique(affine, thres=OBLIQUITY_THRESHOLD_DEG):
     True
 
     """
-    return (obliquity(affine).min() * 180 / pi) > thres
+    return (obliquity(affine).max() * 180 / pi) > thres
 
 
 def _afni_deobliqued_grid(oblique, shape):
