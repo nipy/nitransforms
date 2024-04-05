@@ -10,6 +10,7 @@
 from pathlib import Path
 import numpy as np
 from nibabel.loadsave import load as _nbload
+from scipy import ndimage as ndi
 
 from nitransforms.base import (
     ImageGrid,
@@ -17,6 +18,7 @@ from nitransforms.base import (
     SpatialReference,
     _as_homogeneous,
 )
+
 
 def apply(
     transform,
