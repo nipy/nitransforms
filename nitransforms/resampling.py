@@ -9,14 +9,14 @@
 """Resampling utilities."""
 from pathlib import Path
 import numpy as np
-import h5py
-import warnings
 from nibabel.loadsave import load as _nbload
-from nibabel import funcs as _nbfuncs
-from nibabel.nifti1 import intent_codes as INTENT_CODES
-from nibabel.cifti2 import Cifti2Image
-from scipy import ndimage as ndi
 
+from nitransforms.base import (
+    ImageGrid,
+    TransformError,
+    SpatialReference,
+    _as_homogeneous,
+)
 
 def apply(
     transform,
