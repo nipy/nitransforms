@@ -5,6 +5,7 @@ from textwrap import dedent
 
 from .linear import load as linload
 from .nonlinear import load as nlinload
+from .resampling import apply
 
 
 def cli_apply(pargs):
@@ -38,7 +39,8 @@ def cli_apply(pargs):
     # ensure a reference is set
     xfm.reference = pargs.ref or pargs.moving
 
-    moved = xfm.apply(
+    moved = apply(
+        xfm,
         pargs.moving,
         order=pargs.order,
         mode=pargs.mode,

@@ -13,6 +13,7 @@ from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from nitransforms import linear as nitl
 from nitransforms import io
+from nitransforms.resampling import apply
 from .utils import assert_affines_by_filename
 
 RMSE_TOL = 0.1
@@ -285,7 +286,7 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     assert exit_code == 0
     sw_moved_mask = nb.load("resampled_brainmask.nii.gz")
 
-    nt_moved_mask = xfm.apply(msk, order=0)
+    nt_moved_mask = apply(xfm, msk, order=0)
     nt_moved_mask.set_data_dtype(msk.get_data_dtype())
     nt_moved_mask.to_filename("ntmask.nii.gz")
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
@@ -305,7 +306,7 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     sw_moved = nb.load("resampled.nii.gz")
     sw_moved.set_data_dtype(img.get_data_dtype())
 
-    nt_moved = xfm.apply(img, order=0)
+    nt_moved = apply(xfm, img, order=0)
     diff = (
         np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
         - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
@@ -314,7 +315,7 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     # A certain tolerance is necessary because of resampling at borders
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL
 
-    nt_moved = xfm.apply("img.nii.gz", order=0)
+    nt_moved = apply(xfm, "img.nii.gz", order=0)
     diff = (
         np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
         - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
@@ -343,8 +344,8 @@ def test_LinearTransformsMapping_apply(tmp_path, data_path, testdata_path):
     assert isinstance(hmc, nitl.LinearTransformsMapping)
 
     # Test-case: realign functional data on to sbref
-    nii = hmc.apply(
-        testdata_path / "func.nii.gz", order=1, reference=testdata_path / "sbref.nii.gz"
+    nii = apply(
+        hmc, testdata_path / "func.nii.gz", order=1, reference=testdata_path / "sbref.nii.gz"
     )
     assert nii.dataobj.shape[-1] == len(hmc)
 
@@ -352,13 +353,14 @@ def test_LinearTransformsMapping_apply(tmp_path, data_path, testdata_path):
     hmcinv = nitl.LinearTransformsMapping(
         np.linalg.inv(hmc.matrix), reference=testdata_path / "func.nii.gz"
     )
-    nii = hmcinv.apply(testdata_path / "fmap.nii.gz", order=1)
+    nii = apply(hmcinv, testdata_path / "fmap.nii.gz", order=1)
     assert nii.dataobj.shape[-1] == len(hmc)
 
     # Ensure a ValueError is issued when trying to do weird stuff
     hmc = nitl.LinearTransformsMapping(hmc.matrix[:1, ...])
     with pytest.raises(ValueError):
-        hmc.apply(
+        apply(
+            hmc,
             testdata_path / "func.nii.gz",
             order=1,
             reference=testdata_path / "sbref.nii.gz",
