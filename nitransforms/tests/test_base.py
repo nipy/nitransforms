@@ -6,6 +6,7 @@ import h5py
 
 from ..base import SpatialReference, SampledSpatialData, ImageGrid, TransformBase
 from .. import linear as nitl
+from ..resampling import apply
 
 
 def test_SpatialReference(testdata_path):
@@ -95,7 +96,7 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     xfm = TransformBase()
     xfm.reference = fname
     assert xfm.ndim == 3
-    moved = xfm.apply(fname, order=0)
+    moved = apply(xfm, fname, order=0)
     assert np.all(
         imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
     )
@@ -104,7 +105,7 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     xfm = TransformBase()
     xfm.reference = fname
     assert xfm.ndim == 3
-    moved = xfm.apply(str(fname), reference=fname, order=0)
+    moved = apply(xfm, str(fname), reference=fname, order=0)
     assert np.all(
         imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
     )
@@ -118,7 +119,7 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
             )
         ]
     )
-    giimoved = xfm.apply(fname, reference=gii, order=0)
+    giimoved = apply(xfm, fname, reference=gii, order=0)
     assert np.allclose(giimoved.reshape(xfm.reference.shape), moved.get_fdata())
 
     # Test to_filename
