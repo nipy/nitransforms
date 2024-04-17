@@ -283,7 +283,11 @@ def _as_homogeneous(xyz, dtype="float32", dim=3):
 
     return np.hstack((xyz, np.ones((xyz.shape[0], 1), dtype=dtype)))
 
-
+#import pdb; pdb.set_trace()
 def _apply_affine(x, affine, dim):
     """Get the image array's indexes corresponding to coordinates."""
-    return affine.dot(_as_homogeneous(x, dim=dim).T)[:dim, ...].T
+    return np.tensordot(
+        affine,
+        _as_homogeneous(x, dim=dim).T,
+        axes=1,
+    )[:dim, ...]

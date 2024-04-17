@@ -87,27 +87,36 @@ def apply(
         spatialimage = _nbload(str(spatialimage))
 
     data = np.asanyarray(spatialimage.dataobj)
+    
     targets = ImageGrid(spatialimage).index(  # data should be an image
         _as_homogeneous(transform.map(_ref.ndcoords.T), dim=_ref.ndim)
     )
 
+    if data.ndim < targets.shape[-1]:
+        data = data[..., np.newaxis]
+
+    import pdb; pdb.set_trace()
+     
+    #import pdb; pdb.set_trace()
     resampled = ndi.map_coordinates(
         data,
-        targets.T,
+        #targets.T,
+        #Reshape targets (516096, 3, 8) --> (4, 4128768) : 
+        _as_homogeneous(targets.reshape(-2, targets.shape[0])).T,
         output=output_dtype,
         order=order,
         mode=mode,
         cval=cval,
         prefilter=prefilter,
     )
-
+     
     if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
         hdr = None
         if _ref.header is not None:
             hdr = _ref.header.copy()
             hdr.set_data_dtype(output_dtype or spatialimage.get_data_dtype())
         moved = spatialimage.__class__(
-            resampled.reshape(_ref.shape),
+            resampled.reshape(_ref.shape if data.ndim < 4 else _ref.shape + (-1, )),
             _ref.affine,
             hdr,
         )

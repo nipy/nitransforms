@@ -353,7 +353,11 @@ def test_LinearTransformsMapping_apply(tmp_path, data_path, testdata_path):
     hmcinv = nitl.LinearTransformsMapping(
         np.linalg.inv(hmc.matrix), reference=testdata_path / "func.nii.gz"
     )
-    nii = apply(hmcinv, testdata_path / "fmap.nii.gz", order=1)
+
+    import pdb; pdb.set_trace()
+    nii = apply(
+        hmcinv, testdata_path / "fmap.nii.gz", order=1
+    )
     assert nii.dataobj.shape[-1] == len(hmc)
 
     # Ensure a ValueError is issued when trying to do weird stuff
