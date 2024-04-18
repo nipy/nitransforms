@@ -15,7 +15,6 @@ from nibabel.loadsave import load as _nbload
 from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
 from nibabel.cifti2 import Cifti2Image
-from nitransforms import linear as nitl
 
 EQUALITY_TOL = 1e-5
 

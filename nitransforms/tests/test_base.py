@@ -114,7 +114,9 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
 
     #Test ndim returned by affine
     assert nitl.Affine().ndim == 3
-    assert nitl.LinearTransformsMapping([nitl.Affine()]).ndim == 4
+    assert nitl.LinearTransformsMapping(
+        [nitl.Affine(), nitl.Affine()]
+    ).ndim == 4
 
     # Test applying to Gifti
     gii = nb.gifti.GiftiImage(
