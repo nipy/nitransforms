@@ -275,7 +275,7 @@ should be (0, 0, 0, 1), got %s."""
 
         """
         return repr(self.matrix)
-    
+
 
 class LinearTransformsMapping(Affine):
     """Represents a series of linear transforms."""

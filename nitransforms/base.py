@@ -180,7 +180,6 @@ class TransformBase:
 
     __slots__ = ("_reference", "_ndim",)
 
-
     def __init__(self, reference=None):
         """Instantiate a transform."""
         self._reference = None
