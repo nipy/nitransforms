@@ -15,6 +15,7 @@ from nibabel.loadsave import load as _nbload
 from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
 from nibabel.cifti2 import Cifti2Image
+from scipy import ndimage as ndi
 
 EQUALITY_TOL = 1e-5
 
@@ -212,13 +213,6 @@ class TransformBase:
         if self._reference is None:
             warnings.warn("Reference space not set")
         return self._reference
-    
-    @property
-    def reference(_ndim):
-        """Access a reference space where data will be resampled onto."""
-        if _ndim._reference is None:
-            warnings.warn("Reference space not set")
-        return _ndim._reference
 
     @reference.setter
     def reference(self, image):
@@ -227,7 +221,6 @@ class TransformBase:
     @property
     def ndim(self):
         """Access the dimensions of the reference space."""
-        #return self.reference.ndim
         raise TypeError("TransformBase has no dimensions")
 
     def apply(
@@ -242,6 +235,7 @@ class TransformBase:
     ):
         """
         Apply a transformation to an image, resampling on the reference spatial object.
+
         Parameters
         ----------
         spatialimage : `spatialimage`
@@ -275,10 +269,12 @@ class TransformBase:
             If ``reference`` is defined, then the return value is an image, with
             a data array of the effective dtype but with the on-disk dtype set to
             the input image's on-disk dtype.
+
         Returns
         -------
         resampled : `spatialimage` or ndarray
             The data imaged after resampling to reference space.
+
         """
         if reference is not None and isinstance(reference, (str, Path)):
             reference = _nbload(str(reference))
@@ -388,5 +384,3 @@ def _as_homogeneous(xyz, dtype="float32", dim=3):
 def _apply_affine(x, affine, dim):
     """Get the image array's indexes corresponding to coordinates."""
     return affine.dot(_as_homogeneous(x, dim=dim).T)[:dim, ...].T
-
-#import pdb; pdb.set_trace()
