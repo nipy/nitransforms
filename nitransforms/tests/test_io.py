@@ -28,8 +28,6 @@ from nitransforms.io.lta import (
 )
 from nitransforms.io.base import LinearParameters, TransformIOError, TransformFileError
 from nitransforms.conftest import _datadir, _testdir
-from nitransforms.resampling import apply
-
 
 LPS = np.diag([-1, -1, 1, 1])
 ITK_MAT = LPS.dot(np.ones((4, 4)).dot(LPS))
@@ -499,13 +497,10 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     assert np.allclose(card_aff, nb.load("deob_3drefit.nii.gz").affine)
 
     # Check that nitransforms can emulate 3drefit -deoblique
-    nt3drefit = apply(
-        Affine(
-            afni._cardinal_rotation(img.affine, False),
-            reference="deob_3drefit.nii.gz",
-        ),
-        "orig.nii.gz",
-    )
+    nt3drefit = Affine(
+        afni._cardinal_rotation(img.affine, False),
+        reference="deob_3drefit.nii.gz",
+    ).apply("orig.nii.gz")
 
     diff = (
         np.asanyarray(img.dataobj, dtype="uint8")
@@ -514,13 +509,10 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     assert np.sqrt((diff[10:-10, 10:-10, 10:-10] ** 2).mean()) < 0.1
 
     # Check that nitransforms can revert 3drefit -deoblique
-    nt_undo3drefit = apply(
-        Affine(
-            afni._cardinal_rotation(img.affine, True),
-            reference="orig.nii.gz",
-        ),
-        "deob_3drefit.nii.gz",
-    )
+    nt_undo3drefit = Affine(
+        afni._cardinal_rotation(img.affine, True),
+        reference="orig.nii.gz",
+    ).apply("deob_3drefit.nii.gz")
 
     diff = (
         np.asanyarray(img.dataobj, dtype="uint8")
@@ -539,21 +531,16 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     assert np.allclose(deobaff, deobnii.affine)
 
     # Check resampling in deobliqued grid
-    ntdeobnii = apply(
-        Affine(np.eye(4), reference=deobnii.__class__(
-            np.zeros(deobshape, dtype="uint8"),
-            deobaff,
-            deobnii.header
-        )),
-        img,
-        order=0,
-    )
+    ntdeobnii = Affine(np.eye(4), reference=deobnii.__class__(
+        np.zeros(deobshape, dtype="uint8"),
+        deobaff,
+        deobnii.header
+    )).apply(img, order=0)
 
     # Generate an internal box to exclude border effects
     box = np.zeros(img.shape, dtype="uint8")
     box[10:-10, 10:-10, 10:-10] = 1
-    ntdeobmask = apply(
-        Affine(np.eye(4), reference=ntdeobnii),
+    ntdeobmask = Affine(np.eye(4), reference=ntdeobnii).apply(
         nb.Nifti1Image(box, img.affine, img.header),
         order=0,
     )
