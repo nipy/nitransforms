@@ -95,7 +95,8 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     # Test identity transform
     xfm = TransformBase()
     xfm.reference = fname
-    assert xfm.ndim == 3
+    with pytest.raises(TypeError):
+        _ = xfm.ndim
     moved = apply(xfm, fname, order=0)
     assert np.all(
         imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
@@ -104,11 +105,17 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     # Test identity transform - setting reference
     xfm = TransformBase()
     xfm.reference = fname
-    assert xfm.ndim == 3
+    with pytest.raises(TypeError):
+        _ = xfm.ndim
     moved = apply(xfm, str(fname), reference=fname, order=0)
     assert np.all(
         imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
     )
+
+    #Test ndim returned by affine
+    #breakpoint()
+    assert nitl.Affine().ndim == 3
+    assert nitl.LinearTransformsMapping(xfm.matrix).ndim == 4
 
     # Test applying to Gifti
     gii = nb.gifti.GiftiImage(

@@ -1,0 +1,7 @@
+Terminal command line to test code:
+
+>>> TEST_DATA_HOME=$HOME/Desktop/nitransforms-tests python3 -m pytest
+
+Also works for a path to a specific test, eg:
+
+>>> TEST_DATA_HOME=$HOME/Desktop/nitransforms-tests python3 -m pytest ~/workspace/nitransforms/nitransforms/tests/test_base.py::test_TransformBase 

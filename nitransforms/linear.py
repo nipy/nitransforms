@@ -143,6 +143,11 @@ should be (0, 0, 0, 1), got %s."""
         """Access the internal representation of this affine."""
         return self._matrix
 
+    @property
+    def ndim(self):
+        """Access the internal representation of this affine."""
+        return self._matrix.ndim + 1
+    
     def map(self, x, inverse=False):
         r"""
         Apply :math:`y = f(x)`.
@@ -270,7 +275,7 @@ should be (0, 0, 0, 1), got %s."""
 
         """
         return repr(self.matrix)
-
+    
 
 class LinearTransformsMapping(Affine):
     """Represents a series of linear transforms."""

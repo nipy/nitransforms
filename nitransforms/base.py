@@ -15,6 +15,7 @@ from nibabel.loadsave import load as _nbload
 from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
 from nibabel.cifti2 import Cifti2Image
+from nitransforms import linear as nitl
 
 EQUALITY_TOL = 1e-5
 
@@ -177,7 +178,8 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ("_reference",)
+    __slots__ = ("_reference", "_ndim",)
+
 
     def __init__(self, reference=None):
         """Instantiate a transform."""
@@ -211,6 +213,13 @@ class TransformBase:
         if self._reference is None:
             warnings.warn("Reference space not set")
         return self._reference
+    
+    @property
+    def reference(_ndim):
+        """Access a reference space where data will be resampled onto."""
+        if _ndim._reference is None:
+            warnings.warn("Reference space not set")
+        return _ndim._reference
 
     @reference.setter
     def reference(self, image):
@@ -219,7 +228,8 @@ class TransformBase:
     @property
     def ndim(self):
         """Access the dimensions of the reference space."""
-        return self.reference.ndim
+        #return self.reference.ndim
+        raise TypeError("TransformBase has no dimensions")
 
     def map(self, x, inverse=False):
         r"""
@@ -287,3 +297,5 @@ def _as_homogeneous(xyz, dtype="float32", dim=3):
 def _apply_affine(x, affine, dim):
     """Get the image array's indexes corresponding to coordinates."""
     return affine.dot(_as_homogeneous(x, dim=dim).T)[:dim, ...].T
+
+#import pdb; pdb.set_trace()
