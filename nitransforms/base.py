@@ -178,7 +178,7 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ("_reference",)
+    __slots__ = ("_reference", "_ndim",)
 
     def __init__(self, reference=None):
         """Instantiate a transform."""
@@ -220,7 +220,7 @@ class TransformBase:
     @property
     def ndim(self):
         """Access the dimensions of the reference space."""
-        return self.reference.ndim
+        raise TypeError("TransformBase has no dimensions")
 
     def apply(
         self,
