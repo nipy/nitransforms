@@ -111,7 +111,7 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
         imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
     )
 
-    #Test ndim returned by affine
+    # Test ndim returned by affine
     assert nitl.Affine().ndim == 3
     assert nitl.LinearTransformsMapping(
         [nitl.Affine(), nitl.Affine()]
