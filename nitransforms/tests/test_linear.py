@@ -354,7 +354,6 @@ def test_LinearTransformsMapping_apply(tmp_path, data_path, testdata_path):
         np.linalg.inv(hmc.matrix), reference=testdata_path / "func.nii.gz"
     )
 
-    import pdb; pdb.set_trace()
     nii = apply(
         hmcinv, testdata_path / "fmap.nii.gz", order=1
     )

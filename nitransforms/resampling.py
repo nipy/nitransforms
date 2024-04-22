@@ -92,14 +92,14 @@ def apply(
         _as_homogeneous(transform.map(_ref.ndcoords.T), dim=_ref.ndim)
     )
 
-    #if data.ndim < targets.shape[-1]:
-    #    data = data[..., np.newaxis]
+    if data.ndim == 4 and data.shape[-1] != len(transform):
+        raise ValueError("The fourth dimension of the data does not match the tranform's shape.")
+
+    if data.ndim < transform.ndim:
+        data = data[..., np.newaxis]
  
-    #import pdb; pdb.set_trace()
     resampled = ndi.map_coordinates(
         data,
-        #targets.T,
-        #Reshape targets (516096, 3, 8) --> (4, 4128768) : 
         _as_homogeneous(targets.reshape(-2, targets.shape[0])).T,
         output=output_dtype,
         order=order,

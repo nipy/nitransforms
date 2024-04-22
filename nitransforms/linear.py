@@ -112,6 +112,10 @@ should be (0, 0, 0, 1), got %s."""
 
         """
         return self.__class__(self._inverse)
+    
+    def __len__(self):
+        """Enable using len()."""
+        return 1 if self._matrix.ndim == 2 else len(self._matrix)
 
     def __matmul__(self, b):
         """
@@ -330,10 +334,6 @@ class LinearTransformsMapping(Affine):
         """Enable indexed access to the series of matrices."""
         return Affine(self.matrix[i, ...], reference=self._reference)
 
-    def __len__(self):
-        """Enable using len()."""
-        return len(self._matrix)
-
     def map(self, x, inverse=False):
         r"""
         Apply :math:`y = f(x)`.
@@ -401,119 +401,6 @@ class LinearTransformsMapping(Affine):
                 moving=ImageGrid(moving) if moving is not None else self.reference,
             ).to_filename(filename)
         return filename
-
-    def apply(
-        self,
-        spatialimage,
-        reference=None,
-        order=3,
-        mode="constant",
-        cval=0.0,
-        prefilter=True,
-        output_dtype=None,
-    ):
-        """
-        Apply a transformation to an image, resampling on the reference spatial object.
-
-        Parameters
-        ----------
-        spatialimage : `spatialimage`
-            The image object containing the data to be resampled in reference
-            space
-        reference : spatial object, optional
-            The image, surface, or combination thereof containing the coordinates
-            of samples that will be sampled.
-        order : int, optional
-            The order of the spline interpolation, default is 3.
-            The order has to be in the range 0-5.
-        mode : {"constant", "reflect", "nearest", "mirror", "wrap"}, optional
-            Determines how the input image is extended when the resamplings overflows
-            a border. Default is "constant".
-        cval : float, optional
-            Constant value for ``mode="constant"``. Default is 0.0.
-        prefilter: bool, optional
-            Determines if the image's data array is prefiltered with
-            a spline filter before interpolation. The default is ``True``,
-            which will create a temporary *float64* array of filtered values
-            if *order > 1*. If setting this to ``False``, the output will be
-            slightly blurred if *order > 1*, unless the input is prefiltered,
-            i.e. it is the result of calling the spline filter on the original
-            input.
-
-        Returns
-        -------
-        resampled : `spatialimage` or ndarray
-            The data imaged after resampling to reference space.
-
-        """
-
-        if reference is not None and isinstance(reference, (str, Path)):
-            reference = _nbload(str(reference))
-
-        _ref = (
-            self.reference if reference is None else SpatialReference.factory(reference)
-        )
-
-        if isinstance(spatialimage, (str, Path)):
-            spatialimage = _nbload(str(spatialimage))
-
-        # Avoid opening the data array just yet
-        input_dtype = get_obj_dtype(spatialimage.dataobj)
-        output_dtype = output_dtype or input_dtype
-
-        # Prepare physical coordinates of input (grid, points)
-        xcoords = _ref.ndcoords.astype("f4").T
-
-        # Invert target's (moving) affine once
-        ras2vox = ~Affine(spatialimage.affine)
-
-        if spatialimage.ndim == 4 and (len(self) != spatialimage.shape[-1]):
-            raise ValueError(
-                "Attempting to apply %d transforms on a file with "
-                "%d timepoints" % (len(self), spatialimage.shape[-1])
-            )
-
-        # Order F ensures individual volumes are contiguous in memory
-        # Also matches NIfTI, making final save more efficient
-        resampled = np.zeros(
-            (xcoords.shape[0], len(self)), dtype=output_dtype, order="F"
-        )
-
-        dataobj = (
-            np.asanyarray(spatialimage.dataobj, dtype=input_dtype)
-            if spatialimage.ndim in (2, 3)
-            else None
-        )
-
-        for t, xfm_t in enumerate(self):
-            # Map the input coordinates on to timepoint t of the target (moving)
-            ycoords = xfm_t.map(xcoords)[..., : _ref.ndim]
-
-            # Calculate corresponding voxel coordinates
-            yvoxels = ras2vox.map(ycoords)[..., : _ref.ndim]
-
-            # Interpolate
-            resampled[..., t] = ndi.map_coordinates(
-                (
-                    dataobj
-                    if dataobj is not None
-                    else spatialimage.dataobj[..., t].astype(input_dtype, copy=False)
-                ),
-                yvoxels.T,
-                output=output_dtype,
-                order=order,
-                mode=mode,
-                cval=cval,
-                prefilter=prefilter,
-            )
-
-        if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
-            newdata = resampled.reshape(_ref.shape + (len(self),))
-            moved = spatialimage.__class__(newdata, _ref.affine, spatialimage.header)
-            moved.header.set_data_dtype(output_dtype)
-            return moved
-
-        return resampled
 
 
 def load(filename, fmt=None, reference=None, moving=None):
