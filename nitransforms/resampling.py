@@ -98,6 +98,7 @@ def apply(
     if data.ndim < transform.ndim:
         data = data[..., np.newaxis]
  
+    import pdb; pdb.set_trace()
     resampled = ndi.map_coordinates(
         data,
         _as_homogeneous(targets.reshape(-2, targets.shape[0])).T,

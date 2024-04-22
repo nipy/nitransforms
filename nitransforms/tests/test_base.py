@@ -4,7 +4,7 @@ import nibabel as nb
 import pytest
 import h5py
 
-from ..base import SpatialReference, SampledSpatialData, ImageGrid, TransformBase
+from ..base import SpatialReference, SampledSpatialData, ImageGrid, TransformBase, _as_homogeneous
 from .. import linear as nitl
 from ..resampling import apply
 
@@ -42,11 +42,13 @@ def test_ImageGrid(get_testdata, image_orientation):
     # Test ras2vox and vox2ras conversions
     ijk = [[10, 10, 10], [40, 4, 20], [0, 0, 0], [s - 1 for s in im.shape[:3]]]
     xyz = [img._affine.dot(idx + [1])[:-1] for idx in ijk]
+    # xyz = np.array([np.tensordot(img._affine, idx + [1], axes=1)[:-1] for idx in ijk])
 
-    assert np.allclose(img.ras(ijk[0]), xyz[0])
+    # import pdb; pdb.set_trace()
+    assert np.allclose(np.squeeze(img.ras(ijk[0])), xyz[0])
     assert np.allclose(np.round(img.index(xyz[0])), ijk[0])
-    assert np.allclose(img.ras(ijk), xyz)
-    assert np.allclose(np.round(img.index(xyz)), ijk)
+    assert np.allclose(img.ras(ijk).T, xyz)
+    assert np.allclose(np.round(img.index(xyz)).T, ijk)
 
     # nd index / coords
     idxs = img.ndindex
@@ -92,12 +94,13 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     img = nb.load(fname)
     imgdata = np.asanyarray(img.dataobj, dtype=img.get_data_dtype())
 
-    # Test identity transform
     xfm = TransformBase()
-    xfm.reference = fname
-
     with pytest.raises(TypeError):
         _ = xfm.ndim
+
+    # Test identity transform
+    xfm = nitl.Affine()
+    xfm.reference = fname
     moved = apply(xfm, fname, order=0)
     assert np.all(
         imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
