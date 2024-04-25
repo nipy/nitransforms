@@ -145,7 +145,7 @@ should be (0, 0, 0, 1), got %s."""
 
     @property
     def ndim(self):
-        """Access the internal representation of this affine."""
+        """Access the dimensions of this affine."""
         return self._matrix.ndim + 1
     
     def map(self, x, inverse=False):

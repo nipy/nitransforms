@@ -239,6 +239,10 @@ class BSplineFieldTransform(TransformBase):
 
     __slots__ = ['_coeffs', '_knots', '_weights', '_order', '_moving']
 
+    @property
+    def ndim(self):
+        return self._coeffs.ndim - 1
+
     def __init__(self, coefficients, reference=None, order=3):
         """Create a smooth deformation field using B-Spline basis."""
         super().__init__()

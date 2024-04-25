@@ -5,7 +5,7 @@ import pytest
 import h5py
 
 from ..base import SpatialReference, SampledSpatialData, ImageGrid, TransformBase
-from .. import linear as nitl
+from .. import linear as nitl, nonlinear as nitnl
 
 
 def test_SpatialReference(testdata_path):
@@ -116,6 +116,11 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     assert nitl.LinearTransformsMapping(
         [nitl.Affine(), nitl.Affine()]
     ).ndim == 4
+
+    #assert nitnl.DenseFieldTransform().ndim == 3
+    #assert nitnl.BSplineFieldTransform(
+    #    [nitnl.DenseFieldTransform(), nitnl.DenseFieldTransform()]
+    #).ndim == 4
 
     # Test applying to Gifti
     gii = nb.gifti.GiftiImage(
