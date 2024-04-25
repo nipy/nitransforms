@@ -8,6 +8,7 @@ import pytest
 
 import numpy as np
 import nibabel as nb
+from nitransforms.resampling import apply
 from nitransforms.base import TransformError
 from nitransforms.io.base import TransformFileError
 from nitransforms.nonlinear import (
@@ -247,8 +248,8 @@ def test_bspline(tmp_path, testdata_path):
     bsplxfm = BSplineFieldTransform(bs_name, reference=img_name)
     dispxfm = DenseFieldTransform(disp_name)
 
-    out_disp = dispxfm.apply(img_name)
-    out_bspl = bsplxfm.apply(img_name)
+    out_disp = apply(dispxfm,img_name)
+    out_bspl = apply(bsplxfm,img_name)
 
     out_disp.to_filename("resampled_field.nii.gz")
     out_bspl.to_filename("resampled_bsplines.nii.gz")

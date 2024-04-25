@@ -14,6 +14,7 @@ import numpy as np
 from nitransforms import io
 from nitransforms.io.base import _ensure_image
 from nitransforms.interp.bspline import grid_bspline_weights, _cubic_bspline
+from nitransforms.resampling import apply
 from nitransforms.base import (
     TransformBase,
     TransformError,
@@ -257,7 +258,7 @@ class BSplineFieldTransform(TransformBase):
         if reference is not None:
             self.reference = reference
 
-            if coefficients.shape[-1] != self.ndim:
+            if coefficients.shape[-1] != self.reference.ndim:
                 raise TransformError(
                     'Number of components of the coefficients does '
                     'not match the number of dimensions')
@@ -310,19 +311,23 @@ class BSplineFieldTransform(TransformBase):
         spatialimage = _ensure_image(spatialimage)
 
         # If locations to be interpolated are not on a grid, run map()
+        #import pdb; pdb.set_trace()
         if not isinstance(_ref, ImageGrid):
-            return super().apply(
+            return apply(
+                super(),
                 spatialimage,
                 reference=_ref,
+                output_dtype=output_dtype,
                 order=order,
                 mode=mode,
                 cval=cval,
                 prefilter=prefilter,
-                output_dtype=output_dtype,
+                
             )
 
         # If locations to be interpolated are on a grid, generate a displacements field
-        return self.to_field(reference=reference).apply(
+        return apply(
+            self.to_field(reference=reference),
             spatialimage,
             reference=reference,
             order=order,

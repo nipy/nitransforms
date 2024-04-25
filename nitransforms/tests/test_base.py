@@ -94,25 +94,18 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     img = nb.load(fname)
     imgdata = np.asanyarray(img.dataobj, dtype=img.get_data_dtype())
 
+    # Test identity transform - setting reference
     xfm = TransformBase()
     with pytest.raises(TypeError):
         _ = xfm.ndim
+
+    # Test to_filename
+    xfm.to_filename("data.x5")
 
     # Test identity transform
     xfm = nitl.Affine()
     xfm.reference = fname
     moved = apply(xfm, fname, order=0)
-    assert np.all(
-        imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
-    )
-
-    # Test identity transform - setting reference
-    xfm = TransformBase()
-    xfm.reference = fname
-
-    with pytest.raises(TypeError):
-        _ = xfm.ndim
-    moved = apply(xfm, str(fname), reference=fname, order=0)
     assert np.all(
         imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
     )
@@ -136,7 +129,7 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     assert np.allclose(giimoved.reshape(xfm.reference.shape), moved.get_fdata())
 
     # Test to_filename
-    xfm.to_filename("data.x5")
+    xfm.to_filename("data.xfm", fmt='itk')
 
 
 def test_SampledSpatialData(testdata_path):
