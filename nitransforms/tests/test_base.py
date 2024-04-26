@@ -42,9 +42,7 @@ def test_ImageGrid(get_testdata, image_orientation):
     # Test ras2vox and vox2ras conversions
     ijk = [[10, 10, 10], [40, 4, 20], [0, 0, 0], [s - 1 for s in im.shape[:3]]]
     xyz = [img._affine.dot(idx + [1])[:-1] for idx in ijk]
-    # xyz = np.array([np.tensordot(img._affine, idx + [1], axes=1)[:-1] for idx in ijk])
 
-    # import pdb; pdb.set_trace()
     assert np.allclose(np.squeeze(img.ras(ijk[0])), xyz[0])
     assert np.allclose(np.round(img.index(xyz[0])), ijk[0])
     assert np.allclose(img.ras(ijk).T, xyz)

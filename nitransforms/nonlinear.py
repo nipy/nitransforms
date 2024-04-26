@@ -168,7 +168,7 @@ class DenseFieldTransform(TransformBase):
         indexes = np.round(ijk).astype("int")
 
         if np.all(np.abs(ijk - indexes) < 1e-3):
-            indexes = tuple(tuple(i) for i in indexes.T)
+            indexes = tuple(tuple(i) for i in indexes)
             return self._field[indexes]
 
         return np.vstack(tuple(
