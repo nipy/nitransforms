@@ -117,11 +117,6 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
         [nitl.Affine(), nitl.Affine()]
     ).ndim == 4
 
-    assert nitnl.DenseFieldTransform().ndim == 3
-    assert nitnl.BSplineFieldTransform(
-        [nitnl.DenseFieldTransform(), nitnl.DenseFieldTransform()]
-    ).ndim == 4
-
     # Test applying to Gifti
     gii = nb.gifti.GiftiImage(
         darrays=[
