@@ -97,13 +97,14 @@ def test_bsplines_references(testdata_path):
         ).to_field()
 
     with pytest.raises(TransformError):
-        BSplineFieldTransform(
-            testdata_path / "someones_bspline_coefficients.nii.gz"
-        ).apply(testdata_path / "someones_anatomy.nii.gz")
+        apply(
+            BSplineFieldTransform(testdata_path / "someones_bspline_coefficients.nii.gz"),
+            testdata_path / "someones_anatomy.nii.gz",
+        )
 
-    BSplineFieldTransform(
-        testdata_path / "someones_bspline_coefficients.nii.gz"
-    ).apply(
+    apply(
+        BSplineFieldTransform(
+        testdata_path / "someones_bspline_coefficients.nii.gz"),
         testdata_path / "someones_anatomy.nii.gz",
         reference=testdata_path / "someones_anatomy.nii.gz"
     )

@@ -30,6 +30,11 @@ class DenseFieldTransform(TransformBase):
 
     __slots__ = ("_field", "_deltas")
 
+    @property
+    def ndim(self):
+        """Access the dimensions of this Desne Field Transform."""
+        return self._field.ndim - 1
+
     def __init__(self, field=None, is_deltas=True, reference=None):
         """
         Create a dense field transform.
@@ -82,11 +87,10 @@ class DenseFieldTransform(TransformBase):
                 "Reference is not a spatial image"
             )
 
-        ndim = self._field.ndim - 1
-        if self._field.shape[-1] != ndim:
+        if self._field.shape[-1] != self.ndim:
             raise TransformError(
                 "The number of components of the field (%d) does not match "
-                "the number of dimensions (%d)" % (self._field.shape[-1], ndim)
+                "the number of dimensions (%d)" % (self._field.shape[-1], self.ndim)
             )
 
         if is_deltas:
@@ -245,6 +249,12 @@ class BSplineFieldTransform(TransformBase):
 
     __slots__ = ['_coeffs', '_knots', '_weights', '_order', '_moving']
 
+    @property
+    def ndim(self):
+        """Access the dimensions of this BSpline."""
+        #return ndim = self._coeffs.shape[-1]
+        return self._coeffs.ndim - 1
+
     def __init__(self, coefficients, reference=None, order=3):
         """Create a smooth deformation field using B-Spline basis."""
         super().__init__()
@@ -277,64 +287,17 @@ class BSplineFieldTransform(TransformBase):
         if _ref is None:
             raise TransformError("A reference must be defined")
 
-        ndim = self._coeffs.shape[-1]
-
         if self._weights is None:
             self._weights = grid_bspline_weights(_ref, self._knots)
 
-        field = np.zeros((_ref.npoints, ndim))
+        field = np.zeros((_ref.npoints, self.ndim))
 
-        for d in range(ndim):
+        for d in range(self.ndim):
             #  1 x Nvox :                          (1 x K) @ (K x Nvox)
             field[:, d] = self._coeffs[..., d].reshape(-1) @ self._weights
 
         return DenseFieldTransform(
             field.astype(dtype).reshape(*_ref.shape, -1), reference=_ref
-        )
-
-    def apply(
-        self,
-        spatialimage,
-        reference=None,
-        order=3,
-        mode="constant",
-        cval=0.0,
-        prefilter=True,
-        output_dtype=None,
-    ):
-        """Apply a B-Spline transform on input data."""
-
-        _ref = (
-            self.reference if reference is None else
-            SpatialReference.factory(_ensure_image(reference))
-        )
-        spatialimage = _ensure_image(spatialimage)
-
-        # If locations to be interpolated are not on a grid, run map()
-        #import pdb; pdb.set_trace()
-        if not isinstance(_ref, ImageGrid):
-            return apply(
-                super(),
-                spatialimage,
-                reference=_ref,
-                output_dtype=output_dtype,
-                order=order,
-                mode=mode,
-                cval=cval,
-                prefilter=prefilter,
-                
-            )
-
-        # If locations to be interpolated are on a grid, generate a displacements field
-        return apply(
-            self.to_field(reference=reference),
-            spatialimage,
-            reference=reference,
-            order=order,
-            mode=mode,
-            cval=cval,
-            prefilter=prefilter,
-            output_dtype=output_dtype,
         )
 
     def map(self, x, inverse=False):

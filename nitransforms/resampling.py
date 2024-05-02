@@ -87,16 +87,21 @@ def apply(
         spatialimage = _nbload(str(spatialimage))
 
     data = np.asanyarray(spatialimage.dataobj)
-    
-    targets = ImageGrid(spatialimage).index(  # data should be an image
-        _as_homogeneous(transform.map(_ref.ndcoords.T), dim=_ref.ndim)
-    )
 
     if data.ndim == 4 and data.shape[-1] != len(transform):
         raise ValueError("The fourth dimension of the data does not match the tranform's shape.")
 
     if data.ndim < transform.ndim:
         data = data[..., np.newaxis]
+    
+    if hasattr(transform, 'to_field') and callable(transform.to_field):
+        targets = ImageGrid(spatialimage).index(
+            _as_homogeneous(transform.to_field(reference=reference).map(_ref.ndcoords.T), dim=_ref.ndim)
+        )
+    else:
+        targets = ImageGrid(spatialimage).index(  # data should be an image
+            _as_homogeneous(transform.map(_ref.ndcoords.T), dim=_ref.ndim)
+        )
  
     if transform.ndim == 4:
         targets = _as_homogeneous(targets.reshape(-2, targets.shape[0])).T
