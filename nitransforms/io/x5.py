@@ -51,3 +51,19 @@ class X5LinearTransform(LinearParameters):
         if str(filename).endswith(".h5"):
             with H5File(str(filename)) as f:
                 return cls.from_h5obj(f)
+
+class X5LinearTransformArray(BaseLinearTransformList):
+    """A string-based structure for series of X5 linear transforms."""
+
+    _inner_type = X5LinearTransform
+
+    @property
+    def xforms(self):
+        """Get the list of internal ITKLinearTransforms."""
+        return self._xforms
+
+    @xforms.setter
+    def xforms(self, value):
+        self._xforms = list(value)
+        for i, val in enumerate(self.xforms):
+            val["index"] = i
