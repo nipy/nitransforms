@@ -35,14 +35,9 @@ class X5LinearTransform(LinearParameters):
         return
 
     def to_filename(self, filename):
-        """Store this transform to a file with the appropriate format."""
+        '''store this transform to a file with the X5 format'''
         sa = self.structarr
-        affine = np.array(
-                np.hstack(
-                    (sa["parameters"][:3, :3].reshape(-1), sa["parameters"][:3, 3])
-                )[..., np.newaxis],
-                dtype="f8",
-            )
+        affine = '''some affine that will return a 4x4 array'''
         return
     
     @classmethod
@@ -61,9 +56,3 @@ class X5LinearTransformArray(BaseLinearTransformList):
     def xforms(self):
         """Get the list of internal ITKLinearTransforms."""
         return self._xforms
-
-    @xforms.setter
-    def xforms(self, value):
-        self._xforms = list(value)
-        for i, val in enumerate(self.xforms):
-            val["index"] = i
