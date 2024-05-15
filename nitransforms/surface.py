@@ -9,6 +9,7 @@
 """Surface transforms."""
 
 import h5py
+import numpy as np
 import scipy.sparse as sparse
 
 from nitransforms.base import TransformBase
@@ -62,11 +63,35 @@ class SurfaceTransform(TransformBase):
         xform.create_dataset("indptr", data=self.mat.indptr)
         xform.create_dataset("shape", data=self.mat.shape)
 
+    def to_filename(self, filename, fmt=None):
+        """Store the transform."""
+        if fmt is None:
+            fmt = "npz" if filename.endswith(".npz") else "X5"
+
+        if fmt == "npz":
+            sparse.save_npz(filename, self.mat)
+            return filename
+
+        with h5py.File(filename, "w") as out_file:
+            out_file.attrs["Format"] = "X5"
+            out_file.attrs["Version"] = np.uint16(1)
+            root = out_file.create_group("/0")
+            self._to_hdf5(root)
+
+        return filename
+
     @classmethod
-    def from_filename(cls, filename, fmt="X5"):
+    def from_filename(cls, filename, fmt=None):
         """Load transform from file."""
+        if fmt is None:
+            fmt = "npz" if filename.endswith(".npz") else "X5"
+
+        if fmt == "npz":
+            return cls(sparse.load_npz(filename))
+
         if fmt != "X5":
-            raise ValueError("Only X5 format is supported.")
+            raise ValueError("Only npz and X5 formats are supported.")
+
         with h5py.File(filename, "r") as f:
             assert f.attrs["Format"] == "X5"
             xform = f["/0/Transform"]
@@ -74,4 +99,4 @@ class SurfaceTransform(TransformBase):
                 (xform["data"][()], xform["indices"][()], xform["indptr"][()]),
                 shape=xform["shape"][()],
             )
-            return cls(mat)
+        return cls(mat)
