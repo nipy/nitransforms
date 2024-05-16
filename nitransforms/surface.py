@@ -34,7 +34,7 @@ class SurfaceTransform(TransformBase):
         else:
             self.mat = sparse.csr_array(mat)
 
-    def apply(self, x, inverse=False):
+    def apply(self, x, inverse=False, normalize="element"):
         """Apply the transform to surface data.
 
         Parameters
@@ -44,15 +44,37 @@ class SurfaceTransform(TransformBase):
         inverse : bool, default=False
             Whether to apply the inverse transform. If True, ``x`` has shape
             (..., nv2), and the output will have shape (..., nv1).
+        normalize : {"element", "sum", "none"}, default="element"
+            Normalization strategy. If "element", the scale of each value in
+            the output is comparable to each value of the input. If "sum", the
+            sum of the output is comparable to the sum of the input. If
+            "none", no normalization is applied.
 
         Returns
         -------
         y : array-like, shape (..., nv2)
             Transformed data.
         """
-        if inverse:
-            return x @ self.mat.T
-        return x @ self.mat
+        if normalize not in ("element", "sum", "none"):
+            raise ValueError("Invalid normalization strategy.")
+
+        mat = self.mat.T if inverse else self.mat
+
+        if normalize == "element":
+            sum_ = mat.sum(axis=0)
+            scale = np.zeros_like(sum_)
+            mask = sum_ != 0
+            scale[mask] = 1.0 / sum_[mask]
+            mat = mat @ sparse.diags(scale)
+        elif normalize == "sum":
+            sum_ = mat.sum(axis=1)
+            scale = np.zeros_like(sum_)
+            mask = sum_ != 0
+            scale[mask] = 1.0 / sum_[mask]
+            mat = sparse.diags(scale) @ mat
+
+        y = x @ mat
+        return y
 
     def _to_hdf5(self, x5_root):
         """Write transform to HDF5 file."""

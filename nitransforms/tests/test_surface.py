@@ -43,3 +43,16 @@ def test_surface_transform_npz():
         os.remove(fn)
         raise
     os.remove(fn)
+
+
+def test_surface_transform_normalization():
+    mat = np.random.uniform(size=(20, 10))
+    xfm = SurfaceTransform(mat)
+    x = np.random.uniform(size=(5, 20))
+    y_element = xfm.apply(x, normalize="element")
+    np.testing.assert_array_less(y_element.sum(axis=1), x.sum(axis=1))
+    y_sum = xfm.apply(x, normalize="sum")
+    np.testing.assert_allclose(y_sum.sum(axis=1), x.sum(axis=1))
+    y_none = xfm.apply(x, normalize="none")
+    assert y_none.sum() != y_element.sum()
+    assert y_none.sum() != y_sum.sum()
