@@ -352,6 +352,18 @@ class ITKDisplacementsField(DisplacementsField):
 
         return imgobj.__class__(field, imgobj.affine, hdr)
 
+    @classmethod
+    def to_image(cls, imgobj):
+        """Export a displacements field from a nibabel object."""
+
+        hdr = imgobj.header.copy()
+        hdr.set_intent("vector")
+
+        warp_data = imgobj.get_fdata().reshape(imgobj.shape[:3] + (1, imgobj.shape[-1]))
+        warp_data[..., (0, 1)] *= -1
+
+        return imgobj.__class__(warp_data, imgobj.affine, hdr)
+
 
 class ITKCompositeH5:
     """A data structure for ITK's HDF5 files."""

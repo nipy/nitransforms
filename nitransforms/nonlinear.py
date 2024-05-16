@@ -173,12 +173,16 @@ class DenseFieldTransform(TransformBase):
                     ijk.T,
                     order=3,
                     mode="constant",
-                    cval=0,
+                    cval=np.nan,
                     prefilter=True,
                 )
                 for i in range(self.reference.ndim)
             )
         ).T
+
+        # Set NaN values back to the original coordinates value = no displacement
+        new_map[np.isnan(new_map)] = x[np.isnan(new_map)]
+        return new_map
 
     def __matmul__(self, b):
         """
