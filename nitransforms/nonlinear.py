@@ -163,6 +163,8 @@ class DenseFieldTransform(TransformBase):
 
         if inverse is True:
             raise NotImplementedError
+
+        x = np.array(x)
         ijk = self.reference.index(x)
         indexes = np.round(ijk).astype("int")
 
