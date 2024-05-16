@@ -2,7 +2,7 @@ version: 2
 jobs:
   build_pytest:
     machine:
-      image: ubuntu-2004:202107-02
+      image: default
     working_directory: /tmp/src/nitransforms
     environment:
       TZ: "/usr/share/zoneinfo/America/Los_Angeles"
