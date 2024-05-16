@@ -98,6 +98,11 @@ class DenseFieldTransform(TransformBase):
         """Beautify the python representation."""
         return f"<{self.__class__.__name__}[{self._field.shape[-1]}D] {self._field.shape[:3]}>"
 
+    @property
+    def ndim(self):
+        """Get the dimensions of the transform."""
+        return self._field.ndim - 1
+
     def map(self, x, inverse=False):
         r"""
         Apply the transformation to a list of physical coordinate points.
@@ -256,6 +261,11 @@ class BSplineFieldTransform(TransformBase):
                 raise TransformError(
                     'Number of components of the coefficients does '
                     'not match the number of dimensions')
+
+    @property
+    def ndim(self):
+        """Get the dimensions of the transform."""
+        return self._coeffs.ndim - 1
 
     def to_field(self, reference=None, dtype="float32"):
         """Generate a displacements deformation field from this B-Spline field."""
