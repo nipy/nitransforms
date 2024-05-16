@@ -190,6 +190,17 @@ class FSLDisplacementsField(DisplacementsField):
 
         return imgobj.__class__(field, imgobj.affine, hdr)
 
+    @classmethod
+    def to_image(cls, imgobj):
+        """Export a displacements field from a nibabel object."""
+
+        hdr = imgobj.header.copy()
+
+        warp_data = imgobj.get_fdata()
+        warp_data[..., 0] *= -1
+
+        return imgobj.__class__(warp_data, imgobj.affine, hdr)
+
 
 def _fsl_aff_adapt(space):
     """
