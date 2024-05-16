@@ -108,7 +108,7 @@ ENV PATH="/usr/local/miniconda/bin:$PATH" \
 
 # Installing precomputed python packages
 RUN conda install -y -c anaconda -c conda-forge \
-                     python=3.7 \
+                     python=3.8 \
                      libxml2=2.9 \
                      libxslt=1.1 \
                      lxml \
