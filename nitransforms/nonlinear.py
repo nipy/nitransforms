@@ -170,7 +170,6 @@ class DenseFieldTransform(TransformBase):
             indexes = tuple(tuple(i) for i in indexes.T)
             return self._field[indexes]
 
-
         new_map = np.vstack(tuple(
             map_coordinates(
                 self._field[..., i],
