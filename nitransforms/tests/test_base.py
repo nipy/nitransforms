@@ -4,7 +4,12 @@ import nibabel as nb
 import pytest
 import h5py
 
-from ..base import SpatialReference, SampledSpatialData, ImageGrid, TransformBase, _as_homogeneous
+from ..base import (
+    SpatialReference,
+    SampledSpatialData,
+    ImageGrid,
+    TransformBase,
+)
 from .. import linear as nitl
 from ..resampling import apply
 
@@ -104,15 +109,11 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     xfm = nitl.Affine()
     xfm.reference = fname
     moved = apply(xfm, fname, order=0)
-    assert np.all(
-        imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
-    )
+    assert np.all(imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype()))
 
     # Test ndim returned by affine
     assert nitl.Affine().ndim == 3
-    assert nitl.LinearTransformsMapping(
-        [nitl.Affine(), nitl.Affine()]
-    ).ndim == 4
+    assert nitl.LinearTransformsMapping([nitl.Affine(), nitl.Affine()]).ndim == 4
 
     # Test applying to Gifti
     gii = nb.gifti.GiftiImage(
@@ -127,7 +128,7 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     assert np.allclose(giimoved.reshape(xfm.reference.shape), moved.get_fdata())
 
     # Test to_filename
-    xfm.to_filename("data.xfm", fmt='itk')
+    xfm.to_filename("data.xfm", fmt="itk")
 
 
 def test_SampledSpatialData(testdata_path):

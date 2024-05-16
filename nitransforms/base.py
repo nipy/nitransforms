@@ -177,7 +177,10 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ("_reference", "_ndim",)
+    __slots__ = (
+        "_reference",
+        "_ndim",
+    )
 
     def __init__(self, reference=None):
         """Instantiate a transform."""
@@ -282,6 +285,7 @@ def _as_homogeneous(xyz, dtype="float32", dim=3):
         return xyz
 
     return np.hstack((xyz, np.ones((xyz.shape[0], 1), dtype=dtype)))
+
 
 def _apply_affine(x, affine, dim):
     """Get the image array's indexes corresponding to coordinates."""

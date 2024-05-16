@@ -14,12 +14,10 @@ import numpy as np
 from nitransforms import io
 from nitransforms.io.base import _ensure_image
 from nitransforms.interp.bspline import grid_bspline_weights, _cubic_bspline
-from nitransforms.resampling import apply
 from nitransforms.base import (
     TransformBase,
     TransformError,
     ImageGrid,
-    SpatialReference,
     _as_homogeneous,
 )
 from scipy.ndimage import map_coordinates
@@ -77,14 +75,12 @@ class DenseFieldTransform(TransformBase):
             is_deltas = True
 
         try:
-            self.reference = ImageGrid(
-                reference if reference is not None else field
-            )
+            self.reference = ImageGrid(reference if reference is not None else field)
         except AttributeError:
             raise TransformError(
                 "Field must be a spatial image if reference is not provided"
-                if reference is None else
-                "Reference is not a spatial image"
+                if reference is None
+                else "Reference is not a spatial image"
             )
 
         if self._field.shape[-1] != self.ndim:
@@ -175,16 +171,19 @@ class DenseFieldTransform(TransformBase):
             indexes = tuple(tuple(i) for i in indexes)
             return self._field[indexes]
 
-        return np.vstack(tuple(
-            map_coordinates(
-                self._field[..., i],
-                ijk.T,
-                order=3,
-                mode="constant",
-                cval=0,
-                prefilter=True,
-            ) for i in range(self.reference.ndim)
-        )).T
+        return np.vstack(
+            tuple(
+                map_coordinates(
+                    self._field[..., i],
+                    ijk.T,
+                    order=3,
+                    mode="constant",
+                    cval=0,
+                    prefilter=True,
+                )
+                for i in range(self.reference.ndim)
+            )
+        ).T
 
     def __matmul__(self, b):
         """
@@ -206,9 +205,9 @@ class DenseFieldTransform(TransformBase):
         True
 
         """
-        retval = b.map(
-            self._field.reshape((-1, self._field.shape[-1]))
-        ).reshape(self._field.shape)
+        retval = b.map(self._field.reshape((-1, self._field.shape[-1]))).reshape(
+            self._field.shape
+        )
         return DenseFieldTransform(retval, is_deltas=False, reference=self.reference)
 
     def __eq__(self, other):
@@ -247,12 +246,12 @@ load = DenseFieldTransform.from_filename
 class BSplineFieldTransform(TransformBase):
     """Represent a nonlinear transform parameterized by BSpline basis."""
 
-    __slots__ = ['_coeffs', '_knots', '_weights', '_order', '_moving']
+    __slots__ = ["_coeffs", "_knots", "_weights", "_order", "_moving"]
 
     @property
     def ndim(self):
         """Access the dimensions of this BSpline."""
-        #return ndim = self._coeffs.shape[-1]
+        # return ndim = self._coeffs.shape[-1]
         return self._coeffs.ndim - 1
 
     def __init__(self, coefficients, reference=None, order=3):
@@ -270,8 +269,9 @@ class BSplineFieldTransform(TransformBase):
 
             if coefficients.shape[-1] != self.reference.ndim:
                 raise TransformError(
-                    'Number of components of the coefficients does '
-                    'not match the number of dimensions')
+                    "Number of components of the coefficients does "
+                    "not match the number of dimensions"
+                )
 
     @property
     def ndim(self):
@@ -281,8 +281,7 @@ class BSplineFieldTransform(TransformBase):
     def to_field(self, reference=None, dtype="float32"):
         """Generate a displacements deformation field from this B-Spline field."""
         _ref = (
-            self.reference if reference is None else
-            ImageGrid(_ensure_image(reference))
+            self.reference if reference is None else ImageGrid(_ensure_image(reference))
         )
         if _ref is None:
             raise TransformError("A reference must be defined")
@@ -350,9 +349,9 @@ def _map_xyz(x, reference, knots, coeffs):
     # Probably this will change if the order of the B-Spline is different
     w_start, w_end = np.ceil(ijk - 2).astype(int), np.floor(ijk + 2).astype(int)
     # Generate a grid of indexes corresponding to the window
-    nonzero_knots = tuple([
-        np.arange(start, end + 1) for start, end in zip(w_start, w_end)
-    ])
+    nonzero_knots = tuple(
+        [np.arange(start, end + 1) for start, end in zip(w_start, w_end)]
+    )
     nonzero_knots = tuple(np.meshgrid(*nonzero_knots, indexing="ij"))
     window = np.array(nonzero_knots).reshape((ndim, -1))
 

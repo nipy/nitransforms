@@ -77,7 +77,9 @@ def apply(
         reference = _nbload(str(reference))
 
     _ref = (
-        transform.reference if reference is None else SpatialReference.factory(reference)
+        transform.reference
+        if reference is None
+        else SpatialReference.factory(reference)
     )
 
     if _ref is None:
@@ -89,20 +91,25 @@ def apply(
     data = np.asanyarray(spatialimage.dataobj)
 
     if data.ndim == 4 and data.shape[-1] != len(transform):
-        raise ValueError("The fourth dimension of the data does not match the tranform's shape.")
+        raise ValueError(
+            "The fourth dimension of the data does not match the tranform's shape."
+        )
 
     if data.ndim < transform.ndim:
         data = data[..., np.newaxis]
-    
-    if hasattr(transform, 'to_field') and callable(transform.to_field):
+
+    if hasattr(transform, "to_field") and callable(transform.to_field):
         targets = ImageGrid(spatialimage).index(
-            _as_homogeneous(transform.to_field(reference=reference).map(_ref.ndcoords.T), dim=_ref.ndim)
+            _as_homogeneous(
+                transform.to_field(reference=reference).map(_ref.ndcoords.T),
+                dim=_ref.ndim,
+            )
         )
     else:
         targets = ImageGrid(spatialimage).index(  # data should be an image
             _as_homogeneous(transform.map(_ref.ndcoords.T), dim=_ref.ndim)
         )
- 
+
     if transform.ndim == 4:
         targets = _as_homogeneous(targets.reshape(-2, targets.shape[0])).T
 
@@ -115,14 +122,14 @@ def apply(
         cval=cval,
         prefilter=prefilter,
     )
-     
+
     if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
         hdr = None
         if _ref.header is not None:
             hdr = _ref.header.copy()
             hdr.set_data_dtype(output_dtype or spatialimage.get_data_dtype())
         moved = spatialimage.__class__(
-            resampled.reshape(_ref.shape if data.ndim < 4 else _ref.shape + (-1, )),
+            resampled.reshape(_ref.shape if data.ndim < 4 else _ref.shape + (-1,)),
             _ref.affine,
             hdr,
         )

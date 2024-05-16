@@ -10,16 +10,12 @@
 import warnings
 import numpy as np
 from pathlib import Path
-from scipy import ndimage as ndi
 
-from nibabel.loadsave import load as _nbload
 from nibabel.affines import from_matvec
-from nibabel.arrayproxy import get_obj_dtype
 
 from nitransforms.base import (
     ImageGrid,
     TransformBase,
-    SpatialReference,
     _as_homogeneous,
     EQUALITY_TOL,
 )
@@ -112,7 +108,7 @@ should be (0, 0, 0, 1), got %s."""
 
         """
         return self.__class__(self._inverse)
-    
+
     def __len__(self):
         """Enable using len()."""
         return 1 if self._matrix.ndim == 2 else len(self._matrix)
