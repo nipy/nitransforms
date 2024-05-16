@@ -28,11 +28,6 @@ class DenseFieldTransform(TransformBase):
 
     __slots__ = ("_field", "_deltas")
 
-    @property
-    def ndim(self):
-        """Access the dimensions of this Desne Field Transform."""
-        return self._field.ndim - 1
-
     def __init__(self, field=None, is_deltas=True, reference=None):
         """
         Create a dense field transform.
@@ -247,12 +242,6 @@ class BSplineFieldTransform(TransformBase):
     """Represent a nonlinear transform parameterized by BSpline basis."""
 
     __slots__ = ["_coeffs", "_knots", "_weights", "_order", "_moving"]
-
-    @property
-    def ndim(self):
-        """Access the dimensions of this BSpline."""
-        # return ndim = self._coeffs.shape[-1]
-        return self._coeffs.ndim - 1
 
     def __init__(self, coefficients, reference=None, order=3):
         """Create a smooth deformation field using B-Spline basis."""
