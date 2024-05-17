@@ -22,7 +22,7 @@ _IO_TYPES = {
     "fs": (lta, "FSLinearTransform"),
     "fsl": (fsl, "FSLLinearTransform"),
     "afni": (afni, "AFNILinearTransform"),
-    "x5": (x5, "X5LinearTransform")
+    "x5": (x5, "X5Transform")
 }
 
 
