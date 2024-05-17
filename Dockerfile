@@ -199,7 +199,7 @@ ENV MKL_NUM_THREADS=1 \
 # CRITICAL: Make sure python setup.py --version has been run at least once
 #           outside the container, with access to the git history.
 COPY --from=src /src/dist/*.whl .
-RUN python -m pip install --no-cache-dir $( ls /src/dist/*.whl )[all]
+RUN python -m pip install --no-cache-dir $( ls *.whl )[all]
 
 
 RUN find $HOME -type d -exec chmod go=u {} + && \

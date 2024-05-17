@@ -137,7 +137,8 @@ jobs:
           no_output_timeout: 2h
           command: |
             mkdir -p /tmp/tests/{artifacts,summaries}
-            docker run -u $( id -u ) -it --rm -w /src/nitransforms \
+            docker run -u $( id -u ) -it --rm \
+              -w /src/nitransforms -v $PWD:/src/nitransforms \
               -v /tmp/data/nitransforms-tests:/data -e TEST_DATA_HOME=/data \
               -e COVERAGE_FILE=/tmp/summaries/.pytest.coverage \
               -v /tmp/fslicense/license.txt:/opt/freesurfer/license.txt:ro \
@@ -176,7 +177,7 @@ jobs:
           command: |
             python3 -m venv /tmp/buildenv
             source /tmp/buildenv/bin/activate
-            python3 -m pip install "setuptools >= 45.0" wheel "setuptools_scm[toml] >= 6.2" \
+            python3 -m pip install "setuptools >= 45.0" build wheel "setuptools_scm[toml] >= 6.2" \
                 "pip>=10.0.1" twine docutils
             python3 -m build
             twine check dist/nitransforms*
