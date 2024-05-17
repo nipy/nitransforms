@@ -98,6 +98,7 @@ def apply(
     if data.ndim < transform.ndim:
         data = data[..., np.newaxis]
 
+    # For model-based nonlinear transforms, generate the corresponding dense field
     if hasattr(transform, "to_field") and callable(transform.to_field):
         targets = ImageGrid(spatialimage).index(
             _as_homogeneous(
