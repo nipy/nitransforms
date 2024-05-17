@@ -4,17 +4,17 @@ import tempfile
 import numpy as np
 import scipy.sparse as sparse
 
-from nitransforms.surface import SurfaceTransform
+from nitransforms.surface import SurfaceCoordinateTransform
 
 
 def test_surface_transform_x5():
     mat = sparse.random(10, 10, density=0.5)
-    xfm = SurfaceTransform(mat)
+    xfm = SurfaceCoordinateTransform(mat)
     fn = tempfile.mktemp(suffix=".h5")
     print(fn)
     xfm.to_filename(fn)
 
-    xfm2 = SurfaceTransform.from_filename(fn)
+    xfm2 = SurfaceCoordinateTransform.from_filename(fn)
     try:
         assert xfm.mat.shape == xfm2.mat.shape
         np.testing.assert_array_equal(xfm.mat.data, xfm2.mat.data)
@@ -28,12 +28,12 @@ def test_surface_transform_x5():
 
 def test_surface_transform_npz():
     mat = sparse.random(10, 10, density=0.5)
-    xfm = SurfaceTransform(mat)
+    xfm = SurfaceCoordinateTransform(mat)
     fn = tempfile.mktemp(suffix=".npz")
     print(fn)
     xfm.to_filename(fn)
 
-    xfm2 = SurfaceTransform.from_filename(fn)
+    xfm2 = SurfaceCoordinateTransform.from_filename(fn)
     try:
         assert xfm.mat.shape == xfm2.mat.shape
         np.testing.assert_array_equal(xfm.mat.data, xfm2.mat.data)
@@ -47,7 +47,7 @@ def test_surface_transform_npz():
 
 def test_surface_transform_normalization():
     mat = np.random.uniform(size=(20, 10))
-    xfm = SurfaceTransform(mat)
+    xfm = SurfaceCoordinateTransform(mat)
     x = np.random.uniform(size=(5, 20))
     y_element = xfm.apply(x, normalize="element")
     np.testing.assert_array_less(y_element.sum(axis=1), x.sum(axis=1))

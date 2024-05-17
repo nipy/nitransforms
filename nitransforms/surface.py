@@ -11,11 +11,97 @@
 import h5py
 import numpy as np
 import scipy.sparse as sparse
-
+from nitransforms.base import (
+    SurfaceMesh
+)
+import nibabel as nb
+from scipy.spatial import KDTree
 from nitransforms.base import TransformBase
 
 
-class SurfaceTransform(TransformBase):
+class SurfaceTransformBase():
+    """Generic surface transformation class"""
+    __slots__ = ("_reference", "_moving")
+    def __init__(self, reference, moving):
+        """Instantiate a generic surface transform."""
+        self._reference = reference
+        self._moving = moving
+
+    def __eq__(self, other):
+        ref_coords_eq = (self.reference._coordinates == other.reference._coordinates).all()
+        ref_tris_eq =  (self.reference._triangles == other.reference._triangles).all()
+        mov_coords_eq = (self.moving._coordinates == other.moving._coordinates).all()
+        mov_tris_eq = (self.moving._triangles == other.moving._triangles).all()
+        return ref_coords_eq & ref_tris_eq & mov_coords_eq & mov_tris_eq
+
+    def __invert__(self):
+        return self.__class__(self.moving, self.reference)
+    @property
+    def reference(self):
+        return self._reference
+
+    @reference.setter
+    def reference(self, surface):
+        self._reference = SurfaceMesh(surface)
+
+    @property
+    def moving(self):
+        return self._moving
+
+    @moving.setter
+    def moving(self, surface):
+        self._moving = SurfaceMesh(surface)
+    @classmethod
+    def from_filename(cls, reference_path, moving_path):
+        """Create an Surface Index Transformation from a pair of surfaces with corresponding vertices."""
+        reference = SurfaceMesh(nb.load(reference_path))
+        moving = SurfaceMesh(nb.load(moving_path))
+        return cls(reference, moving)
+
+class SurfaceIndexTransform(SurfaceTransformBase):
+    """Represents surface transformations in which the indices correspond and the coordinates differ."""
+
+    __slots__ = ("_reference", "_moving")
+    def __init__(self, reference, moving):
+        """Instantiate a transform between two surfaces with corresponding vertices."""
+        super().__init__(reference=reference, moving=moving)
+        if (self._reference._triangles != self._moving._triangles).all():
+            raise ValueError("Both surfaces for an index transform must have corresponding vertices.")
+
+    def map(self, x, inverse=False):
+        if inverse:
+            source = self.reference
+            dest = self.moving
+        else:
+            source = self.moving
+            dest = self.reference
+
+        s_tree = KDTree(source._coords)
+        dists, matches = s_tree.query(x)
+        if not np.allclose(dists, 0):
+            raise NotImplementedError("Mapping on surfaces not implemented for coordinates that aren't vertices")
+        return dest._coords[matches]
+
+    def __add__(self, other):
+        return self.__class__(self.reference, other.moving)
+
+    @property
+    def reference(self):
+        return self._reference
+
+    @reference.setter
+    def reference(self, surface):
+        self._reference = SurfaceMesh(surface)
+
+    @property
+    def moving(self):
+        return self._moving
+
+    @moving.setter
+    def moving(self, surface):
+        self._moving = SurfaceMesh(surface)
+
+class SurfaceCoordinateTransform(SurfaceTransformBase):
     """Represents transforms between surface spaces."""
 
     __slots__ = ("mat",)

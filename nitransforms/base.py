@@ -88,6 +88,33 @@ class SampledSpatialData:
         """Access the space's size of each dimension."""
         return self._shape
 
+class SurfaceMesh(SampledSpatialData):
+    """Class to represent surface meshes."""
+
+    __slots__ = ["_triangles"]
+    def __init__(self, dataset):
+        """Create a sampling reference."""
+        self._shape = None
+
+        if isinstance(dataset, (str, Path)):
+            dataset = _nbload(str(dataset))
+
+        if hasattr(dataset, "numDA"):  # Looks like a Gifti file
+            _das = dataset.get_arrays_from_intent(INTENT_CODES["pointset"])
+            if not _das:
+                raise TypeError(
+                    "Input Gifti file does not contain reference coordinates."
+                )
+            self._coords = np.vstack([da.data for da in _das])
+            _tris = dataset.get_arrays_from_intent(INTENT_CODES["triangle"])
+            self._triangles = np.vstack([da.data for da in _tris])
+            self._npoints, self._ndim = self._coords.shape
+            return
+
+        if isinstance(dataset, Cifti2Image):
+            raise NotImplementedError
+
+        raise ValueError("Dataset could not be interpreted as an irregular sample.")
 
 class ImageGrid(SampledSpatialData):
     """Class to represent spaces of gridded data (images)."""
