@@ -13,20 +13,10 @@ from nitransforms.io.base import (
     TransformFileError,
 )
 
-LPS = np.diag([-1, -1, 1, 1])
-
-class X5LinearTransform(LinearParameters):
+class X5Transform:
     """A string-based structure for X5 linear transforms."""
 
-    template_dtype = np.dtype(
-        [
-            ("type", "i4"),
-            ("index", "i4"),
-            ("parameters", "f8", (4, 4)),
-            ("offset", "f4", 3),  # Center of rotation
-        ]
-    )
-    dtype = template_dtype
+    _transform = None
 
     def __init__(self, parameters=None, offset=None):
         return
@@ -34,25 +24,32 @@ class X5LinearTransform(LinearParameters):
     def __str__(self):
         return
 
-    def to_filename(self, filename):
-        '''store this transform to a file with the X5 format'''
-        sa = self.structarr
-        affine = '''some affine that will return a 4x4 array'''
-        return
-    
     @classmethod
     def from_filename(cls, filename):
         """Read the struct from a X5 file given its path."""
         if str(filename).endswith(".h5"):
-            with H5File(str(filename)) as f:
-                return cls.from_h5obj(f)
+            with H5File(str(filename), 'r') as hdf:
+                return cls.from_h5obj(hdf)
+            
+    @classmethod
+    def from_h5obj(cls, h5obj):
+        """Read the transformations in an X5 file."""
+        xfm_list = list(h5obj.keys())
+
+        xfm = xfm_list["Transform"]
+        inv = xfm_list["Inverse"]
+        coords = xfm_list["Size"]
+        map = xfm_list["Mapping"]
+
+        return xfm, inv, coords, map
+
 
 class X5LinearTransformArray(BaseLinearTransformList):
     """A string-based structure for series of X5 linear transforms."""
 
-    _inner_type = X5LinearTransform
+    _inner_type = X5Transform
 
     @property
     def xforms(self):
-        """Get the list of internal ITKLinearTransforms."""
+        """Get the list of internal X5LinearTransforms."""
         return self._xforms
