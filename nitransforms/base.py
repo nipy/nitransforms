@@ -248,16 +248,47 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = (
-        "_reference",
-        "_ndim",
-    )
+    __slots__ = ("_reference", "_ndim", "_affine", "_shape", "_header",
+        "_grid", "_mapping", "_hdf5_dct", "_x5_dct")
 
-    def __init__(self, reference=None):
+    x5_struct = {
+        'TransformGroup/0': {
+            'Type': None,
+            'Transform': None,
+            'Metadata': None,
+            'Inverse': None
+        },
+        'TransformGroup/0/Domain': {
+            'Grid': None,
+            'Size': None,
+            'Mapping': None
+        },
+        'TransformGroup/1': {},
+        'TransformChain': {}
+    }
+
+    def __init__(self, x5=None, hdf5=None, nifti=None, shape=None, affine=None, 
+        header=None, reference=None):
         """Instantiate a transform."""
+
         self._reference = None
         if reference:
             self.reference = reference
+
+        if nifti is not None:
+            self._x5_dct = self.init_x5_structure(nifti)
+        elif hdf5:
+            self.update_x5_structure(hdf5)
+        elif x5:
+            self.update_x5_structure(x5)
+        
+        self._shape = shape
+        self._affine = affine
+        self._header = header
+
+        # TO-DO
+        self._grid = None
+        self._mapping = None
 
     def __call__(self, x, inverse=False):
         """Apply y = f(x)."""
@@ -295,6 +326,12 @@ class TransformBase:
         """Access the dimensions of the reference space."""
         raise TypeError("TransformBase has no dimensions")
 
+    def init_x5_structure(self, xfm_data=None):
+        self.x5_struct['TransformGroup/0/Transform'] = xfm_data
+    
+    def update_x5_structure(self, hdf5_struct=None):
+        self.x5_struct.update(hdf5_struct)
+
     def map(self, x, inverse=False):
         r"""
         Apply :math:`y = f(x)`.
@@ -315,20 +352,6 @@ class TransformBase:
 
         """
         return x
-
-    def to_filename(self, filename, fmt="X5"):
-        """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-        with h5py.File(filename, "w") as out_file:
-            out_file.attrs["Format"] = "X5"
-            out_file.attrs["Version"] = np.uint16(1)
-            root = out_file.create_group("/0")
-            self._to_hdf5(root)
-
-        return filename
-
-    def _to_hdf5(self, x5_root):
-        """Serialize this object into the x5 file format."""
-        raise NotImplementedError
 
     def apply(self, *args, **kwargs):
         """Apply the transform to a dataset.
