@@ -66,7 +66,7 @@ def test_SurfaceResampler(testdata_path):
         resampling.to_filename(fn)
         resampling2 = SurfaceResampler.from_filename(fn)
 
-        assert resampling2 == resampling2
+        assert resampling2 == resampling
         assert np.all(resampling2.reference._coords == resampling.reference._coords)
         assert np.all(resampling2.reference._triangles == resampling.reference._triangles)
         assert np.all(resampling2.reference._coords == resampling.reference._coords)
@@ -78,3 +78,14 @@ def test_SurfaceResampler(testdata_path):
         os.remove(fn)
         raise
     os.remove(fn)
+
+    # test loading from surfaces
+    resampling3 = SurfaceResampler.from_filename(reference_file=fslr_sphere_path,
+                                                 moving_file=sphere_reg_path)
+    assert resampling3 == resampling
+    assert np.all(resampling3.reference._coords == resampling.reference._coords)
+    assert np.all(resampling3.reference._triangles == resampling.reference._triangles)
+    assert np.all(resampling3.reference._coords == resampling.reference._coords)
+    assert np.all(resampling3.moving._triangles == resampling.moving._triangles)
+    resampled_thickness3 = resampling3.apply(subj_thickness.agg_data(), normalize='element')
+    assert np.all(resampled_thickness3 == resampled_thickness)

@@ -262,29 +262,39 @@ class SurfaceResampler(SurfaceTransformBase):
         return filename
 
     @classmethod
-    def from_filename(cls, filename, fmt=None):
+    def from_filename(cls, filename=None, reference_file=None, moving_file=None, fmt=None, interpolation_method=None):
         """Load transform from file."""
-        if fmt is None:
-            fmt = "npz" if filename.endswith(".npz") else "X5"
+        if filename is None:
+            if reference_file is None or moving_file is None:
+                raise ValueError("You must pass either a X5 file or a pair of reference and moving surfaces.")
+            else:
+                if interpolation_method is None:
+                    interpolation_method='barycentric'
+                return cls(SurfaceMesh(nb.load(reference_file)),
+                           SurfaceMesh(nb.load(moving_file)),
+                           interpolation_method=interpolation_method)
+        else:
+            if fmt is None:
+                fmt = "npz" if filename.endswith(".npz") else "X5"
 
-        if fmt == "npz":
-            raise NotImplementedError
-            #return cls(sparse.load_npz(filename))
+            if fmt == "npz":
+                raise NotImplementedError
+                #return cls(sparse.load_npz(filename))
 
-        if fmt != "X5":
-            raise ValueError("Only npz and X5 formats are supported.")
+            if fmt != "X5":
+                raise ValueError("Only npz and X5 formats are supported.")
 
-        with h5py.File(filename, "r") as f:
-            assert f.attrs["Format"] == "X5"
-            xform = f["/0/Transform"]
-            mat = sparse.csr_matrix(
-                (xform["mat_data"][()], xform["mat_indices"][()], xform["mat_indptr"][()]),
-                shape=xform["mat_shape"][()],
-            )
-            reference = SurfaceMesh.from_arrays(xform['reference_coordinates'], xform['reference_triangles'])
-            moving = SurfaceMesh.from_arrays(xform['moving_coordinates'], xform['moving_triangles'])
-            interpolation_method = xform.attrs['interpolation_method']
-        return cls(reference, moving, interpolation_method=interpolation_method, mat=mat)
+            with h5py.File(filename, "r") as f:
+                assert f.attrs["Format"] == "X5"
+                xform = f["/0/Transform"]
+                mat = sparse.csr_matrix(
+                    (xform["mat_data"][()], xform["mat_indices"][()], xform["mat_indptr"][()]),
+                    shape=xform["mat_shape"][()],
+                )
+                reference = SurfaceMesh.from_arrays(xform['reference_coordinates'], xform['reference_triangles'])
+                moving = SurfaceMesh.from_arrays(xform['moving_coordinates'], xform['moving_triangles'])
+                interpolation_method = xform.attrs['interpolation_method']
+            return cls(reference, moving, interpolation_method=interpolation_method, mat=mat)
 
 
 def _pointsToTriangles(points, triangles):
