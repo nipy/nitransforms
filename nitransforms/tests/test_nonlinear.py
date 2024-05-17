@@ -8,6 +8,7 @@ import pytest
 
 import numpy as np
 import nibabel as nb
+from nitransforms.resampling import apply
 from nitransforms.base import TransformError
 from nitransforms.io.base import TransformFileError
 from nitransforms.nonlinear import (
@@ -28,7 +29,7 @@ antsApplyTransforms -d 3 -r {reference} -i {moving} \
 3dNwarpApply -nwarp {transform} -source {moving} \
 -master {reference} -interp NN -prefix {output} {extra}\
 """.format,
-    'fsl': """\
+    "fsl": """\
 applywarp -i {moving} -r {reference} -o {output} {extra}\
 -w {transform} --interp=nn""".format,
 }
@@ -38,7 +39,9 @@ applywarp -i {moving} -r {reference} -o {output} {extra}\
 def test_itk_disp_load(size):
     """Checks field sizes."""
     with pytest.raises(TransformFileError):
-        ITKDisplacementsField.from_image(nb.Nifti1Image(np.zeros(size), np.eye(4), None))
+        ITKDisplacementsField.from_image(
+            nb.Nifti1Image(np.zeros(size), np.eye(4), None)
+        )
 
 
 @pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 2, 3), (20, 20, 20, 1, 4)])
@@ -96,15 +99,17 @@ def test_bsplines_references(testdata_path):
         ).to_field()
 
     with pytest.raises(TransformError):
-        BSplineFieldTransform(
-            testdata_path / "someones_bspline_coefficients.nii.gz"
-        ).apply(testdata_path / "someones_anatomy.nii.gz")
+        apply(
+            BSplineFieldTransform(
+                testdata_path / "someones_bspline_coefficients.nii.gz"
+            ),
+            testdata_path / "someones_anatomy.nii.gz",
+        )
 
-    BSplineFieldTransform(
-        testdata_path / "someones_bspline_coefficients.nii.gz"
-    ).apply(
+    apply(
+        BSplineFieldTransform(testdata_path / "someones_bspline_coefficients.nii.gz"),
         testdata_path / "someones_anatomy.nii.gz",
-        reference=testdata_path / "someones_anatomy.nii.gz"
+        reference=testdata_path / "someones_anatomy.nii.gz",
     )
 
 
@@ -168,7 +173,7 @@ def test_displacements_field1(
     nt_moved_mask.set_data_dtype(msk.get_data_dtype())
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
 
-    assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
+    assert np.sqrt((diff**2).mean()) < RMSE_TOL
     brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
 
     # Then apply the transform and cross-check with software
@@ -177,7 +182,7 @@ def test_displacements_field1(
         reference=tmp_path / "reference.nii.gz",
         moving=tmp_path / "reference.nii.gz",
         output=tmp_path / "resampled.nii.gz",
-        extra="--output-data-type uchar" if sw_tool == "itk" else ""
+        extra="--output-data-type uchar" if sw_tool == "itk" else "",
     )
 
     exit_code = check_call([cmd], shell=True)
@@ -188,10 +193,9 @@ def test_displacements_field1(
     nt_moved.set_data_dtype(nii.get_data_dtype())
     nt_moved.to_filename("nt_resampled.nii.gz")
     sw_moved.set_data_dtype(nt_moved.get_data_dtype())
-    diff = (
-        np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
-        - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
-    )
+    diff = np.asanyarray(
+        sw_moved.dataobj, dtype=sw_moved.get_data_dtype()
+    ) - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
     # A certain tolerance is necessary because of resampling at borders
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL
 
@@ -228,12 +232,11 @@ def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     nt_moved = xfm.apply(img_fname, order=0)
     nt_moved.to_filename("nt_resampled.nii.gz")
     sw_moved.set_data_dtype(nt_moved.get_data_dtype())
-    diff = (
-        np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
-        - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
-    )
+    diff = np.asanyarray(
+        sw_moved.dataobj, dtype=sw_moved.get_data_dtype()
+    ) - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
     # A certain tolerance is necessary because of resampling at borders
-    assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
+    assert np.sqrt((diff**2).mean()) < RMSE_TOL
 
 
 def test_bspline(tmp_path, testdata_path):
@@ -247,12 +250,16 @@ def test_bspline(tmp_path, testdata_path):
     bsplxfm = BSplineFieldTransform(bs_name, reference=img_name)
     dispxfm = DenseFieldTransform(disp_name)
 
-    out_disp = dispxfm.apply(img_name)
-    out_bspl = bsplxfm.apply(img_name)
+    out_disp = apply(dispxfm, img_name)
+    out_bspl = apply(bsplxfm, img_name)
 
     out_disp.to_filename("resampled_field.nii.gz")
     out_bspl.to_filename("resampled_bsplines.nii.gz")
 
-    assert np.sqrt(
-        (out_disp.get_fdata(dtype="float32") - out_bspl.get_fdata(dtype="float32")) ** 2
-    ).mean() < 0.2
+    assert (
+        np.sqrt(
+            (out_disp.get_fdata(dtype="float32") - out_bspl.get_fdata(dtype="float32"))
+            ** 2
+        ).mean()
+        < 0.2
+    )

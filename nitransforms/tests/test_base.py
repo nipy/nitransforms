@@ -4,8 +4,14 @@ import nibabel as nb
 import pytest
 import h5py
 
-from ..base import SpatialReference, SampledSpatialData, ImageGrid, TransformBase
+from ..base import (
+    SpatialReference,
+    SampledSpatialData,
+    ImageGrid,
+    TransformBase,
+)
 from .. import linear as nitl
+from ..resampling import apply
 
 
 def test_SpatialReference(testdata_path):
@@ -42,10 +48,10 @@ def test_ImageGrid(get_testdata, image_orientation):
     ijk = [[10, 10, 10], [40, 4, 20], [0, 0, 0], [s - 1 for s in im.shape[:3]]]
     xyz = [img._affine.dot(idx + [1])[:-1] for idx in ijk]
 
-    assert np.allclose(img.ras(ijk[0]), xyz[0])
+    assert np.allclose(np.squeeze(img.ras(ijk[0])), xyz[0])
     assert np.allclose(np.round(img.index(xyz[0])), ijk[0])
-    assert np.allclose(img.ras(ijk), xyz)
-    assert np.allclose(np.round(img.index(xyz)), ijk)
+    assert np.allclose(img.ras(ijk).T, xyz)
+    assert np.allclose(np.round(img.index(xyz)).T, ijk)
 
     # nd index / coords
     idxs = img.ndindex
@@ -91,31 +97,23 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     img = nb.load(fname)
     imgdata = np.asanyarray(img.dataobj, dtype=img.get_data_dtype())
 
-    # Test identity transform
-    xfm = TransformBase()
-    xfm.reference = fname
-    with pytest.raises(TypeError):
-        _ = xfm.ndim
-    moved = xfm.apply(fname, order=0)
-    assert np.all(
-        imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
-    )
-
     # Test identity transform - setting reference
     xfm = TransformBase()
-    xfm.reference = fname
     with pytest.raises(TypeError):
         _ = xfm.ndim
-    moved = xfm.apply(str(fname), reference=fname, order=0)
-    assert np.all(
-        imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype())
-    )
+
+    # Test to_filename
+    xfm.to_filename("data.x5")
+
+    # Test identity transform
+    xfm = nitl.Affine()
+    xfm.reference = fname
+    moved = apply(xfm, fname, order=0)
+    assert np.all(imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype()))
 
     # Test ndim returned by affine
     assert nitl.Affine().ndim == 3
-    assert nitl.LinearTransformsMapping(
-        [nitl.Affine(), nitl.Affine()]
-    ).ndim == 4
+    assert nitl.LinearTransformsMapping([nitl.Affine(), nitl.Affine()]).ndim == 4
 
     # Test applying to Gifti
     gii = nb.gifti.GiftiImage(
@@ -126,11 +124,11 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
             )
         ]
     )
-    giimoved = xfm.apply(fname, reference=gii, order=0)
+    giimoved = apply(xfm, fname, reference=gii, order=0)
     assert np.allclose(giimoved.reshape(xfm.reference.shape), moved.get_fdata())
 
     # Test to_filename
-    xfm.to_filename("data.x5")
+    xfm.to_filename("data.xfm", fmt="itk")
 
 
 def test_SampledSpatialData(testdata_path):
