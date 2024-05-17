@@ -46,7 +46,9 @@ jobs:
       - run:
           name: Install test data from GIN
           command: |
-              export PATH=/opt/circleci/.pyenv/versions/3.12.2/bin/:/opt/circleci/git-annex.linux:$PATH
+              export PATH=/opt/circleci/git-annex.linux:$PATH
+              pyenv local 3
+              eval "$(pyenv init --path)"
               mkdir -p /tmp/data
               cd /tmp/data
               datalad install -r https://gin.g-node.org/oesteban/nitransforms-tests
@@ -129,7 +131,7 @@ jobs:
               echo "cHJpbnRmICJrcnp5c3p0b2YuZ29yZ29sZXdza2lAZ21haWwuY29tXG41MTcyXG4gKkN2dW12RVYzelRmZ1xuRlM1Si8yYzFhZ2c0RVxuIiA+IGxpY2Vuc2UudHh0Cg==" | base64 -d | sh
       - run:
           name: Get codecov
-          command: python -m pip install codecov
+          command: python3 -m pip install codecov
       - run:
           name: Run unit tests
           no_output_timeout: 2h
@@ -147,7 +149,7 @@ jobs:
           name: Submit unit test coverage
           command: |
             cd /tmp/src/nitransforms
-            python -m codecov --file /tmp/tests/summaries/unittests.xml \
+            python3 -m codecov --file /tmp/tests/summaries/unittests.xml \
                 --flags unittests -e CIRCLE_JOB
       - run:
           name: Clean up tests directory
@@ -176,7 +178,7 @@ jobs:
             source /tmp/buildenv/bin/activate
             python3 -m pip install "setuptools >= 45.0" wheel "setuptools_scm[toml] >= 6.2" \
                 "pip>=10.0.1" twine docutils
-            python setup.py sdist bdist_wheel
+            python3 -m build
             twine check dist/nitransforms*
       - store_artifacts:
           path: /tmp/src/nitransforms/dist
