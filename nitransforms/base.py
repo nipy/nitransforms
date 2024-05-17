@@ -15,6 +15,7 @@ from nibabel.loadsave import load as _nbload
 from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
 from nibabel.cifti2 import Cifti2Image
+import nibabel as nb
 from scipy import ndimage as ndi
 
 EQUALITY_TOL = 1e-5
@@ -115,6 +116,23 @@ class SurfaceMesh(SampledSpatialData):
             raise NotImplementedError
 
         raise ValueError("Dataset could not be interpreted as an irregular sample.")
+
+    @classmethod
+    def from_arrays(cls, coordinates, triangles):
+        darrays = [
+            nb.gifti.GiftiDataArray(
+                coordinates.astype(np.float32),
+                intent=nb.nifti1.intent_codes['NIFTI_INTENT_POINTSET'],
+                datatype=nb.nifti1.data_type_codes['NIFTI_TYPE_FLOAT32'],
+            ),
+            nb.gifti.GiftiDataArray(
+                triangles.astype(np.int32),
+                intent=nb.nifti1.intent_codes['NIFTI_INTENT_TRIANGLE'],
+                datatype=nb.nifti1.data_type_codes['NIFTI_TYPE_INT32'],
+            ),
+        ]
+        gii = nb.gifti.GiftiImage(darrays=darrays)
+        return cls(gii)
 
 class ImageGrid(SampledSpatialData):
     """Class to represent spaces of gridded data (images)."""
