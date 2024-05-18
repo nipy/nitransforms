@@ -160,7 +160,6 @@ class DenseFieldTransform(TransformBase):
         if inverse is True:
             raise NotImplementedError
 
-        x = np.array(x)
         ijk = self.reference.index(x)
         indexes = np.round(ijk).astype("int")
 
@@ -172,7 +171,7 @@ class DenseFieldTransform(TransformBase):
             tuple(
                 map_coordinates(
                     self._field[..., i],
-                    ijk.T,
+                    ijk,
                     order=3,
                     mode="constant",
                     cval=np.nan,
@@ -183,7 +182,7 @@ class DenseFieldTransform(TransformBase):
         ).T
 
         # Set NaN values back to the original coordinates value = no displacement
-        new_map[np.isnan(new_map)] = x[np.isnan(new_map)]
+        new_map[np.isnan(new_map)] = np.array(x)[np.isnan(new_map)]
         return new_map
 
     def __matmul__(self, b):
