@@ -16,7 +16,6 @@ from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
 from nibabel.cifti2 import Cifti2Image
 import nibabel as nb
-from scipy import ndimage as ndi
 
 EQUALITY_TOL = 1e-5
 
@@ -223,7 +222,10 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ("_reference", "_ndim",)
+    __slots__ = (
+        "_reference",
+        "_ndim",
+    )
 
     def __init__(self, reference=None):
         """Instantiate a transform."""
@@ -266,101 +268,6 @@ class TransformBase:
     def ndim(self):
         """Access the dimensions of the reference space."""
         raise TypeError("TransformBase has no dimensions")
-
-    def apply(
-        self,
-        spatialimage,
-        reference=None,
-        order=3,
-        mode="constant",
-        cval=0.0,
-        prefilter=True,
-        output_dtype=None,
-    ):
-        """
-        Apply a transformation to an image, resampling on the reference spatial object.
-
-        Parameters
-        ----------
-        spatialimage : `spatialimage`
-            The image object containing the data to be resampled in reference
-            space
-        reference : spatial object, optional
-            The image, surface, or combination thereof containing the coordinates
-            of samples that will be sampled.
-        order : int, optional
-            The order of the spline interpolation, default is 3.
-            The order has to be in the range 0-5.
-        mode : {'constant', 'reflect', 'nearest', 'mirror', 'wrap'}, optional
-            Determines how the input image is extended when the resamplings overflows
-            a border. Default is 'constant'.
-        cval : float, optional
-            Constant value for ``mode='constant'``. Default is 0.0.
-        prefilter: bool, optional
-            Determines if the image's data array is prefiltered with
-            a spline filter before interpolation. The default is ``True``,
-            which will create a temporary *float64* array of filtered values
-            if *order > 1*. If setting this to ``False``, the output will be
-            slightly blurred if *order > 1*, unless the input is prefiltered,
-            i.e. it is the result of calling the spline filter on the original
-            input.
-        output_dtype: dtype specifier, optional
-            The dtype of the returned array or image, if specified.
-            If ``None``, the default behavior is to use the effective dtype of
-            the input image. If slope and/or intercept are defined, the effective
-            dtype is float64, otherwise it is equivalent to the input image's
-            ``get_data_dtype()`` (on-disk type).
-            If ``reference`` is defined, then the return value is an image, with
-            a data array of the effective dtype but with the on-disk dtype set to
-            the input image's on-disk dtype.
-
-        Returns
-        -------
-        resampled : `spatialimage` or ndarray
-            The data imaged after resampling to reference space.
-
-        """
-        if reference is not None and isinstance(reference, (str, Path)):
-            reference = _nbload(str(reference))
-
-        _ref = (
-            self.reference if reference is None else SpatialReference.factory(reference)
-        )
-
-        if _ref is None:
-            raise TransformError("Cannot apply transform without reference")
-
-        if isinstance(spatialimage, (str, Path)):
-            spatialimage = _nbload(str(spatialimage))
-
-        data = np.asanyarray(spatialimage.dataobj)
-        targets = ImageGrid(spatialimage).index(  # data should be an image
-            _as_homogeneous(self.map(_ref.ndcoords.T), dim=_ref.ndim)
-        )
-
-        resampled = ndi.map_coordinates(
-            data,
-            targets.T,
-            output=output_dtype,
-            order=order,
-            mode=mode,
-            cval=cval,
-            prefilter=prefilter,
-        )
-
-        if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
-            hdr = None
-            if _ref.header is not None:
-                hdr = _ref.header.copy()
-                hdr.set_data_dtype(output_dtype or spatialimage.get_data_dtype())
-            moved = spatialimage.__class__(
-                resampled.reshape(_ref.shape),
-                _ref.affine,
-                hdr,
-            )
-            return moved
-
-        return resampled
 
     def map(self, x, inverse=False):
         r"""
@@ -427,4 +334,8 @@ def _as_homogeneous(xyz, dtype="float32", dim=3):
 
 def _apply_affine(x, affine, dim):
     """Get the image array's indexes corresponding to coordinates."""
-    return affine.dot(_as_homogeneous(x, dim=dim).T)[:dim, ...].T
+    return np.tensordot(
+        affine,
+        _as_homogeneous(x, dim=dim).T,
+        axes=1,
+    )[:dim, ...]

@@ -18,7 +18,6 @@ from nitransforms.base import (
     TransformBase,
     TransformError,
     ImageGrid,
-    SpatialReference,
     _as_homogeneous,
 )
 from scipy.ndimage import map_coordinates
@@ -71,21 +70,18 @@ class DenseFieldTransform(TransformBase):
             is_deltas = True
 
         try:
-            self.reference = ImageGrid(
-                reference if reference is not None else field
-            )
+            self.reference = ImageGrid(reference if reference is not None else field)
         except AttributeError:
             raise TransformError(
                 "Field must be a spatial image if reference is not provided"
-                if reference is None else
-                "Reference is not a spatial image"
+                if reference is None
+                else "Reference is not a spatial image"
             )
 
-        ndim = self._field.ndim - 1
-        if self._field.shape[-1] != ndim:
+        if self._field.shape[-1] != self.ndim:
             raise TransformError(
                 "The number of components of the field (%d) does not match "
-                "the number of dimensions (%d)" % (self._field.shape[-1], ndim)
+                "the number of dimensions (%d)" % (self._field.shape[-1], self.ndim)
             )
 
         if is_deltas:
@@ -97,6 +93,11 @@ class DenseFieldTransform(TransformBase):
     def __repr__(self):
         """Beautify the python representation."""
         return f"<{self.__class__.__name__}[{self._field.shape[-1]}D] {self._field.shape[:3]}>"
+
+    @property
+    def ndim(self):
+        """Get the dimensions of the transform."""
+        return self._field.ndim - 1
 
     def map(self, x, inverse=False):
         r"""
@@ -158,23 +159,31 @@ class DenseFieldTransform(TransformBase):
 
         if inverse is True:
             raise NotImplementedError
+
         ijk = self.reference.index(x)
         indexes = np.round(ijk).astype("int")
 
         if np.all(np.abs(ijk - indexes) < 1e-3):
-            indexes = tuple(tuple(i) for i in indexes.T)
+            indexes = tuple(tuple(i) for i in indexes)
             return self._field[indexes]
 
-        return np.vstack(tuple(
-            map_coordinates(
-                self._field[..., i],
-                ijk.T,
-                order=3,
-                mode="constant",
-                cval=0,
-                prefilter=True,
-            ) for i in range(self.reference.ndim)
-        )).T
+        new_map = np.vstack(
+            tuple(
+                map_coordinates(
+                    self._field[..., i],
+                    ijk,
+                    order=3,
+                    mode="constant",
+                    cval=np.nan,
+                    prefilter=True,
+                )
+                for i in range(self.reference.ndim)
+            )
+        ).T
+
+        # Set NaN values back to the original coordinates value = no displacement
+        new_map[np.isnan(new_map)] = np.array(x)[np.isnan(new_map)]
+        return new_map
 
     def __matmul__(self, b):
         """
@@ -196,9 +205,9 @@ class DenseFieldTransform(TransformBase):
         True
 
         """
-        retval = b.map(
-            self._field.reshape((-1, self._field.shape[-1]))
-        ).reshape(self._field.shape)
+        retval = b.map(self._field.reshape((-1, self._field.shape[-1]))).reshape(
+            self._field.shape
+        )
         return DenseFieldTransform(retval, is_deltas=False, reference=self.reference)
 
     def __eq__(self, other):
@@ -237,7 +246,7 @@ load = DenseFieldTransform.from_filename
 class BSplineFieldTransform(TransformBase):
     """Represent a nonlinear transform parameterized by BSpline basis."""
 
-    __slots__ = ['_coeffs', '_knots', '_weights', '_order', '_moving']
+    __slots__ = ["_coeffs", "_knots", "_weights", "_order", "_moving"]
 
     def __init__(self, coefficients, reference=None, order=3):
         """Create a smooth deformation field using B-Spline basis."""
@@ -252,74 +261,36 @@ class BSplineFieldTransform(TransformBase):
         if reference is not None:
             self.reference = reference
 
-            if coefficients.shape[-1] != self.ndim:
+            if coefficients.shape[-1] != self.reference.ndim:
                 raise TransformError(
-                    'Number of components of the coefficients does '
-                    'not match the number of dimensions')
+                    "Number of components of the coefficients does "
+                    "not match the number of dimensions"
+                )
+
+    @property
+    def ndim(self):
+        """Get the dimensions of the transform."""
+        return self._coeffs.ndim - 1
 
     def to_field(self, reference=None, dtype="float32"):
         """Generate a displacements deformation field from this B-Spline field."""
         _ref = (
-            self.reference if reference is None else
-            ImageGrid(_ensure_image(reference))
+            self.reference if reference is None else ImageGrid(_ensure_image(reference))
         )
         if _ref is None:
             raise TransformError("A reference must be defined")
 
-        ndim = self._coeffs.shape[-1]
-
         if self._weights is None:
             self._weights = grid_bspline_weights(_ref, self._knots)
 
-        field = np.zeros((_ref.npoints, ndim))
+        field = np.zeros((_ref.npoints, self.ndim))
 
-        for d in range(ndim):
+        for d in range(self.ndim):
             #  1 x Nvox :                          (1 x K) @ (K x Nvox)
             field[:, d] = self._coeffs[..., d].reshape(-1) @ self._weights
 
         return DenseFieldTransform(
             field.astype(dtype).reshape(*_ref.shape, -1), reference=_ref
-        )
-
-    def apply(
-        self,
-        spatialimage,
-        reference=None,
-        order=3,
-        mode="constant",
-        cval=0.0,
-        prefilter=True,
-        output_dtype=None,
-    ):
-        """Apply a B-Spline transform on input data."""
-
-        _ref = (
-            self.reference if reference is None else
-            SpatialReference.factory(_ensure_image(reference))
-        )
-        spatialimage = _ensure_image(spatialimage)
-
-        # If locations to be interpolated are not on a grid, run map()
-        if not isinstance(_ref, ImageGrid):
-            return super().apply(
-                spatialimage,
-                reference=_ref,
-                order=order,
-                mode=mode,
-                cval=cval,
-                prefilter=prefilter,
-                output_dtype=output_dtype,
-            )
-
-        # If locations to be interpolated are on a grid, generate a displacements field
-        return self.to_field(reference=reference).apply(
-            spatialimage,
-            reference=reference,
-            order=order,
-            mode=mode,
-            cval=cval,
-            prefilter=prefilter,
-            output_dtype=output_dtype,
         )
 
     def map(self, x, inverse=False):
@@ -346,11 +317,11 @@ class BSplineFieldTransform(TransformBase):
         --------
         >>> xfm = BSplineFieldTransform(test_dir / "someones_bspline_coefficients.nii.gz")
         >>> xfm.reference = test_dir / "someones_anatomy.nii.gz"
-        >>> xfm.map([-6.5, -36., -19.5]).tolist()
-        [[-6.5, -31.476097418406784, -19.5]]
+        >>> xfm.map([-6.5, -36., -19.5]).tolist()  # doctest: +ELLIPSIS
+        [[-6.5, -31.476097418406..., -19.5]]
 
-        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
-        [[-6.5, -31.476097418406784, -19.5], [-1.0, -3.8072675377121996, -11.25]]
+        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()  # doctest: +ELLIPSIS
+        [[-6.5, -31.4760974184..., -19.5], [-1.0, -3.807267537712..., -11.25]]
 
         """
         vfunc = partial(
@@ -372,9 +343,9 @@ def _map_xyz(x, reference, knots, coeffs):
     # Probably this will change if the order of the B-Spline is different
     w_start, w_end = np.ceil(ijk - 2).astype(int), np.floor(ijk + 2).astype(int)
     # Generate a grid of indexes corresponding to the window
-    nonzero_knots = tuple([
-        np.arange(start, end + 1) for start, end in zip(w_start, w_end)
-    ])
+    nonzero_knots = tuple(
+        [np.arange(start, end + 1) for start, end in zip(w_start, w_end)]
+    )
     nonzero_knots = tuple(np.meshgrid(*nonzero_knots, indexing="ij"))
     window = np.array(nonzero_knots).reshape((ndim, -1))
 
