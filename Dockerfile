@@ -33,7 +33,9 @@ RUN update-ca-certificates -f
 # FreeSurfer 7.3.2
 FROM downloader as freesurfer
 COPY docker/files/freesurfer7.3.2-exclude.txt /usr/local/etc/freesurfer7.3.2-exclude.txt
-RUN curl -sSL https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/7.3.2/freesurfer-linux-ubuntu22_amd64-7.3.2.tar.gz \
+COPY docker/files/fs-cert.pem /usr/local/etc/fs-cert.pem
+RUN curl --cacert /usr/local/etc/fs-cert.pem \
+     -sSL https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/7.3.2/freesurfer-linux-ubuntu22_amd64-7.3.2.tar.gz \
      | tar zxv --no-same-owner -C /opt --exclude-from=/usr/local/etc/freesurfer7.3.2-exclude.txt
 
 # AFNI
