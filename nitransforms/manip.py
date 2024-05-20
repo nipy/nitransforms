@@ -68,6 +68,11 @@ class TransformChain(TransformBase):
         return len(self.transforms)
 
     @property
+    def ndim(self):
+        """Get the number of dimensions."""
+        return max(x.ndim for x in self._transforms)
+
+    @property
     def transforms(self):
         """Get the internal list of transforms."""
         return self._transforms
