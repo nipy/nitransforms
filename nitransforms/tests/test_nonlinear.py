@@ -169,7 +169,7 @@ def test_displacements_field1(
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
     sw_moved_mask = nb.load("resampled_brainmask.nii.gz")
-    nt_moved_mask = xfm.apply(msk, order=0)
+    nt_moved_mask = apply(xfm, msk, order=0)
     nt_moved_mask.set_data_dtype(msk.get_data_dtype())
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
 
@@ -189,7 +189,7 @@ def test_displacements_field1(
     assert exit_code == 0
     sw_moved = nb.load("resampled.nii.gz")
 
-    nt_moved = xfm.apply(nii, order=0)
+    nt_moved = apply(xfm, nii, order=0)
     nt_moved.set_data_dtype(nii.get_data_dtype())
     nt_moved.to_filename("nt_resampled.nii.gz")
     sw_moved.set_data_dtype(nt_moved.get_data_dtype())
@@ -229,7 +229,7 @@ def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     assert exit_code == 0
     sw_moved = nb.load("resampled.nii.gz")
 
-    nt_moved = xfm.apply(img_fname, order=0)
+    nt_moved = apply(xfm, img_fname, order=0)
     nt_moved.to_filename("nt_resampled.nii.gz")
     sw_moved.set_data_dtype(nt_moved.get_data_dtype())
     diff = np.asanyarray(
