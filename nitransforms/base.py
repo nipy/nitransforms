@@ -88,10 +88,12 @@ class SampledSpatialData:
         """Access the space's size of each dimension."""
         return self._shape
 
+
 class SurfaceMesh(SampledSpatialData):
     """Class to represent surface meshes."""
 
     __slots__ = ["_triangles"]
+
     def __init__(self, dataset):
         """Create a sampling reference."""
         self._shape = None
@@ -132,6 +134,7 @@ class SurfaceMesh(SampledSpatialData):
         ]
         gii = nb.gifti.GiftiImage(darrays=darrays)
         return cls(gii)
+
 
 class ImageGrid(SampledSpatialData):
     """Class to represent spaces of gridded data (images)."""

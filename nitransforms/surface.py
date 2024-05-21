@@ -23,6 +23,7 @@ from scipy.spatial.distance import cdist
 class SurfaceTransformBase():
     """Generic surface transformation class"""
     __slots__ = ("_reference", "_moving")
+
     def __init__(self, reference, moving):
         """Instantiate a generic surface transform."""
         self._reference = reference
@@ -30,13 +31,14 @@ class SurfaceTransformBase():
 
     def __eq__(self, other):
         ref_coords_eq = (self.reference._coords == other.reference._coords).all()
-        ref_tris_eq =  (self.reference._triangles == other.reference._triangles).all()
+        ref_tris_eq = (self.reference._triangles == other.reference._triangles).all()
         mov_coords_eq = (self.moving._coords == other.moving._coords).all()
         mov_tris_eq = (self.moving._triangles == other.moving._triangles).all()
         return ref_coords_eq & ref_tris_eq & mov_coords_eq & mov_tris_eq
 
     def __invert__(self):
         return self.__class__(self.moving, self.reference)
+
     @property
     def reference(self):
         return self._reference
@@ -52,22 +54,28 @@ class SurfaceTransformBase():
     @moving.setter
     def moving(self, surface):
         self._moving = SurfaceMesh(surface)
+
     @classmethod
     def from_filename(cls, reference_path, moving_path):
-        """Create an Surface Index Transformation from a pair of surfaces with corresponding vertices."""
+        """Create an Surface Index Transformation from a pair of surfaces with corresponding
+         vertices."""
         reference = SurfaceMesh(nb.load(reference_path))
         moving = SurfaceMesh(nb.load(moving_path))
         return cls(reference, moving)
 
+
 class SurfaceCoordinateTransform(SurfaceTransformBase):
-    """Represents surface transformations in which the indices correspond and the coordinates differ."""
+    """Represents surface transformations in which the indices correspond and the coordinates
+     differ."""
 
     __slots__ = ("_reference", "_moving")
+
     def __init__(self, reference, moving):
         """Instantiate a transform between two surfaces with corresponding vertices."""
         super().__init__(reference=reference, moving=moving)
         if (self._reference._triangles != self._moving._triangles).all():
-            raise ValueError("Both surfaces for an index transform must have corresponding vertices.")
+            raise ValueError("Both surfaces for an index transform must have corresponding"
+                             " vertices.")
 
     def map(self, x, inverse=False):
         if inverse:
@@ -80,7 +88,8 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
         s_tree = KDTree(source._coords)
         dists, matches = s_tree.query(x)
         if not np.allclose(dists, 0):
-            raise NotImplementedError("Mapping on surfaces not implemented for coordinates that aren't vertices")
+            raise NotImplementedError("Mapping on surfaces not implemented for coordinates that"
+                                      " aren't vertices")
         return dest._coords[matches]
 
     def __add__(self, other):
@@ -105,8 +114,10 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
     def moving(self, surface):
         self._moving = SurfaceMesh(surface)
 
+
 class SurfaceResampler(SurfaceTransformBase):
-    """Represents transformations in which the coordinate space remains the same and the indicies change."""
+    """Represents transformations in which the coordinate space remains the same and the indicies
+     change."""
 
     __slots__ = ("mat", 'interpolation_method')
 
@@ -134,15 +145,14 @@ class SurfaceResampler(SurfaceTransformBase):
         # that it only has to be calculated once and will always be saved with the
         # transform
         if mat is None:
-            r_tree = KDTree(self.reference._coords)
             m_tree = KDTree(self.moving._coords)
             kmr_dists, kmr_closest = m_tree.query(self.reference._coords, k=10)
 
             # invert the triangles to generate a lookup table from vertices to triangle index
-            tri_lut = dict()
+            tri_lut = {}
             for i, idxs in enumerate(self.moving._triangles):
                 for x in idxs:
-                    if not x in tri_lut:
+                    if x not in tri_lut:
                         tri_lut[x] = [i]
                     else:
                         tri_lut[x].append(i)
@@ -150,7 +160,7 @@ class SurfaceResampler(SurfaceTransformBase):
             # calculate the barycentric interpolation weights
             bc_weights = []
             enclosing = []
-            for sidx, (point, kmrv) in enumerate(zip(self.reference._coords, kmr_closest)):
+            for _, (point, kmrv) in enumerate(zip(self.reference._coords, kmr_closest)):
                 close_tris = _find_close_tris(kmrv, tri_lut, self.moving)
                 ww, ee = _find_weights(point, close_tris, m_tree)
                 bc_weights.append(ww)
@@ -158,12 +168,14 @@ class SurfaceResampler(SurfaceTransformBase):
 
             # build sparse matrix
             # commenting out code for barycentric nearest neighbor
-            #bary_nearest = []
+            # bary_nearest = []
             mat = sparse.lil_array((self.reference._npoints, self.moving._npoints))
             for s_ix, dd in enumerate(bc_weights):
                 for k, v in dd.items():
                     mat[s_ix, k] = v
-                # bary_nearest.append(np.array(list(dd.keys()))[np.array(list(dd.values())).argmax()])
+                # bary_nearest.append(
+                #   np.array(list(dd.keys()))[np.array(list(dd.values())).argmax()]
+                # )
             # bary_nearest = np.array(bary_nearest)
             # transpose so that number of out vertices is columns
             self.mat = sparse.csr_array(mat.T)
@@ -178,14 +190,22 @@ class SurfaceResampler(SurfaceTransformBase):
 
     def __add__(self, other):
 
-        if isinstance(other, SurfaceResampler) and (other.interpolation_method == self.interpolation_method):
-            return self.__class__(self.reference, other.moving, interpolation_method=self.interpolation_method)
+        if (isinstance(other, SurfaceResampler)
+                and (other.interpolation_method == self.interpolation_method)):
+            return self.__class__(
+                self.reference,
+                other.moving,
+                interpolation_method=self.interpolation_method
+            )
         else:
             raise NotImplementedError
 
-
     def __invert__(self):
-        return self.__class__(self.moving, self.reference, interpolation_method=self.interpolation_method)
+        return self.__class__(
+            self.moving,
+            self.reference,
+            interpolation_method=self.interpolation_method
+        )
 
     def apply(self, x, inverse=False, normalize="element"):
         """Apply the transform to surface data.
@@ -262,14 +282,16 @@ class SurfaceResampler(SurfaceTransformBase):
         return filename
 
     @classmethod
-    def from_filename(cls, filename=None, reference_file=None, moving_file=None, fmt=None, interpolation_method=None):
+    def from_filename(cls, filename=None, reference_file=None, moving_file=None,
+                      fmt=None, interpolation_method=None):
         """Load transform from file."""
         if filename is None:
             if reference_file is None or moving_file is None:
-                raise ValueError("You must pass either a X5 file or a pair of reference and moving surfaces.")
+                raise ValueError("You must pass either a X5 file or a pair of reference and moving"
+                                 " surfaces.")
             else:
                 if interpolation_method is None:
-                    interpolation_method='barycentric'
+                    interpolation_method = 'barycentric'
                 return cls(SurfaceMesh(nb.load(reference_file)),
                            SurfaceMesh(nb.load(moving_file)),
                            interpolation_method=interpolation_method)
@@ -279,7 +301,7 @@ class SurfaceResampler(SurfaceTransformBase):
 
             if fmt == "npz":
                 raise NotImplementedError
-                #return cls(sparse.load_npz(filename))
+                # return cls(sparse.load_npz(filename))
 
             if fmt != "X5":
                 raise ValueError("Only npz and X5 formats are supported.")
@@ -291,8 +313,14 @@ class SurfaceResampler(SurfaceTransformBase):
                     (xform["mat_data"][()], xform["mat_indices"][()], xform["mat_indptr"][()]),
                     shape=xform["mat_shape"][()],
                 )
-                reference = SurfaceMesh.from_arrays(xform['reference_coordinates'], xform['reference_triangles'])
-                moving = SurfaceMesh.from_arrays(xform['moving_coordinates'], xform['moving_triangles'])
+                reference = SurfaceMesh.from_arrays(
+                    xform['reference_coordinates'],
+                    xform['reference_triangles']
+                )
+                moving = SurfaceMesh.from_arrays(
+                    xform['moving_coordinates'],
+                    xform['moving_triangles']
+                )
                 interpolation_method = xform.attrs['interpolation_method']
             return cls(reference, moving, interpolation_method=interpolation_method, mat=mat)
 
@@ -448,6 +476,9 @@ def _find_weights(point, close_tris, d_tree):
     e1 = closest_tri[1] - a
     e2 = closest_tri[2] - a
     vecs = np.vstack([a, e1, e2, np.cross(e1, e2), np.cross(e2, a), np.cross(a, e1)])
-    res = dict()
-    res[ct_idxs[0]], res[ct_idxs[1]], res[ct_idxs[2]], _ = _barycentric_weights(vecs, point.squeeze())
+    res = {}
+    res[ct_idxs[0]], res[ct_idxs[1]], res[ct_idxs[2]], _ = _barycentric_weights(
+        vecs,
+        point.squeeze()
+    )
     return res, enclosing
