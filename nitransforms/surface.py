@@ -131,6 +131,8 @@ class SurfaceResampler(SurfaceTransformBase):
             Only barycentric is currently implemented
         """
         super().__init__(reference, moving)
+        if interpolation_method not in ['barycentric']:
+            raise NotImplementedError(f"{interpolation_method} is not implemented.")
         self.interpolation_method = interpolation_method
 
         # TODO: should we deal with the case where reference and moving are the same?
@@ -145,6 +147,17 @@ class SurfaceResampler(SurfaceTransformBase):
                 self.mat = mat
             else:
                 self.mat = sparse.csr_array(mat)
+            # validate shape of the provided matrix
+            if (mat.shape[0] != moving._npoints) or (mat.shape[1] != reference._npoints):
+                msg = "Shape of provided mat does not match expectations based on " \
+                      "dimensions of moving and reference. \n"
+                if (mat.shape[0] != moving._npoints):
+                    msg += f" mat has {mat.shape[0]} rows but moving has {moving._npoints} " \
+                           f"vertices. \n"
+                if (mat.shape[1] != reference._npoints):
+                    msg += f" mat has {mat.shape[1]} columns but reference has" \
+                           f" {reference._npoints} vertices."
+                raise ValueError(msg)
 
     def __calculate_mat(self):
         m_tree = KDTree(self.moving._coords)

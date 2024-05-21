@@ -132,6 +132,8 @@ def test_SurfaceResampler(testdata_path):
         resampling.reference = reference
     with pytest.raises(ValueError):
         resampling.moving = moving
+    with pytest.raises(NotImplementedError):
+        _ = SurfaceResampler(reference, moving, "foo")
 
     # test file io
     fn = tempfile.mktemp(suffix=".h5")
@@ -155,10 +157,14 @@ def test_SurfaceResampler(testdata_path):
 
     # test loading with a csr
     assert isinstance(resampling.mat, sparse.csr_array)
-    resampling2a = SurfaceResampler(reference, moving, resampling.mat)
+    resampling2a = SurfaceResampler(reference, moving, mat=resampling.mat)
     resampled_thickness2a = resampling2a.apply(subj_thickness.agg_data(), normalize='element')
     assert np.all(resampled_thickness2a == resampled_thickness)
 
+    with pytest.raises(ValueError):
+        rsfail = SurfaceResampler(moving, reference, mat=resampling.mat)
+
+    # test map
     assert np.all(resampling.map(np.array([[0, 0, 0]])) == np.array([[0, 0, 0]]))
 
     # test loading from surfaces
