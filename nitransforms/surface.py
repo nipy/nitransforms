@@ -37,7 +37,7 @@ class SurfaceTransformBase():
         return ref_coords_eq & ref_tris_eq & mov_coords_eq & mov_tris_eq
 
     def __invert__(self):
-        return self.__class__(self.moving, self.reference)
+        return self.__class__(self._moving, self._reference)
 
     @property
     def reference(self):
@@ -108,22 +108,6 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
         else:
             raise NotImplementedError
 
-    @property
-    def reference(self):
-        return self._reference
-
-    @reference.setter
-    def reference(self, surface):
-        self._reference = SurfaceMesh(surface)
-
-    @property
-    def moving(self):
-        return self._moving
-
-    @moving.setter
-    def moving(self, surface):
-        self._moving = SurfaceMesh(surface)
-
 
 class SurfaceResampler(SurfaceTransformBase):
     """Represents transformations in which the coordinate space remains the same and the indicies
@@ -155,45 +139,48 @@ class SurfaceResampler(SurfaceTransformBase):
         # that it only has to be calculated once and will always be saved with the
         # transform
         if mat is None:
-            m_tree = KDTree(self.moving._coords)
-            kmr_dists, kmr_closest = m_tree.query(self.reference._coords, k=10)
-
-            # invert the triangles to generate a lookup table from vertices to triangle index
-            tri_lut = {}
-            for i, idxs in enumerate(self.moving._triangles):
-                for x in idxs:
-                    if x not in tri_lut:
-                        tri_lut[x] = [i]
-                    else:
-                        tri_lut[x].append(i)
-
-            # calculate the barycentric interpolation weights
-            bc_weights = []
-            enclosing = []
-            for _, (point, kmrv) in enumerate(zip(self.reference._coords, kmr_closest)):
-                close_tris = _find_close_tris(kmrv, tri_lut, self.moving)
-                ww, ee = _find_weights(point, close_tris, m_tree)
-                bc_weights.append(ww)
-                enclosing.append(ee)
-
-            # build sparse matrix
-            # commenting out code for barycentric nearest neighbor
-            # bary_nearest = []
-            mat = sparse.lil_array((self.reference._npoints, self.moving._npoints))
-            for s_ix, dd in enumerate(bc_weights):
-                for k, v in dd.items():
-                    mat[s_ix, k] = v
-                # bary_nearest.append(
-                #   np.array(list(dd.keys()))[np.array(list(dd.values())).argmax()]
-                # )
-            # bary_nearest = np.array(bary_nearest)
-            # transpose so that number of out vertices is columns
-            self.mat = sparse.csr_array(mat.T)
+            self.__calculate_mat()
         else:
             if isinstance(mat, sparse.csr_array):
                 self.mat = mat
             else:
                 self.mat = sparse.csr_array(mat)
+
+    def __calculate_mat(self):
+        m_tree = KDTree(self.moving._coords)
+        kmr_dists, kmr_closest = m_tree.query(self.reference._coords, k=10)
+
+        # invert the triangles to generate a lookup table from vertices to triangle index
+        tri_lut = {}
+        for i, idxs in enumerate(self.moving._triangles):
+            for x in idxs:
+                if x not in tri_lut:
+                    tri_lut[x] = [i]
+                else:
+                    tri_lut[x].append(i)
+
+        # calculate the barycentric interpolation weights
+        bc_weights = []
+        enclosing = []
+        for _, (point, kmrv) in enumerate(zip(self.reference._coords, kmr_closest)):
+            close_tris = _find_close_tris(kmrv, tri_lut, self.moving)
+            ww, ee = _find_weights(point, close_tris, m_tree)
+            bc_weights.append(ww)
+            enclosing.append(ee)
+
+        # build sparse matrix
+        # commenting out code for barycentric nearest neighbor
+        # bary_nearest = []
+        mat = sparse.lil_array((self.reference._npoints, self.moving._npoints))
+        for s_ix, dd in enumerate(bc_weights):
+            for k, v in dd.items():
+                mat[s_ix, k] = v
+            # bary_nearest.append(
+            #   np.array(list(dd.keys()))[np.array(list(dd.values())).argmax()]
+            # )
+        # bary_nearest = np.array(bary_nearest)
+        # transpose so that number of out vertices is columns
+        self.mat = sparse.csr_array(mat.T)
 
     def map(self, x, inverse=False):
         return x
@@ -216,6 +203,16 @@ class SurfaceResampler(SurfaceTransformBase):
             self.reference,
             interpolation_method=self.interpolation_method
         )
+
+    @SurfaceTransformBase.reference.setter
+    def reference(self, surface):
+        raise ValueError("Don't modify the reference of an existing resampling."
+                         "Create a new one instead.")
+
+    @SurfaceTransformBase.moving.setter
+    def moving(self, surface):
+        raise ValueError("Don't modify the moving of an existing resampling."
+                         "Create a new one instead.")
 
     def apply(self, x, inverse=False, normalize="element"):
         """Apply the transform to surface data.

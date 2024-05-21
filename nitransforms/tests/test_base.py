@@ -175,6 +175,14 @@ def test_SurfaceMesh(testdata_path):
     assert mesh._npoints == exp_coords_shape[0]
     assert mesh._ndim == exp_coords_shape[1]
 
+    mfd = SurfaceMesh(surf_path)
+    assert (mfd._coords == mesh._coords).all()
+    assert (mfd._triangles == mesh._triangles).all()
+
+    mfsm = SurfaceMesh(mfd)
+    assert (mfd._coords == mfsm._coords).all()
+    assert (mfd._triangles == mfsm._triangles).all()
+
     with pytest.raises(ValueError):
         SurfaceMesh(nb.load(img_path))
 

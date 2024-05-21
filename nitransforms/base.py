@@ -98,6 +98,14 @@ class SurfaceMesh(SampledSpatialData):
         """Create a sampling reference."""
         self._shape = None
 
+        if isinstance(dataset, SurfaceMesh):
+            self._coords = dataset._coords
+            self._triangles = dataset._triangles
+            self._ndim = dataset._ndim
+            self._npoints = dataset._npoints
+            self._shape = dataset._shape
+            return
+
         if isinstance(dataset, (str, Path)):
             dataset = _nbload(str(dataset))
 
@@ -111,6 +119,7 @@ class SurfaceMesh(SampledSpatialData):
             _tris = dataset.get_arrays_from_intent(INTENT_CODES["triangle"])
             self._triangles = np.vstack([da.data for da in _tris])
             self._npoints, self._ndim = self._coords.shape
+            self._shape = self._coords.shape
             return
 
         if isinstance(dataset, Cifti2Image):
