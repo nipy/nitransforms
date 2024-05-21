@@ -66,12 +66,22 @@ class SurfaceTransformBase():
 
 class SurfaceCoordinateTransform(SurfaceTransformBase):
     """Represents surface transformations in which the indices correspond and the coordinates
-     differ."""
+     differ. This could be two surfaces representing difference structures from the same
+     hemisphere, like white matter and pial, or it could be a sphere and a deformed sphere that
+     moves those coordinates to a different location."""
 
     __slots__ = ("_reference", "_moving")
 
     def __init__(self, reference, moving):
-        """Instantiate a transform between two surfaces with corresponding vertices."""
+        """Instantiate a transform between two surfaces with corresponding vertices.
+         Parameters
+        ----------
+        reference: surface
+            Surface with the destination coordinates for each index.
+        moving: surface
+            Surface with the starting coordinates for each index.
+        """
+
         super().__init__(reference=reference, moving=moving)
         if (self._reference._triangles != self._moving._triangles).all():
             raise ValueError("Both surfaces for an index transform must have corresponding"
@@ -122,7 +132,7 @@ class SurfaceResampler(SurfaceTransformBase):
     __slots__ = ("mat", 'interpolation_method')
 
     def __init__(self, reference, moving, interpolation_method='barycentric', mat=None):
-        """Initialize the transform.
+        """Initialize the resampling.
 
         Parameters
         ----------
