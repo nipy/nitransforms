@@ -366,6 +366,55 @@ class TransformBase:
 
         return apply(self, *args, **kwargs)
 
+    def _to_hdf5(self, x5_root):
+        """Serialize this object into the x5 file format."""
+        transform_group = x5_root.create_group("TransformGroup")
+
+        """Group '0' containing Affine transform"""
+        transform_0 = transform_group.create_group("0")
+        
+        transform_0.attrs["Type"] = "Affine"
+        transform_0.create_dataset("Transform", data=self._matrix)
+        transform_0.create_dataset("Inverse", data=np.linalg.inv(self._matrix))
+
+        metadata = {"key": "value"}
+        transform_0.attrs["Metadata"] = str(metadata)
+
+        """sub-group 'Domain' contained within group '0' """
+        domain_group = transform_0.create_group("Domain")
+        domain_group.attrs["Grid"] = self.grid
+        domain_group.create_dataset("Size", data=_as_homogeneous(self._reference.shape))
+        domain_group.create_dataset("Mapping", data=self.map)
+        
+        raise NotImplementedError
+    
+    def read_x5(self, x5_root):
+        variables = {}
+        with h5py.File(x5_root, "r") as f:
+            f.visititems(lambda filename, x5_root: self._from_hdf5(filename, x5_root, variables))
+
+        _transform = variables["TransformGroup/0/Transform"]
+        _inverse = variables["TransformGroup/0/Inverse"]
+        _size = variables["TransformGroup/0/Domain/Size"]
+        _map = variables["TransformGroup/0/Domain/Mapping"]
+
+        return _transform, _inverse, _size, _map
+        
+    def _from_hdf5(self, name, x5_root, storage):
+        if isinstance(x5_root, h5py.Dataset):
+            storage[name] = {
+                'type': 'dataset',
+                'attrs': dict(x5_root.attrs),
+                'shape': x5_root.shape,
+                'data': x5_root[()]  # Read the data
+            } 
+        elif isinstance(x5_root, h5py.Group):
+            storage[name] = {
+                'type': 'group',
+                'attrs': dict(x5_root.attrs),
+                'members': {}
+            }
+
 
 def _as_homogeneous(xyz, dtype="float32", dim=3):
     """
