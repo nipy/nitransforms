@@ -370,10 +370,10 @@ class TransformBase:
         
         raise NotImplementedError
     
-    def read_x5(x5_root):
+    def read_x5(self, x5_root):
         variables = {}
         with h5py.File(x5_root, "r") as f:
-            f.visititems(lambda name, x5_root: _from_hdf5(name, x5_root, variables))
+            f.visititems(lambda filename, x5_root: self._from_hdf5(filename, x5_root, variables))
 
         _transform = variables["TransformGroup/0/Transform"]
         _inverse = variables["TransformGroup/0/Inverse"]
@@ -382,7 +382,7 @@ class TransformBase:
 
         return _transform, _inverse, _size, _map
         
-    def _from_hdf5(name, x5_root, storage):
+    def _from_hdf5(self, name, x5_root, storage):
         if isinstance(x5_root, h5py.Dataset):
             storage[name] = {
                 'type': 'dataset',
