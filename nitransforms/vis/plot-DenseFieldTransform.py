@@ -23,13 +23,13 @@ xfm = DenseFieldTransform(
     )
 
 """Calculate vector components of the field using the reference coordinates"""
-x = xfm.reference.ndcoords[0]
-y = xfm.reference.ndcoords[1]
-z = xfm.reference.ndcoords[2]
+i = xfm.reference.ndcoords[0]
+j = xfm.reference.ndcoords[1]
+k = xfm.reference.ndcoords[2]
 
-u = xfm._field[...,0].flatten() - x
-v = xfm._field[...,1].flatten() - y
-w = xfm._field[...,2].flatten() - z
+u = xfm._field[...,0].flatten() - i
+v = xfm._field[...,1].flatten() - j
+w = xfm._field[...,2].flatten() - k
 
 magnitude = np.sqrt(u**2 + v**2 + w**2)
 
@@ -45,21 +45,21 @@ gs = GridSpec(2, 3, figure=fig, wspace=1/4, hspace=1/2.5)
 fig.suptitle(str("Non-Linear DenseFieldTransform field \n (DataSource: nii_data, elements: [0::"+str(index)+"])"), fontsize='14')
 
 ax1 = fig.add_subplot(gs[0,0])
-q1 = ax1.quiver(x[0::index], y[0::index], u[0::index], v[0::index], clr_xy, cmap='viridis')
-ax1.set_title("x-y projection", weight='bold')
-ax1.set_xlabel("x")
-ax1.set_ylabel("y")
+q1 = ax1.quiver(i[0::index], j[0::index], u[0::index], v[0::index], clr_xy, cmap='viridis')
+ax1.set_title("i-j projection", weight='bold')
+ax1.set_xlabel("i")
+ax1.set_ylabel("j")
 #plt.colorbar(q1)
 
 ax3 = fig.add_subplot(gs[1,0])
-q3 = ax3.quiver(x[0::index], z[0::index], u[0::index], w[0::index], clr_xz, cmap='viridis')
-ax3.set_title("x-z projection", weight='bold')
-ax3.set_xlabel("x")
-ax3.set_ylabel("z")
+q3 = ax3.quiver(i[0::index], k[0::index], u[0::index], w[0::index], clr_xz, cmap='viridis')
+ax3.set_title("i-k projection", weight='bold')
+ax3.set_xlabel("i")
+ax3.set_ylabel("k")
 #plt.colorbar(q3)
 
 ax2 = fig.add_subplot(gs[:,1:], projection='3d')
-q2 = ax2.quiver(x[0::index], y[0::index], z[0::index], u[0::index], v[0::index], w[0::index], colors=clr3d, length=0.1)
+q2 = ax2.quiver(i[0::index], j[0::index], k[0::index], u[0::index], v[0::index], w[0::index], colors=clr3d, length=0.1)
 ax2.set_title("3D projection", weight='bold')
 ax2.set_xlabel("x"); ax2.xaxis.set_rotate_label(False)
 ax2.set_ylabel("y"); ax2.yaxis.set_rotate_label(False)
