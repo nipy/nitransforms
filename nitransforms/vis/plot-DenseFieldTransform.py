@@ -18,7 +18,7 @@ class Vis():
 
     def plot_densefield(self, is_deltas=True, scaling=1, index=1000, save_to_dir=None):
         """
-        Plot output field from DenseFieldTransform class. 
+        Plot output field from DenseFieldTransform class.
 
         Parameters
         ----------
@@ -35,8 +35,7 @@ class Vis():
         -------
         >>> plot = Vis(
         ...     test_dir / "someones_displacement_field.nii.gz"
-        ... ).plot_densefield()        
-        
+        ... ).plot_densefield()
 
         >>> plot = Vis(
         ...     test_dir / "someones_displacement_field.nii.gz"
@@ -47,7 +46,7 @@ class Vis():
         ...     save_to_path = test_dir / "plot_of_someones_displacement_field.nii.gz" #save figure
         ... )
         """
-        
+
         xfm = DenseFieldTransform(
              self._path_to_file,
              is_deltas=is_deltas,
@@ -90,7 +89,7 @@ class Vis():
             pass
         plt.show()
 
-    def map_coords(self, xfm): 
+    def map_coords(self, xfm):
         """Calculate vector components of the field using the reference coordinates"""
         x = xfm.reference.ndcoords[0]
         y = xfm.reference.ndcoords[1]
@@ -100,7 +99,7 @@ class Vis():
         v = xfm._field[...,1].flatten() - y
         w = xfm._field[...,2].flatten() - z
         return x, y, z, u, v, w
-    
+
     def format_fig(self, figsize, gs_rows, gs_cols, gs_wspace, gs_hspace):
         fig = plt.figure(figsize=figsize) #(12, 6) for gs(2,3)
         fig.suptitle(str("Non-Linear DenseFieldTransform field"), fontsize='20', weight='bold')
@@ -133,7 +132,6 @@ class Vis():
         except:
             pass
 
-    
 #Example:
 path_to_file = Path("../tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
 save_to_dir = Path("/Users/julienmarabotto/workspace/Neuroimaging/plots/quiver")
