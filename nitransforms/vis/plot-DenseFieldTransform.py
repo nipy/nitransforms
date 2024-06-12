@@ -10,13 +10,16 @@ from nitransforms.linear import Affine
 from nitransforms.nonlinear import DenseFieldTransform
 
 class Vis():
+    """
+    NotImplented: description of class object here
+    """
 
     __slots__ = ('_path_to_file')
 
     def __init__(self, path_to_file):
          self._path_to_file = path_to_file
 
-    def plot_densefield(self, is_deltas=True, scaling=1, index=1000, save_to_dir=None):
+    def plot_densefield(self, is_deltas=True, scaling=1, index=10000, save_to_dir=None):
         """
         Plot output field from DenseFieldTransform class.
 
@@ -42,7 +45,7 @@ class Vis():
         ... ).plot_densefield(
         ...     is_deltas = True #deltas field
                 scaling = 0.25 #arrow scaling = 4 times true length
-                index = 10 #plot 1/10 data points, with indexing [0::10]
+                index = 100 #plot 1/100 data points, using indexing [0::10]
         ...     save_to_path = test_dir / "plot_of_someones_displacement_field.nii.gz" #save figure
         ... )
         """
@@ -65,21 +68,18 @@ class Vis():
         clr3d = plt.cm.viridis(magnitude[0::index]/magnitude[0::index].max())
 
         """Plot"""
-        fig, gs = self.format_fig(figsize=(15, 8), gs_rows=2, gs_cols=3, gs_wspace=1/4, gs_hspace=1/2.5)
+        fig, gs, axes = self.format_fig(figsize=(15, 8), gs_rows=2, gs_cols=3, gs_wspace=1/4, gs_hspace=1/2.5)
 
-        ax1 = fig.add_subplot(gs[0,0])
-        ax_params = self.format_axes(ax1, "x-y projection", "x", "y")
-        q1 = ax1.quiver(x[0::index], y[0::index], u[0::index], v[0::index], clr_xy, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
+        ax_params = self.format_axes(axes[0], "x-y projection", "x", "y")
+        q1 = axes[0].quiver(x[0::index], y[0::index], u[0::index], v[0::index], clr_xy, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
         plt.colorbar(q1)
 
-        ax2 = fig.add_subplot(gs[1,0])
-        ax_params = self.format_axes(ax2, "x-z projection", "x", "z")
-        q2 = ax2.quiver(x[0::index], z[0::index], u[0::index], w[0::index], clr_xz, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
+        ax_params = self.format_axes(axes[1], "x-z projection", "x", "z")
+        q2 = axes[1].quiver(x[0::index], z[0::index], u[0::index], w[0::index], clr_xz, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
         plt.colorbar(q2)
 
-        ax3 = fig.add_subplot(gs[:,1:], projection='3d')
-        ax_params = self.format_axes(ax3, "3D projection", "x", "y", "z")
-        q3 = ax3.quiver(x[0::index], y[0::index], z[0::index], u[0::index], v[0::index], w[0::index], colors=clr3d, length=2/scaling)
+        ax_params = self.format_axes(axes[2], "3D projection", "x", "y", "z")
+        q3 = axes[2].quiver(x[0::index], y[0::index], z[0::index], u[0::index], v[0::index], w[0::index], colors=clr3d, length=2/scaling)
         plt.colorbar(q3)
 
         if save_to_dir is not None:
@@ -104,7 +104,9 @@ class Vis():
         fig = plt.figure(figsize=figsize) #(12, 6) for gs(2,3)
         fig.suptitle(str("Non-Linear DenseFieldTransform field"), fontsize='20', weight='bold')
         gs = GridSpec(gs_rows, gs_cols, figure=fig, wspace=gs_wspace, hspace=gs_hspace)
-        return fig, gs
+
+        axes = [fig.add_subplot(gs[0,0]), fig.add_subplot(gs[1,0]), fig.add_subplot(gs[:,1:], projection='3d')]
+        return fig, gs, axes
 
     def format_axes(self, axis, title=None, xlabel="x", ylabel="y", zlabel="z", rotate_3dlabel=False, labelsize=16, ticksize=14):
         '''Format the figure axes. For 2D plots, zlabel and zticks parameters are None.'''
