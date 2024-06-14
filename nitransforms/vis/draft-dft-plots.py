@@ -9,7 +9,7 @@ from nitransforms.base import TransformError
 from nitransforms.linear import Affine
 from nitransforms.nonlinear import DenseFieldTransform
 
-class Vis():
+class PlotDenseField():
     """
     NotImplented: description of class object here
     """
@@ -19,7 +19,7 @@ class Vis():
     def __init__(self, path_to_file):
          self._path_to_file = path_to_file
 
-    def plot_densefield(self, is_deltas=True, scaling=1, index=10000, save_to_dir=None):
+    def plot_densefield(self, is_deltas=True, scaling=1, index=10000, save_to_path=None):
         """
         Plot output field from DenseFieldTransform class.
 
@@ -61,43 +61,44 @@ class Vis():
                 "the number of dimensions (%d)" % (xfm._field.shape[-1], xfm.ndim)
             )
 
-        x, y, z, u, v, w = self.map_coords(xfm)
+        x, y, z, u, v, w = self.map_coords(xfm, index)
+
         magnitude = np.sqrt(u**2 + v**2 + w**2)
-        clr_xy = np.hypot(u, v)[0::index]
-        clr_xz = np.hypot(u, w)[0::index]
-        clr3d = plt.cm.viridis(magnitude[0::index]/magnitude[0::index].max())
+        clr_xy = np.hypot(u, v)
+        clr_xz = np.hypot(u, w)
+        clr3d = plt.cm.viridis(magnitude/magnitude.max())
 
         """Plot"""
-        fig, gs, axes = self.format_fig(figsize=(15, 8), gs_rows=2, gs_cols=3, gs_wspace=1/4, gs_hspace=1/2.5)
+        axes = self.format_fig(figsize=(15, 8), gs_rows=2, gs_cols=3, gs_wspace=1/4, gs_hspace=1/2.5)
 
-        ax_params = self.format_axes(axes[0], "x-y projection", "x", "y")
-        q1 = axes[0].quiver(x[0::index], y[0::index], u[0::index], v[0::index], clr_xy, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
+        self.format_axes(axes[0], "x-y projection", "x", "y")
+        q1 = axes[0].quiver(x, y, u, v, clr_xy, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
         plt.colorbar(q1)
 
-        ax_params = self.format_axes(axes[1], "x-z projection", "x", "z")
-        q2 = axes[1].quiver(x[0::index], z[0::index], u[0::index], w[0::index], clr_xz, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
+        self.format_axes(axes[1], "x-z projection", "x", "z")
+        q2 = axes[1].quiver(x, z, u, w, clr_xz, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
         plt.colorbar(q2)
 
-        ax_params = self.format_axes(axes[2], "3D projection", "x", "y", "z")
-        q3 = axes[2].quiver(x[0::index], y[0::index], z[0::index], u[0::index], v[0::index], w[0::index], colors=clr3d, length=2/scaling)
+        self.format_axes(axes[2], "3D projection", "x", "y", "z")
+        q3 = axes[2].quiver(x, y, z, u, v, w, colors=clr3d, length=2/scaling)
         plt.colorbar(q3)
 
-        if save_to_dir is not None:
-            plt.savefig(str(save_to_dir), dpi=300)
-            assert os.path.isdir(os.path.dirname(save_to_dir))
+        if save_to_path is not None:
+            plt.savefig(str(save_to_path), dpi=300)
+            assert os.path.isdir(os.path.dirname(save_to_path))
         else:
             pass
         plt.show()
 
-    def map_coords(self, xfm):
+    def map_coords(self, xfm, index):
         """Calculate vector components of the field using the reference coordinates"""
-        x = xfm.reference.ndcoords[0]
-        y = xfm.reference.ndcoords[1]
-        z = xfm.reference.ndcoords[2]
+        x = xfm.reference.ndcoords[0][0::index]
+        y = xfm.reference.ndcoords[1][0::index]
+        z = xfm.reference.ndcoords[2][0::index]
 
-        u = xfm._field[...,0].flatten() - x
-        v = xfm._field[...,1].flatten() - y
-        w = xfm._field[...,2].flatten() - z
+        u = xfm._field[...,0].flatten()[0::index] - x
+        v = xfm._field[...,1].flatten()[0::index] - y
+        w = xfm._field[...,2].flatten()[0::index] - z
         return x, y, z, u, v, w
 
     def format_fig(self, figsize, gs_rows, gs_cols, gs_wspace, gs_hspace):
@@ -106,7 +107,7 @@ class Vis():
         gs = GridSpec(gs_rows, gs_cols, figure=fig, wspace=gs_wspace, hspace=gs_hspace)
 
         axes = [fig.add_subplot(gs[0,0]), fig.add_subplot(gs[1,0]), fig.add_subplot(gs[:,1:], projection='3d')]
-        return fig, gs, axes
+        return axes
 
     def format_axes(self, axis, title=None, xlabel="x", ylabel="y", zlabel="z", rotate_3dlabel=False, labelsize=16, ticksize=14):
         '''Format the figure axes. For 2D plots, zlabel and zticks parameters are None.'''
@@ -138,4 +139,4 @@ class Vis():
 path_to_file = Path("../tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
 save_to_dir = Path("/Users/julienmarabotto/workspace/Neuroimaging/plots/quiver")
 
-plot = Vis(path_to_file).plot_densefield(is_deltas=True, scaling=0.25, save_to_dir=(save_to_dir / "example_dense_field.jpg"), index=10000)
+plot = PlotDenseField(path_to_file).plot_densefield(is_deltas=True, scaling=0.25, save_to_path=(save_to_dir / "example_dense_field.jpg"), index=10000)
