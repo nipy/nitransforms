@@ -61,7 +61,7 @@ class PlotDenseField():
             suptitle="Non-Linear DenseFieldTransform field"
             )
 
-        titles=["RGB", None, "Grid", None, "Quiver", None]
+        titles=["RGB", None, "Distortion Grid", None, "Quiver", None]
         for i in range(len(axes)):
             ylabel = "y" if i%2==0 else "z"
             format_axes(axes[i], title=titles[i], xlabel="x", ylabel=ylabel)
@@ -82,6 +82,7 @@ class PlotDenseField():
             pass
         
     def plot_grid(self, ax, index):
+        #return NotImplementedError
         x, y, z, u, v, w = self.map_coords(index*10)
 
         ax[0].scatter(x+u, y+v, c='k', s=0.25)
@@ -203,6 +204,8 @@ def format_axes(axis, **kwargs):
 
 path_to_file = Path("../tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
 save_to_dir = Path("/Users/julienmarabotto/workspace/Neuroimaging/plots/quiver")
+PlotDenseField(path_to_file, is_deltas=True).plot_template(save_to_path=str(save_to_dir / "template.jpg"))
+plt.show()
 
 """___EXAMPLES___"""
 
