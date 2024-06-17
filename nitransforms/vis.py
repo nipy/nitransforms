@@ -31,7 +31,7 @@ class PlotDenseField():
                 "the number of dimensions (%d)" % (self._xfm._field.shape[-1], self._xfm.ndim)
             )
 
-    def plot_template(self, scaling=1, index=100, save_to_path=None):
+    def plot_field(self, scaling=1, index=100, save_to_path=None):
         """
         Plot output field from DenseFieldTransform class.
 
@@ -204,14 +204,12 @@ def format_axes(axis, **kwargs):
 
 path_to_file = Path("../tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
 save_to_dir = Path("/Users/julienmarabotto/workspace/Neuroimaging/plots/quiver")
-PlotDenseField(path_to_file, is_deltas=True).plot_template(save_to_path=str(save_to_dir / "template.jpg"))
-plt.show()
 
 """___EXAMPLES___"""
-
 """
 #Example 1: plot_template
-PlotDenseField(path_to_file, is_deltas=True).plot_template(save_to_path=str(save_to_dir / "template.jpg"))
+PlotDenseField(path_to_file, is_deltas=True).plot_field(index=10, save_to_path=str(save_to_dir / "template.jpg"))
+plt.show()
 """
 """
 #Example 2a: plot_quiver (2d)
@@ -221,11 +219,16 @@ format_axes(axes[0], xlabel="x", ylabel="y", labelsize=14)
 format_axes(axes[1], xlabel="x", ylabel="z", labelsize=14)
 plt.show()
 """
-"""
+
 #Example 2b: plot_quiver (3d)
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
 PlotDenseField(path_to_file, is_deltas=True).plot_quiver(ax, index=100)
 format_axes(ax)
+plt.show()
+
+"""
+fig, axes = plt.subplots(1, 2, figsize=(10, 4), tight_layout=True)
+PlotDenseField(path_to_file, is_deltas=True).plot_grid([axes[0], axes[1]], index=100)
 plt.show()
 """
