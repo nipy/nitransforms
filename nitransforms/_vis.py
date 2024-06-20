@@ -59,8 +59,14 @@ class PlotDenseField():
         ...     save_to_path = str(save_to_dir / "template.jpg")
         ... )
         """
+        xslice = self._xfm._field.shape[0]/2
+        yslice = self._xfm._field.shape[1]/2
+        zslice = self._xfm._field.shape[2]/2
+
+        slices = [int(xslice), int(yslice), int(zslice)]
+
         axes = format_fig(
-            figsize=(15,8), #(20, 5) if include 3d plot
+            figsize=(12,7), #(20, 5) if include 3d plot
             gs_rows=2,
             gs_cols=3, #change to 5 if include 3d plot, un-hash in format_axes
             suptitle="Non-Linear DenseFieldTransform field"
@@ -68,12 +74,13 @@ class PlotDenseField():
 
         titles=["RGB", None, "Distortion Grid", None, "Quiver", None]
         for i, ax in enumerate(axes):
+            xlabel = "x"
             ylabel = "y" if i%2==0 else "z"
-            format_axes(ax, title=titles[i], xlabel="x", ylabel=ylabel)
+            format_axes(ax, title=titles[i], xlabel=xlabel, ylabel=ylabel)
         
-        self.plot_scatter((axes[0], axes[1]), index=index)
-        self.plot_grid((axes[2], axes[3]), index=index)
-        self.plot_quiver([axes[4], axes[5]], index=index, scaling=scaling)
+        self.plot_dsm((axes[0], axes[1]), slices, index=index)
+        self.plot_grid((axes[2], axes[3]), slices, index=index)
+        self.plot_quiver((axes[4], axes[5]), slices, index=index, scaling=scaling)
         
         if save_to_path is not None:
             assert os.path.isdir(os.path.dirname(save_to_path))
@@ -81,7 +88,7 @@ class PlotDenseField():
         else:
             pass
         
-    def plot_dsm(self, ax, index=100):
+    def plot_dsm(self, axes, slices, index=100):
         """
         Plot the Diffusion Scalar Map (dsm).
         Parameters
@@ -92,13 +99,30 @@ class PlotDenseField():
             Indexing for plotting (default: index=100). The index defines the interval to be used when selecting datapoints, such that are only plotted elements [0::index].
         """
         x, y, z, u, v, w = self.map_coords(index)
-        axx = np.arange(0, 100)
-        axy = np.arange(0, 100)
-        axz = np.arange(-100, 0) * -1
-        ax[0].plot(axx,axy)
-        ax[1].plot(axx,axz)
-    
-    def plot_grid(self, ax, index=100):
+        c_reds, c_greens, c_blues, zeros = [], [], [], []
+
+        for ind, (i, j, k) in enumerate(zip(x, y, z)):
+            if np.abs(u[ind]) > [np.abs(v[ind]) and np.abs(w[ind])]:
+                c_reds.append((i, j, k, u[ind]))
+            elif np.abs(v[ind]) > [np.abs(u[ind]) and np.abs(w[ind])]:
+                c_greens.append((i, j, k, v[ind]))
+            elif np.abs(w[ind]) > [np.abs(u[ind]) and np.abs(v[ind])]:
+                c_blues.append((i, j, k, w[ind]))
+            else:
+                zeros.append(0)
+
+        assert len(np.concatenate((c_reds, c_greens, c_blues))) == len(x) - len(zeros)
+
+        c_reds = np.asanyarray(c_reds)
+        c_greens = np.asanyarray(c_greens)
+        c_blues = np.asanyarray(c_blues)
+
+        for i, ax in enumerate(axes):
+            ax.scatter(c_reds[:, 0], c_reds[:, i+1], c=(c_reds[:, -1]), cmap='Reds', norm=mpl.colors.Normalize(vmin=c_reds.min(), vmax=c_reds.max()), s=0.05, alpha=1)
+            ax.scatter(c_greens[:, 0], c_greens[:, i+1], c=(c_greens[:, -1]), cmap='Greens', norm=mpl.colors.Normalize(vmin=c_greens.min(), vmax=c_greens.max()), s=0.05, alpha=1)
+            ax.scatter(c_blues[:, 0], c_blues[:, i+1], c=(c_blues[:, -1]), cmap='Blues', norm=mpl.colors.Normalize(vmin=c_blues.min(), vmax=c_blues.max()), s=0.05, alpha=1)
+
+    def plot_grid(self, ax, slices, index=100):
         """
         Plot the distortion grid. 
 
@@ -116,7 +140,6 @@ class PlotDenseField():
 
         gc_xz, lenx, lenz = get_2dcenters(x, z, index)
         xz = list(gc_xz)
-
         uv = u[0::int(len(u)/(lenx * leny))]
         v = v[0::int(len(v)/(lenx * leny))]
         uw = u[0::int(len(u)/(lenx * lenz))]
@@ -145,7 +168,7 @@ class PlotDenseField():
             ax[0].plot(xy_moved[ind::leny], y_moved[ind::leny], c='k', lw=0.1)
             ax[1].plot(xz_moved[ind::lenz], z_moved[ind::lenz], c='k', lw=0.1)
     
-    def plot_quiver(self, ax, index, scaling=1):
+    def plot_quiver(self, ax, slices, index, scaling=1):
         """
         Plot the dense field as a quiver plot. 
         The direction of each arrow indicates the local orientation of the displacement field. 
@@ -166,7 +189,10 @@ class PlotDenseField():
         magnitude = np.sqrt(u**2 + v**2 + w**2)
         clr_xy = np.hypot(u, v)
         clr_xz = np.hypot(u, w)
+        clr_yz = np.hypot(v, w)
         clr3d = plt.cm.viridis(magnitude/magnitude.max())
+
+        xslice, yslice, zslice = slices
 
         try:
             if ax.name=='3d':
@@ -197,21 +223,22 @@ class PlotDenseField():
         u = self._xfm._field[...,0].flatten()[0::index] - x
         v = self._xfm._field[...,1].flatten()[0::index] - y
         w = self._xfm._field[...,2].flatten()[0::index] - z
+
         return x, y, z, u, v, w
 
 
 """Formatting"""
 
 def get_2dcenters(x, y, ind):
-        samples_x = np.arange(x.min(), x.max(), step=(ind)**(1/2)).astype(int)
-        samples_y = np.arange(y.min(), y.max(), step=(ind)**(1/2)).astype(int)
+        samples_x = np.arange(x.min(), x.max(), step=2).astype(int)
+        samples_y = np.arange(y.min(), y.max(), step=2).astype(int)
 
         lenx = len(samples_x)
         leny = len(samples_y)
         return zip(*product(samples_x, samples_y)), lenx, leny
 
 def format_fig(figsize, gs_rows, gs_cols, **kwargs):
-    params={'gs_wspace':1/3,
+    params={'gs_wspace':1/2.5,
             'gs_hspace':1/3,
             'suptitle':None,
             }
@@ -266,19 +293,23 @@ def format_axes(axis, **kwargs):
         pass
     return
 
-path_to_file = Path("./tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
+path_to_file = Path("/Users/julienmarabotto/workspace/nitransforms/nitransforms/tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
 save_to_dir = Path("/Users/julienmarabotto/workspace/Neuroimaging/plots/quiver")
 
 """___EXAMPLES___"""
 
 #Example 1: plot_template
-PlotDenseField(path_to_file, is_deltas=True).show_transform(index=10, save_to_path=str(save_to_dir / "template.jpg"))
+PlotDenseField(path_to_file, is_deltas=True).show_transform(
+    index=100, 
+    #save_to_path=None
+    save_to_path=str(save_to_dir / "template.jpg")
+)
 plt.show()
 
 """
 #Example 2a: plot_quiver (2d)
 fig, axes = plt.subplots(1, 2, figsize=(10, 4), tight_layout=True)
-PlotDenseField(path_to_file, is_deltas=True).plot_quiver([axes[0], axes[1]], index=10) #works the same for plot_grid, plot_scatter
+PlotDenseField(path_to_file, is_deltas=True).plot_dsm([axes[0], axes[1]], index=10) #works the same for plot_grid, plot_scatter
 format_axes(axes[0], xlabel="x", ylabel="y", labelsize=14)
 format_axes(axes[1], xlabel="x", ylabel="z", labelsize=14)
 plt.show()
