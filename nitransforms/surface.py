@@ -7,7 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Surface transforms."""
-
+import pathlib
 import warnings
 import h5py
 import numpy as np
@@ -24,8 +24,15 @@ class SurfaceTransformBase():
     """Generic surface transformation class"""
     __slots__ = ("_reference", "_moving")
 
-    def __init__(self, reference, moving):
+    def __init__(self, reference, moving, spherical=False):
         """Instantiate a generic surface transform."""
+        if spherical:
+            if not reference.check_sphere():
+                raise ValueError("reference was not spherical")
+            if not moving.check_sphere():
+                raise ValueError("moving was not spherical")
+            reference.set_radius()
+            moving.set_radius()
         self._reference = reference
         self._moving = moving
 
@@ -111,7 +118,12 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
 
 class SurfaceResampler(SurfaceTransformBase):
     """Represents transformations in which the coordinate space remains the same and the indicies
-     change."""
+     change.
+     To achieve surface project-unproject functionality:
+        sphere_in as the reference
+        sphere_project_to as the moving
+     Then apply the transformation to sphere_unproject_from
+      """
 
     __slots__ = ("mat", 'interpolation_method')
 
@@ -130,7 +142,10 @@ class SurfaceResampler(SurfaceTransformBase):
         interpolation_method : str
             Only barycentric is currently implemented
         """
-        super().__init__(reference, moving)
+        super().__init__(SurfaceMesh(reference), SurfaceMesh(moving), spherical=True)
+
+        self.reference.set_radius()
+        self.moving.set_radius()
         if interpolation_method not in ['barycentric']:
             raise NotImplementedError(f"{interpolation_method} is not implemented.")
         self.interpolation_method = interpolation_method
@@ -232,8 +247,8 @@ class SurfaceResampler(SurfaceTransformBase):
 
         Parameters
         ----------
-        x : array-like, shape (..., nv1)
-            Data to transform.
+        x : array-like, shape (..., nv1), or SurfaceMesh
+            Data to transform or SurfaceMesh to resample
         inverse : bool, default=False
             Whether to apply the inverse transform. If True, ``x`` has shape
             (..., nv2), and the output will have shape (..., nv1).
@@ -266,7 +281,18 @@ class SurfaceResampler(SurfaceTransformBase):
             scale[mask] = 1.0 / sum_[mask]
             mat = sparse.diags(scale) @ mat
 
-        y = x @ mat
+        if isinstance(x, SurfaceMesh) or isinstance(x, str) or isinstance(x, pathlib.PurePath):
+            x = SurfaceMesh(x)
+            if not x.check_sphere():
+                raise ValueError("If x is a surface, it should be a sphere.")
+            x.set_radius()
+            rs_x = x._coords[:, 0] @ mat
+            rs_y = x._coords[:, 1] @ mat
+            rs_z = x._coords[:, 2] @ mat
+            y = SurfaceMesh.from_arrays(np.vstack([rs_x, rs_y, rs_z]).T, self.reference._triangles)
+            y.set_radius()
+        else:
+            y = x @ mat
         return y
 
     def _to_hdf5(self, x5_root):
@@ -337,6 +363,7 @@ class SurfaceResampler(SurfaceTransformBase):
                     xform['reference_coordinates'],
                     xform['reference_triangles']
                 )
+
                 moving = SurfaceMesh.from_arrays(
                     xform['moving_coordinates'],
                     xform['moving_triangles']

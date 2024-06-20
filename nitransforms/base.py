@@ -127,6 +127,19 @@ class SurfaceMesh(SampledSpatialData):
 
         raise ValueError("Dataset could not be interpreted as an irregular sample.")
 
+    def check_sphere(self, tolerance=1.001):
+        """Check sphericity of surface.
+        Based on https://github.com/Washington-University/workbench/blob/7ba3345d161d567a4b628ceb02ab4471fc96cb20/src/Files/SurfaceResamplingHelper.cxx#L503
+        """
+        dists = np.linalg.norm(self._coords, axis=1)
+        return (dists.min() * tolerance) > dists.max()
+
+    def set_radius(self, radius=100):
+        if not self.check_sphere():
+            raise ValueError("You should only set the radius on spherical surfaces.")
+        dists = np.linalg.norm(self._coords, axis=1)
+        self._coords = self._coords * (radius / dists).reshape((-1, 1))
+
     @classmethod
     def from_arrays(cls, coordinates, triangles):
         darrays = [
