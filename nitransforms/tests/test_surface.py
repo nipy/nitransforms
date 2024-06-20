@@ -120,7 +120,6 @@ def test_SurfaceResampler(testdata_path):
     fslr_sphere = SurfaceMesh(nb.load(fslr_sphere_path))
     sphere_reg = SurfaceMesh(nb.load(sphere_reg_path))
     subj_thickness = nb.load(shape_path)
-    subj_fsaverage_sphere = nb.load(subj_fsaverage_sphere_path)
 
     reference = fslr_sphere
     moving = sphere_reg
