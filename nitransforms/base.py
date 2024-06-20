@@ -329,6 +329,19 @@ class TransformBase:
         """Serialize this object into the x5 file format."""
         raise NotImplementedError
 
+    def apply(self, *args, **kwargs):
+        """Apply the transform to a dataset.
+
+        Deprecated. Please use ``nitransforms.resampling.apply`` instead.
+        """
+        message = (
+            "The `apply` method is deprecated. Please use `nitransforms.resampling.apply` instead."
+        )
+        warnings.warn(message, DeprecationWarning, level=2)
+        from .resampling import apply
+
+        return apply(self, *args, **kwargs)
+
 
 def _as_homogeneous(xyz, dtype="float32", dim=3):
     """
