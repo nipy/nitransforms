@@ -59,7 +59,7 @@ RUN mkdir -p /opt/afni-latest \
         -name "3dAutomask" -or \
         -name "3dvolreg" -or \
         -name "3dNwarpApply" \
-    ) -delete
+    \) -delete
 
 # Micromamba
 FROM downloader as micromamba
