@@ -85,14 +85,15 @@ def test_SurfaceCoordinateTransform(testdata_path):
 
     # test loading from filenames
     sct = SurfaceCoordinateTransform(sphere_reg, pial)
-    sctf = SurfaceCoordinateTransform.from_filename(sphere_reg_path, pial_path)
+    sctf = SurfaceCoordinateTransform.from_filename(reference_path=sphere_reg_path,
+                                                    moving_path=pial_path)
     assert sct == sctf
 
     # test mapping
-    assert np.all(sct.map(sct.moving._coords[:100]) == sct.reference._coords[:100])
-    assert np.all(sct.map(sct.reference._coords[:100], inverse=True) == sct.moving._coords[:100])
+    assert np.all(sct.map(sct.moving._coords[:100], inverse=True) == sct.reference._coords[:100])
+    assert np.all(sct.map(sct.reference._coords[:100]) == sct.moving._coords[:100])
     with pytest.raises(NotImplementedError):
-        sct.map(sct.reference._coords[0])
+        sct.map(sct.moving._coords[0])
 
     # test inversion and addition
     scti = ~sct
@@ -105,6 +106,17 @@ def test_SurfaceCoordinateTransform(testdata_path):
     assert np.all(scti.reference._coords == sct.reference._coords)
     assert np.all(scti.reference._triangles == sct.reference._triangles)
     assert scti == sct
+
+def test_SurfaceCoordinateTransformIO(testdata_path, tmpdir):
+    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
+
+    sct = SurfaceCoordinateTransform(sphere_reg_path, pial_path)
+    fn = tempfile.mktemp(suffix=".h5")
+    sct.to_filename(fn)
+    sct2 = SurfaceCoordinateTransform.from_filename(fn)
+    assert sct == sct2
 
 def test_ProjectUnproject(testdata_path):
 
