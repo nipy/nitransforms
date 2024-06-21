@@ -286,10 +286,9 @@ class SurfaceResampler(SurfaceTransformBase):
             if not x.check_sphere():
                 raise ValueError("If x is a surface, it should be a sphere.")
             x.set_radius()
-            rs_x = x._coords[:, 0] @ mat
-            rs_y = x._coords[:, 1] @ mat
-            rs_z = x._coords[:, 2] @ mat
-            y = SurfaceMesh.from_arrays(np.vstack([rs_x, rs_y, rs_z]).T, self.reference._triangles)
+            rs_coords = x._coords.T @ mat
+
+            y = SurfaceMesh.from_arrays(rs_coords.T, self.reference._triangles)
             y.set_radius()
         else:
             y = x @ mat
