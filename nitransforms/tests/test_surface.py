@@ -3,14 +3,14 @@ import tempfile
 
 import numpy as np
 import nibabel as nb
+import pytest
+from scipy import sparse
 from nitransforms.base import SurfaceMesh
 from nitransforms.surface import (
     SurfaceTransformBase,
     SurfaceCoordinateTransform,
     SurfaceResampler
 )
-import pytest
-from scipy import sparse
 
 # def test_surface_transform_npz():
 #     mat = sparse.random(10, 10, density=0.5)
@@ -57,13 +57,13 @@ def test_SurfaceTransformBase(testdata_path):
     assert stfb_ff == stfb
 
     # test inversion and setting
-    stfb_i = stfb.__invert__()
+    stfb_i = ~stfb
     stfb.reference = pial
     stfb.moving = sphere_reg
-    assert (stfb_i._reference._coords == stfb._reference._coords).all()
-    assert (stfb_i._reference._triangles == stfb._reference._triangles).all()
-    assert (stfb_i._moving._coords == stfb._moving._coords).all()
-    assert (stfb_i._moving._triangles == stfb._moving._triangles).all()
+    assert np.all(stfb_i._reference._coords == stfb._reference._coords)
+    assert np.all(stfb_i._reference._triangles == stfb._reference._triangles)
+    assert np.all(stfb_i._moving._coords == stfb._moving._coords)
+    assert np.all(stfb_i._moving._triangles == stfb._moving._triangles)
     # test equality
     assert stfb_i == stfb
 
@@ -89,21 +89,21 @@ def test_SurfaceCoordinateTransform(testdata_path):
     assert sct == sctf
 
     # test mapping
-    assert (sct.map(sct.moving._coords[:100]) == sct.reference._coords[:100]).all()
-    assert (sct.map(sct.reference._coords[:100], inverse=True) == sct.moving._coords[:100]).all()
+    assert np.all(sct.map(sct.moving._coords[:100]) == sct.reference._coords[:100])
+    assert np.all(sct.map(sct.reference._coords[:100], inverse=True) == sct.moving._coords[:100])
     with pytest.raises(NotImplementedError):
         sct.map(sct.reference._coords[0])
 
     # test inversion and addition
-    scti = sct.__invert__()
+    scti = ~sct
 
     assert scti + sct == SurfaceCoordinateTransform(pial, pial)
     assert sct + scti == SurfaceCoordinateTransform(sphere_reg, sphere_reg)
 
     sct.reference = pial
     sct.moving = sphere_reg
-    assert (scti.reference._coords == sct.reference._coords).all()
-    assert (scti.reference._triangles == sct.reference._triangles).all()
+    assert np.all(scti.reference._coords == sct.reference._coords)
+    assert np.all(scti.reference._triangles == sct.reference._triangles)
     assert scti == sct
 
 def test_ProjectUnproject(testdata_path):
@@ -121,9 +121,9 @@ def test_ProjectUnproject(testdata_path):
     transformed = projunproj.apply(fslr_fsaverage_sphere_path)
     projunproj_ref = nb.load(subj_fsaverage_sphere_path)
     assert (projunproj_ref.agg_data()[0] - transformed._coords).max() < 0.0005
-    assert (transformed._triangles == projunproj_ref.agg_data()[1]).all()
+    assert np.all(transformed._triangles == projunproj_ref.agg_data()[1])
 
-def test_SurfaceResampler(testdata_path):
+def test_SurfaceResampler(testdata_path, tmpdir):
     dif_tol = 0.001
     fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
     shape_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
@@ -163,23 +163,17 @@ def test_SurfaceResampler(testdata_path):
 
     # test file io
     fn = tempfile.mktemp(suffix=".h5")
-    try:
-        resampling.to_filename(fn)
-        resampling2 = SurfaceResampler.from_filename(fn)
+    resampling.to_filename(fn)
+    resampling2 = SurfaceResampler.from_filename(fn)
 
-        #assert resampling2 == resampling
-        assert np.allclose(resampling2.reference._coords, resampling.reference._coords)
-        assert np.all(resampling2.reference._triangles == resampling.reference._triangles)
-        assert np.allclose(resampling2.reference._coords, resampling.reference._coords)
-        assert np.all(resampling2.moving._triangles == resampling.moving._triangles)
+    #assert resampling2 == resampling
+    assert np.allclose(resampling2.reference._coords, resampling.reference._coords)
+    assert np.all(resampling2.reference._triangles == resampling.reference._triangles)
+    assert np.allclose(resampling2.reference._coords, resampling.reference._coords)
+    assert np.all(resampling2.moving._triangles == resampling.moving._triangles)
 
-        resampled_thickness2 = resampling2.apply(subj_thickness.agg_data(), normalize='element')
-        assert np.all(resampled_thickness2 == resampled_thickness)
-
-    except Exception:
-        os.remove(fn)
-        raise
-    os.remove(fn)
+    resampled_thickness2 = resampling2.apply(subj_thickness.agg_data(), normalize='element')
+    assert np.all(resampled_thickness2 == resampled_thickness)
 
     # test loading with a csr
     assert isinstance(resampling.mat, sparse.csr_array)
@@ -188,18 +182,14 @@ def test_SurfaceResampler(testdata_path):
     assert np.all(resampled_thickness2a == resampled_thickness)
 
     with pytest.raises(ValueError):
-        rsfail = SurfaceResampler(moving, reference, mat=resampling.mat)
+        _ = SurfaceResampler(moving, reference, mat=resampling.mat)
 
     # test map
     assert np.all(resampling.map(np.array([[0, 0, 0]])) == np.array([[0, 0, 0]]))
 
     # test loading from surfaces
-    resampling3 = SurfaceResampler.from_filename(reference_file=fslr_sphere_path,
-                                                 moving_file=sphere_reg_path)
+    resampling3 = SurfaceResampler.from_filename(reference_path=fslr_sphere_path,
+                                                 moving_path=sphere_reg_path)
     assert resampling3 == resampling
-    assert np.all(resampling3.reference._coords == resampling.reference._coords)
-    assert np.all(resampling3.reference._triangles == resampling.reference._triangles)
-    assert np.all(resampling3.reference._coords == resampling.reference._coords)
-    assert np.all(resampling3.moving._triangles == resampling.moving._triangles)
     resampled_thickness3 = resampling3.apply(subj_thickness.agg_data(), normalize='element')
     assert np.all(resampled_thickness3 == resampled_thickness)

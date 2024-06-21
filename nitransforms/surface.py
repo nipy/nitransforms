@@ -11,18 +11,17 @@ import pathlib
 import warnings
 import h5py
 import numpy as np
-import scipy.sparse as sparse
+import nibabel as nb
+from scipy import sparse
+from scipy.spatial import KDTree
+from scipy.spatial.distance import cdist
 from nitransforms.base import (
     SurfaceMesh
 )
-import nibabel as nb
-from scipy.spatial import KDTree
-from scipy.spatial.distance import cdist
 
 
 class SurfaceTransformBase():
     """Generic surface transformation class"""
-    __slots__ = ("_reference", "_moving")
 
     def __init__(self, reference, moving, spherical=False):
         """Instantiate a generic surface transform."""
@@ -37,10 +36,10 @@ class SurfaceTransformBase():
         self._moving = moving
 
     def __eq__(self, other):
-        ref_coords_eq = (self.reference._coords == other.reference._coords).all()
-        ref_tris_eq = (self.reference._triangles == other.reference._triangles).all()
-        mov_coords_eq = (self.moving._coords == other.moving._coords).all()
-        mov_tris_eq = (self.moving._triangles == other.moving._triangles).all()
+        ref_coords_eq = np.all(self.reference._coords == other.reference._coords)
+        ref_tris_eq = np.all(self.reference._triangles == other.reference._triangles)
+        mov_coords_eq = np.all(self.moving._coords == other.moving._coords)
+        mov_tris_eq = np.all(self.moving._triangles == other.moving._triangles)
         return ref_coords_eq & ref_tris_eq & mov_coords_eq & mov_tris_eq
 
     def __invert__(self):
@@ -90,7 +89,7 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
         """
 
         super().__init__(reference=reference, moving=moving)
-        if (self._reference._triangles != self._moving._triangles).all():
+        if np.all(self._reference._triangles != self._moving._triangles):
             raise ValueError("Both surfaces for an index transform must have corresponding"
                              " vertices.")
 
@@ -112,8 +111,7 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
     def __add__(self, other):
         if isinstance(other, SurfaceCoordinateTransform):
             return self.__class__(self.reference, other.moving)
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
 
 class SurfaceResampler(SurfaceTransformBase):
@@ -125,7 +123,7 @@ class SurfaceResampler(SurfaceTransformBase):
      Then apply the transformation to sphere_unproject_from
       """
 
-    __slots__ = ("mat", 'interpolation_method')
+    __slots__ = ("_reference", "_moving", "mat", 'interpolation_method')
 
     def __init__(self, reference, moving, interpolation_method='barycentric', mat=None):
         """Initialize the resampling.
@@ -166,17 +164,17 @@ class SurfaceResampler(SurfaceTransformBase):
             if (mat.shape[0] != moving._npoints) or (mat.shape[1] != reference._npoints):
                 msg = "Shape of provided mat does not match expectations based on " \
                       "dimensions of moving and reference. \n"
-                if (mat.shape[0] != moving._npoints):
+                if mat.shape[0] != moving._npoints:
                     msg += f" mat has {mat.shape[0]} rows but moving has {moving._npoints} " \
                            f"vertices. \n"
-                if (mat.shape[1] != reference._npoints):
+                if mat.shape[1] != reference._npoints:
                     msg += f" mat has {mat.shape[1]} columns but reference has" \
                            f" {reference._npoints} vertices."
                 raise ValueError(msg)
 
     def __calculate_mat(self):
         m_tree = KDTree(self.moving._coords)
-        kmr_dists, kmr_closest = m_tree.query(self.reference._coords, k=10)
+        _, kmr_closest = m_tree.query(self.reference._coords, k=10)
 
         # invert the triangles to generate a lookup table from vertices to triangle index
         tri_lut = {}
@@ -190,7 +188,7 @@ class SurfaceResampler(SurfaceTransformBase):
         # calculate the barycentric interpolation weights
         bc_weights = []
         enclosing = []
-        for _, (point, kmrv) in enumerate(zip(self.reference._coords, kmr_closest)):
+        for point, kmrv in zip(self.reference._coords, kmr_closest):
             close_tris = _find_close_tris(kmrv, tri_lut, self.moving)
             ww, ee = _find_weights(point, close_tris, m_tree)
             bc_weights.append(ww)
@@ -210,7 +208,7 @@ class SurfaceResampler(SurfaceTransformBase):
         # transpose so that number of out vertices is columns
         self.mat = sparse.csr_array(mat.T)
 
-    def map(self, x, inverse=False):
+    def map(self, x):
         return x
 
     def __add__(self, other):
@@ -222,8 +220,7 @@ class SurfaceResampler(SurfaceTransformBase):
                 other.moving,
                 interpolation_method=self.interpolation_method
             )
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     def __invert__(self):
         return self.__class__(
@@ -281,7 +278,7 @@ class SurfaceResampler(SurfaceTransformBase):
             scale[mask] = 1.0 / sum_[mask]
             mat = sparse.diags(scale) @ mat
 
-        if isinstance(x, SurfaceMesh) or isinstance(x, str) or isinstance(x, pathlib.PurePath):
+        if isinstance(x, (SurfaceMesh, pathlib.PurePath, str)):
             x = SurfaceMesh(x)
             if not x.check_sphere():
                 raise ValueError("If x is a surface, it should be a sphere.")
@@ -327,51 +324,50 @@ class SurfaceResampler(SurfaceTransformBase):
         return filename
 
     @classmethod
-    def from_filename(cls, filename=None, reference_file=None, moving_file=None,
+    def from_filename(cls, filename=None, reference_path=None, moving_path=None,
                       fmt=None, interpolation_method=None):
         """Load transform from file."""
         if filename is None:
-            if reference_file is None or moving_file is None:
+            if reference_path is None or moving_path is None:
                 raise ValueError("You must pass either a X5 file or a pair of reference and moving"
                                  " surfaces.")
-            else:
-                if interpolation_method is None:
-                    interpolation_method = 'barycentric'
-                return cls(SurfaceMesh(nb.load(reference_file)),
-                           SurfaceMesh(nb.load(moving_file)),
-                           interpolation_method=interpolation_method)
-        else:
-            if fmt is None:
-                fmt = "npz" if filename.endswith(".npz") else "X5"
+            if interpolation_method is None:
+                interpolation_method = 'barycentric'
+            return cls(SurfaceMesh(nb.load(reference_path)),
+                       SurfaceMesh(nb.load(moving_path)),
+                       interpolation_method=interpolation_method)
 
-            if fmt == "npz":
-                raise NotImplementedError
-                # return cls(sparse.load_npz(filename))
+        if fmt is None:
+            fmt = "npz" if filename.endswith(".npz") else "X5"
 
-            if fmt != "X5":
-                raise ValueError("Only npz and X5 formats are supported.")
+        if fmt == "npz":
+            raise NotImplementedError
+            # return cls(sparse.load_npz(filename))
 
-            with h5py.File(filename, "r") as f:
-                assert f.attrs["Format"] == "X5"
-                xform = f["/0/Transform"]
-                mat = sparse.csr_matrix(
-                    (xform["mat_data"][()], xform["mat_indices"][()], xform["mat_indptr"][()]),
-                    shape=xform["mat_shape"][()],
-                )
-                reference = SurfaceMesh.from_arrays(
-                    xform['reference_coordinates'],
-                    xform['reference_triangles']
-                )
+        if fmt != "X5":
+            raise ValueError("Only npz and X5 formats are supported.")
 
-                moving = SurfaceMesh.from_arrays(
-                    xform['moving_coordinates'],
-                    xform['moving_triangles']
-                )
-                interpolation_method = xform.attrs['interpolation_method']
-            return cls(reference, moving, interpolation_method=interpolation_method, mat=mat)
+        with h5py.File(filename, "r") as f:
+            assert f.attrs["Format"] == "X5"
+            xform = f["/0/Transform"]
+            mat = sparse.csr_matrix(
+                (xform["mat_data"][()], xform["mat_indices"][()], xform["mat_indptr"][()]),
+                shape=xform["mat_shape"][()],
+            )
+            reference = SurfaceMesh.from_arrays(
+                xform['reference_coordinates'],
+                xform['reference_triangles']
+            )
+
+            moving = SurfaceMesh.from_arrays(
+                xform['moving_coordinates'],
+                xform['moving_triangles']
+            )
+            interpolation_method = xform.attrs['interpolation_method']
+        return cls(reference, moving, interpolation_method=interpolation_method, mat=mat)
 
 
-def _pointsToTriangles(points, triangles):
+def _points_to_triangles(points, triangles):
     """Implementation that vectorizes project of a point to a set of triangles.
     from: https://stackoverflow.com/a/32529589
     """
@@ -388,7 +384,7 @@ def _pointsToTriangles(points, triangles):
 
         # Calculate determinant and denominator
         det = a * c - b * b
-        invDet = 1. / det
+        inv_det = 1. / det
         denom = a - 2 * b + c
 
         # Project to the edges
@@ -411,7 +407,7 @@ def _pointsToTriangles(points, triangles):
         m1 = u < 0
         m2 = v < 0
         m3 = d < 0
-        m4 = (a + d > b + e)
+        m4 = a + d > b + e
         m5 = ce > bd
 
         t0 = m0 & m1 & m2 & m3
@@ -433,8 +429,8 @@ def _pointsToTriangles(points, triangles):
         v = np.where(t2, np.clip(ec, 0, 1), v)
         u = np.where(t3, np.clip(da, 0, 1), u)
         v = np.where(t3, 0, v)
-        u *= np.where(t4, invDet, 1)
-        v *= np.where(t4, invDet, 1)
+        u *= np.where(t4, inv_det, 1)
+        v *= np.where(t4, inv_det, 1)
         u = np.where(t5, np.clip(numer0, 0, 1), u)
         v = np.where(t5, 1 - u, v)
         u = np.where(t6, 0, u)
@@ -504,7 +500,7 @@ def _find_close_tris(kdsv, tri_lut, surface):
 
 def _find_weights(point, close_tris, d_tree):
     point = point[np.newaxis, :]
-    tri_dists = cdist(point, _pointsToTriangles(point, close_tris).squeeze())
+    tri_dists = cdist(point, _points_to_triangles(point, close_tris).squeeze())
     closest_tri = close_tris[(tri_dists == tri_dists.min()).squeeze()]
     # make sure a single closest triangle was found
     if closest_tri.shape[0] != 1:
@@ -515,7 +511,7 @@ def _find_weights(point, close_tris, d_tree):
     closest_tri = closest_tri.squeeze()
     # Make sure point is actually inside triangle
     enclosing = True
-    if ((point > closest_tri).sum(0) != 3).all():
+    if np.all((point > closest_tri).sum(0) != 3):
         enclosing = False
     _, ct_idxs = d_tree.query(closest_tri)
     a = closest_tri[0]
