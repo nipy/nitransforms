@@ -106,20 +106,39 @@ def test_SurfaceCoordinateTransform(testdata_path):
     assert (scti.reference._triangles == sct.reference._triangles).all()
     assert scti == sct
 
+def test_ProjectUnproject(testdata_path):
+
+    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
+    subj_fsaverage_sphere_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsaverage_desc-reg_sphere.surf.gii"
+    fslr_fsaverage_sphere_path = testdata_path / "tpl-fsLR_space-fsaverage_hemi-R_den-32k_sphere.surf.gii"
+    pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+
+    # test project-unproject funcitonality
+    projunproj = SurfaceResampler(sphere_reg_path, fslr_sphere_path)
+    with pytest.raises(ValueError):
+        projunproj.apply(pial_path)
+    transformed = projunproj.apply(fslr_fsaverage_sphere_path)
+    projunproj_ref = nb.load(subj_fsaverage_sphere_path)
+    assert (projunproj_ref.agg_data()[0] - transformed._coords).max() < 0.0005
+    assert (transformed._triangles == projunproj_ref.agg_data()[1]).all()
 
 def test_SurfaceResampler(testdata_path):
     dif_tol = 0.001
-    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
     fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
     shape_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
     ref_resampled_thickness_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_thickness.shape.gii"
-    fslr_fsaverage_sphere_path = testdata_path / "tpl-fsLR_space-fsaverage_hemi-R_den-32k_sphere.surf.gii"
-    subj_fsaverage_sphere_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsaverage_desc-reg_sphere.surf.gii"
     pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
 
     fslr_sphere = SurfaceMesh(nb.load(fslr_sphere_path))
     sphere_reg = SurfaceMesh(nb.load(sphere_reg_path))
     subj_thickness = nb.load(shape_path)
+
+    with pytest.raises(ValueError):
+        SurfaceResampler(sphere_reg_path, pial_path)
+    with pytest.raises(ValueError):
+        SurfaceResampler(pial_path, sphere_reg_path)
 
     reference = fslr_sphere
     moving = sphere_reg
@@ -180,17 +199,3 @@ def test_SurfaceResampler(testdata_path):
     assert np.all(resampling3.moving._triangles == resampling.moving._triangles)
     resampled_thickness3 = resampling3.apply(subj_thickness.agg_data(), normalize='element')
     assert np.all(resampled_thickness3 == resampled_thickness)
-
-    # test project-unproject funcitonality
-    projunproj = SurfaceResampler(sphere_reg_path, fslr_sphere_path)
-    with pytest.raises(ValueError):
-        projunproj.apply(pial_path)
-    transformed = projunproj.apply(fslr_fsaverage_sphere_path)
-    projunproj_ref = nb.load(subj_fsaverage_sphere_path)
-    assert (projunproj_ref.agg_data()[0] - transformed._coords).max() < 0.0005
-    assert (transformed._triangles == projunproj_ref.agg_data()[1]).all()
-
-    with pytest.raises(ValueError):
-        SurfaceResampler(sphere_reg_path, pial_path)
-    with pytest.raises(ValueError):
-        SurfaceResampler(pial_path, sphere_reg_path)
