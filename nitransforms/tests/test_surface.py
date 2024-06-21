@@ -151,6 +151,10 @@ def test_SurfaceResampler(testdata_path):
     assert max_dif < dif_tol
 
     with pytest.raises(ValueError):
+        SurfaceResampler(reference, moving, mat=resampling.mat[:, :10000])
+    with pytest.raises(ValueError):
+        SurfaceResampler(reference, moving, mat=resampling.mat[:10000, :])
+    with pytest.raises(ValueError):
         resampling.reference = reference
     with pytest.raises(ValueError):
         resampling.moving = moving
