@@ -18,6 +18,9 @@ from scipy.spatial.distance import cdist
 from nitransforms.base import (
     SurfaceMesh
 )
+import nibabel as nb
+from scipy.spatial import KDTree
+from scipy.spatial.distance import cdist
 
 
 class SurfaceTransformBase():
@@ -112,6 +115,7 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
         if isinstance(other, SurfaceCoordinateTransform):
             return self.__class__(self.reference, other.moving)
         raise NotImplementedError
+
 
     def _to_hdf5(self, x5_root):
         """Write transform to HDF5 file."""
@@ -211,6 +215,7 @@ class SurfaceResampler(SurfaceTransformBase):
         interpolation_method : str
             Only barycentric is currently implemented
         """
+
         super().__init__(SurfaceMesh(reference), SurfaceMesh(moving), spherical=True)
 
         self.reference.set_radius()
@@ -226,6 +231,39 @@ class SurfaceResampler(SurfaceTransformBase):
         # transform
         if mat is None:
             self.__calculate_mat()
+            r_tree = KDTree(self.reference._coords)
+            m_tree = KDTree(self.moving._coords)
+            kmr_dists, kmr_closest = m_tree.query(self.reference._coords, k=10)
+
+            # invert the triangles to generate a lookup table from vertices to triangle index
+            tri_lut = dict()
+            for i, idxs in enumerate(self.moving._triangles):
+                for x in idxs:
+                    if not x in tri_lut:
+                        tri_lut[x] = [i]
+                    else:
+                        tri_lut[x].append(i)
+
+            # calculate the barycentric interpolation weights
+            bc_weights = []
+            enclosing = []
+            for sidx, (point, kmrv) in enumerate(zip(self.reference._coords, kmr_closest)):
+                close_tris = _find_close_tris(kmrv, tri_lut, self.moving)
+                ww, ee = _find_weights(point, close_tris, m_tree)
+                bc_weights.append(ww)
+                enclosing.append(ee)
+
+            # build sparse matrix
+            # commenting out code for barycentric nearest neighbor
+            #bary_nearest = []
+            mat = sparse.lil_array((self.reference._npoints, self.moving._npoints))
+            for s_ix, dd in enumerate(bc_weights):
+                for k, v in dd.items():
+                    mat[s_ix, k] = v
+                # bary_nearest.append(np.array(list(dd.keys()))[np.array(list(dd.values())).argmax()])
+            # bary_nearest = np.array(bary_nearest)
+            # transpose so that number of out vertices is columns
+            self.mat = sparse.csr_array(mat.T)
         else:
             if isinstance(mat, sparse.csr_array):
                 self.mat = mat
@@ -283,7 +321,6 @@ class SurfaceResampler(SurfaceTransformBase):
         return x
 
     def __add__(self, other):
-
         if (isinstance(other, SurfaceResampler)
                 and (other.interpolation_method == self.interpolation_method)):
             return self.__class__(
@@ -455,6 +492,7 @@ class SurfaceResampler(SurfaceTransformBase):
 
 
 def _points_to_triangles(points, triangles):
+
     """Implementation that vectorizes project of a point to a set of triangles.
     from: https://stackoverflow.com/a/32529589
     """
@@ -495,6 +533,7 @@ def _points_to_triangles(points, triangles):
         m2 = v < 0
         m3 = d < 0
         m4 = a + d > b + e
+
         m5 = ce > bd
 
         t0 = m0 & m1 & m2 & m3
@@ -588,6 +627,7 @@ def _find_close_tris(kdsv, tri_lut, surface):
 def _find_weights(point, close_tris, d_tree):
     point = point[np.newaxis, :]
     tri_dists = cdist(point, _points_to_triangles(point, close_tris).squeeze())
+
     closest_tri = close_tris[(tri_dists == tri_dists.min()).squeeze()]
     # make sure a single closest triangle was found
     if closest_tri.shape[0] != 1:
@@ -599,6 +639,7 @@ def _find_weights(point, close_tris, d_tree):
     # Make sure point is actually inside triangle
     enclosing = True
     if np.all((point > closest_tri).sum(0) != 3):
+
         enclosing = False
     _, ct_idxs = d_tree.query(closest_tri)
     a = closest_tri[0]

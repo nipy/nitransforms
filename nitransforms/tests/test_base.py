@@ -4,6 +4,7 @@ import nibabel as nb
 import pytest
 import h5py
 
+
 from ..base import (
     SpatialReference,
     SampledSpatialData,

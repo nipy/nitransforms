@@ -12,6 +12,10 @@ from nitransforms.surface import (
     SurfaceResampler
 )
 
+from nitransforms.base import SurfaceMesh
+from nitransforms.surface import SurfaceCoordinateTransform, SurfaceResampler
+
+
 # def test_surface_transform_npz():
 #     mat = sparse.random(10, 10, density=0.5)
 #     xfm = SurfaceCoordinateTransform(mat)
@@ -42,6 +46,7 @@ from nitransforms.surface import (
 #     y_none = xfm.apply(x, normalize="none")
 #     assert y_none.sum() != y_element.sum()
 #     assert y_none.sum() != y_sum.sum()
+
 def test_SurfaceTransformBase(testdata_path):
     # note these transformations are a bit of a weird use of surface transformation, but I'm
     # just testing the base class and the io
@@ -205,3 +210,4 @@ def test_SurfaceResampler(testdata_path, tmpdir):
     assert resampling3 == resampling
     resampled_thickness3 = resampling3.apply(subj_thickness.agg_data(), normalize='element')
     assert np.all(resampled_thickness3 == resampled_thickness)
+
