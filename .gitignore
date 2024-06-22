@@ -82,5 +82,4 @@ local_settings.py
 
 *.swp
 .vscode/
-
 .DS_Store
