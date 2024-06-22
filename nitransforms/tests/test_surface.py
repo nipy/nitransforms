@@ -112,7 +112,7 @@ def test_SurfaceCoordinateTransformIO(testdata_path, tmpdir):
     pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
     fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
 
-    sct = SurfaceCoordinateTransform(sphere_reg_path, pial_path)
+    sct = SurfaceCoordinateTransform(pial_path, sphere_reg_path)
     fn = tempfile.mktemp(suffix=".h5")
     sct.to_filename(fn)
     sct2 = SurfaceCoordinateTransform.from_filename(fn)
