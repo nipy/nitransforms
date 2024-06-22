@@ -589,7 +589,8 @@ def _barycentric_weights(vecs, coords):
         triangle, respectively. ``t`` is the scale that needs to be multiplied
         to ``coords`` to make it in the same plane as the three vertices.
 
-    From: https://github.com/neuroboros/neuroboros/blob/f2a2efb914e783add2bf06e0f3715236d3d8550e/src/neuroboros/surface/_barycentric.pyx#L9-L47
+    From: https://github.com/neuroboros/neuroboros/blob/\
+f2a2efb914e783add2bf06e0f3715236d3d8550e/src/neuroboros/surface/_barycentric.pyx#L9-L47
     """
     det = coords[0] * vecs[3, 0] + coords[1] * vecs[3, 1] + coords[2] * vecs[3, 2]
     if det == 0:

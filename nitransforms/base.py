@@ -129,7 +129,8 @@ class SurfaceMesh(SampledSpatialData):
 
     def check_sphere(self, tolerance=1.001):
         """Check sphericity of surface.
-        Based on https://github.com/Washington-University/workbench/blob/7ba3345d161d567a4b628ceb02ab4471fc96cb20/src/Files/SurfaceResamplingHelper.cxx#L503
+        Based on https://github.com/Washington-University/workbench/blob/\
+7ba3345d161d567a4b628ceb02ab4471fc96cb20/src/Files/SurfaceResamplingHelper.cxx#L503
         """
         dists = np.linalg.norm(self._coords, axis=1)
         return (dists.min() * tolerance) > dists.max()
