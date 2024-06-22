@@ -113,7 +113,6 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
             return self.__class__(self.reference, other.moving)
         raise NotImplementedError
 
-
     def _to_hdf5(self, x5_root):
         """Write transform to HDF5 file."""
         triangles = x5_root.create_group("Triangles")
@@ -186,9 +185,11 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
             )
         return cls(reference, moving)
 
+
 class SurfaceResampler(SurfaceTransformBase):
     """
-    Represents transformations in which the coordinate space remains the same and the indices change.
+    Represents transformations in which the coordinate space remains the same
+    and the indices change.
     To achieve surface project-unproject functionality:
         sphere_in as the reference
         sphere_project_to as the moving
@@ -235,7 +236,7 @@ class SurfaceResampler(SurfaceTransformBase):
             tri_lut = {}
             for i, idxs in enumerate(self.moving._triangles):
                 for x in idxs:
-                    if not x in tri_lut:
+                    if x not in tri_lut:
                         tri_lut[x] = [i]
                     else:
                         tri_lut[x].append(i)
@@ -251,7 +252,7 @@ class SurfaceResampler(SurfaceTransformBase):
 
             # build sparse matrix
             # commenting out code for barycentric nearest neighbor
-            #bary_nearest = []
+            # bary_nearest = []
             mat = sparse.lil_array((self.reference._npoints, self.moving._npoints))
             for s_ix, dd in enumerate(bc_weights):
                 for k, v in dd.items():
@@ -473,7 +474,7 @@ class SurfaceResampler(SurfaceTransformBase):
                     shape=iws["Shape"][()],
                 )
             except KeyError:
-                mat=None
+                mat = None
             reference = SurfaceMesh.from_arrays(
                 xform['Reference']['Coordinates'],
                 xform['Reference']['Triangles']

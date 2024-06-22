@@ -45,7 +45,10 @@ from nitransforms.surface import (
 def test_SurfaceTransformBase(testdata_path):
     # note these transformations are a bit of a weird use of surface transformation, but I'm
     # just testing the base class and the io
-    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    sphere_reg_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    )
     pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
 
     sphere_reg = SurfaceMesh(nb.load(sphere_reg_path))
@@ -71,7 +74,10 @@ def test_SurfaceTransformBase(testdata_path):
 def test_SurfaceCoordinateTransform(testdata_path):
     # note these transformations are a bit of a weird use of surface transformation, but I'm
     # just testing the class and the io
-    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    sphere_reg_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    )
     pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
     fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
 
@@ -107,8 +113,12 @@ def test_SurfaceCoordinateTransform(testdata_path):
     assert np.all(scti.reference._triangles == sct.reference._triangles)
     assert scti == sct
 
+
 def test_SurfaceCoordinateTransformIO(testdata_path, tmpdir):
-    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    sphere_reg_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    )
     pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
 
     sct = SurfaceCoordinateTransform(pial_path, sphere_reg_path)
@@ -117,12 +127,22 @@ def test_SurfaceCoordinateTransformIO(testdata_path, tmpdir):
     sct2 = SurfaceCoordinateTransform.from_filename(fn)
     assert sct == sct2
 
+
 def test_ProjectUnproject(testdata_path):
 
-    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    sphere_reg_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    )
     fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
-    subj_fsaverage_sphere_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsaverage_desc-reg_sphere.surf.gii"
-    fslr_fsaverage_sphere_path = testdata_path / "tpl-fsLR_space-fsaverage_hemi-R_den-32k_sphere.surf.gii"
+    subj_fsaverage_sphere_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsaverage_desc-reg_sphere.surf.gii"
+    )
+    fslr_fsaverage_sphere_path = (
+        testdata_path
+        / "tpl-fsLR_space-fsaverage_hemi-R_den-32k_sphere.surf.gii"
+    )
     pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
 
     # test project-unproject funcitonality
@@ -134,13 +154,28 @@ def test_ProjectUnproject(testdata_path):
     assert (projunproj_ref.agg_data()[0] - transformed._coords).max() < 0.0005
     assert np.all(transformed._triangles == projunproj_ref.agg_data()[1])
 
+
 def test_SurfaceResampler(testdata_path, tmpdir):
     dif_tol = 0.001
-    fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
-    shape_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
-    ref_resampled_thickness_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_thickness.shape.gii"
-    pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
-    sphere_reg_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    fslr_sphere_path = (
+        testdata_path
+        / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
+    )
+    shape_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
+    )
+    ref_resampled_thickness_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_thickness.shape.gii"
+    )
+    pial_path = (
+        testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    )
+    sphere_reg_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
+    )
 
     fslr_sphere = SurfaceMesh(nb.load(fslr_sphere_path))
     sphere_reg = SurfaceMesh(nb.load(sphere_reg_path))
@@ -177,7 +212,7 @@ def test_SurfaceResampler(testdata_path, tmpdir):
     resampling.to_filename(fn)
     resampling2 = SurfaceResampler.from_filename(fn)
 
-    #assert resampling2 == resampling
+    # assert resampling2 == resampling
     assert np.allclose(resampling2.reference._coords, resampling.reference._coords)
     assert np.all(resampling2.reference._triangles == resampling.reference._triangles)
     assert np.allclose(resampling2.reference._coords, resampling.reference._coords)
