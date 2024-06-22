@@ -403,14 +403,19 @@ class ITKCompositeH5:
             if xfm["TransformType"][0].startswith(b"DisplacementFieldTransform"):
                 if only_linear:
                     continue
-                _fixed = np.asanyarray(xfm[f"{typo_fallback}FixedParameters"])
-                shape = _fixed[:3].astype("uint16").tolist()
-                offset = _fixed[3:6].astype("float")
-                zooms = _fixed[6:9].astype("float")
-                directions = _fixed[9:].astype("float").reshape((3, 3))
+                _fixed = xfm[f"{typo_fallback}FixedParameters"]
+                shape = _fixed[:3]
+                offset = _fixed[3:6]
+                zooms = _fixed[6:9]
+                directions = np.reshape(_fixed[9:], (3, 3))
                 affine = from_matvec(directions * zooms, offset)
-                field = np.asanyarray(xfm[f"{typo_fallback}Parameters"]).reshape(
-                    (*shape, 1, -1)
+                # ITK uses Fortran ordering, like NIfTI, but with the vector dimension first
+                field = np.moveaxis(
+                    np.reshape(
+                        xfm[f"{typo_fallback}Parameters"], (3, *shape.astype(int)), order='F'
+                    ),
+                    0,
+                    -1,
                 )
                 field[..., (0, 1)] *= -1.0
                 hdr = Nifti1Header()
@@ -418,7 +423,7 @@ class ITKCompositeH5:
                 hdr.set_data_dtype("float")
 
                 xfm_list.append(
-                    Nifti1Image(field.astype("float"), LPS @ affine @ LPS, hdr)
+                    Nifti1Image(field.astype("float"), affine @ LPS, hdr)
                 )
                 continue
 
