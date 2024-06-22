@@ -1,9 +1,14 @@
 """Test _version.py."""
 import sys
 from collections import namedtuple
-from pkg_resources import DistributionNotFound
 from importlib import reload
+import pytest
 import nitransforms
+
+try:
+    from pkg_resources import DistributionNotFound
+except ImportError:
+    pytest.skip(allow_module_level=True)
 
 
 def test_version_scm0(monkeypatch):
