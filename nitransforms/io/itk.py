@@ -423,7 +423,7 @@ class ITKCompositeH5:
                 hdr.set_data_dtype("float")
 
                 xfm_list.append(
-                    Nifti1Image(field.astype("float"), affine @ LPS, hdr)
+                    Nifti1Image(field.astype("float"), LPS @ affine, hdr)
                 )
                 continue
 
