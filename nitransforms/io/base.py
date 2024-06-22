@@ -76,12 +76,12 @@ class LinearParameters(LinearTransformStruct):
     Examples
     --------
     >>> lp = LinearParameters()
-    >>> np.all(lp.structarr['parameters'] == np.eye(4))
+    >>> np.array_equal(lp.structarr['parameters'], np.eye(4))
     True
 
     >>> p = np.diag([2., 2., 2., 1.])
     >>> lp = LinearParameters(p)
-    >>> np.all(lp.structarr['parameters'] == p)
+    >>> np.array_equal(lp.structarr['parameters'], p)
     True
 
     """
