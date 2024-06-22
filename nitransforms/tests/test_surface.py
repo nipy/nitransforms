@@ -103,11 +103,11 @@ def test_SurfaceCoordinateTransform(testdata_path):
     # test inversion and addition
     scti = ~sct
 
-    assert scti + sct == SurfaceCoordinateTransform(pial, pial)
-    assert sct + scti == SurfaceCoordinateTransform(sphere_reg, sphere_reg)
+    assert sct + scti == SurfaceCoordinateTransform(pial, pial)
+    assert scti + sct == SurfaceCoordinateTransform(sphere_reg, sphere_reg)
 
-    sct.reference = pial
-    sct.moving = sphere_reg
+    sct.reference = sphere_reg
+    sct.moving = pial
     assert np.all(scti.reference._coords == sct.reference._coords)
     assert np.all(scti.reference._triangles == sct.reference._triangles)
     assert scti == sct
