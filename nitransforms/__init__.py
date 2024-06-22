@@ -16,7 +16,7 @@ Geometric transforms.
 
    transform
 """
-from . import linear, manip, nonlinear
+from . import linear, manip, nonlinear, surface
 from .linear import Affine, LinearTransformsMapping
 from .nonlinear import DenseFieldTransform
 from .manip import TransformChain
@@ -37,6 +37,7 @@ __packagename__ = "nitransforms"
 __copyright__ = "Copyright (c) 2021 The NiPy developers"
 
 __all__ = [
+    "surface",
     "linear",
     "manip",
     "nonlinear",

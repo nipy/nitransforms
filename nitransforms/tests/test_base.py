@@ -4,11 +4,13 @@ import nibabel as nb
 import pytest
 import h5py
 
+
 from ..base import (
     SpatialReference,
     SampledSpatialData,
     ImageGrid,
     TransformBase,
+    SurfaceMesh,
 )
 from .. import linear as nitl
 from ..resampling import apply
@@ -159,3 +161,31 @@ def test_concatenation(testdata_path):
     x = [(0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (-1.0, -1.0, -1.0)]
     assert np.all((aff + nitl.Affine())(x) == x)
     assert np.all((aff + nitl.Affine())(x, inverse=True) == x)
+
+
+def test_SurfaceMesh(testdata_path):
+    surf_path = testdata_path / "sub-200148_hemi-R_pial.surf.gii"
+    shape_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
+    img_path = testdata_path / "bold.nii.gz"
+
+    mesh = SurfaceMesh(nb.load(surf_path))
+    exp_coords_shape = (249277, 3)
+    exp_tris_shape = (498550, 3)
+    assert mesh._coords.shape == exp_coords_shape
+    assert mesh._triangles.shape == exp_tris_shape
+    assert mesh._npoints == exp_coords_shape[0]
+    assert mesh._ndim == exp_coords_shape[1]
+
+    mfd = SurfaceMesh(surf_path)
+    assert (mfd._coords == mesh._coords).all()
+    assert (mfd._triangles == mesh._triangles).all()
+
+    mfsm = SurfaceMesh(mfd)
+    assert (mfd._coords == mfsm._coords).all()
+    assert (mfd._triangles == mfsm._triangles).all()
+
+    with pytest.raises(ValueError):
+        SurfaceMesh(nb.load(img_path))
+
+    with pytest.raises(TypeError):
+        SurfaceMesh(nb.load(shape_path))

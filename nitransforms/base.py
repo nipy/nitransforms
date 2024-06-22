@@ -15,6 +15,7 @@ from nibabel.loadsave import load as _nbload
 from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
 from nibabel.cifti2 import Cifti2Image
+import nibabel as nb
 
 EQUALITY_TOL = 1e-5
 
@@ -86,6 +87,76 @@ class SampledSpatialData:
     def shape(self):
         """Access the space's size of each dimension."""
         return self._shape
+
+
+class SurfaceMesh(SampledSpatialData):
+    """Class to represent surface meshes."""
+
+    __slots__ = ["_triangles"]
+
+    def __init__(self, dataset):
+        """Create a sampling reference."""
+        self._shape = None
+
+        if isinstance(dataset, SurfaceMesh):
+            self._coords = dataset._coords
+            self._triangles = dataset._triangles
+            self._ndim = dataset._ndim
+            self._npoints = dataset._npoints
+            self._shape = dataset._shape
+            return
+
+        if isinstance(dataset, (str, Path)):
+            dataset = _nbload(str(dataset))
+
+        if hasattr(dataset, "numDA"):  # Looks like a Gifti file
+            _das = dataset.get_arrays_from_intent(INTENT_CODES["pointset"])
+            if not _das:
+                raise TypeError(
+                    "Input Gifti file does not contain reference coordinates."
+                )
+            self._coords = np.vstack([da.data for da in _das])
+            _tris = dataset.get_arrays_from_intent(INTENT_CODES["triangle"])
+            self._triangles = np.vstack([da.data for da in _tris])
+            self._npoints, self._ndim = self._coords.shape
+            self._shape = self._coords.shape
+            return
+
+        if isinstance(dataset, Cifti2Image):
+            raise NotImplementedError
+
+        raise ValueError("Dataset could not be interpreted as an irregular sample.")
+
+    def check_sphere(self, tolerance=1.001):
+        """Check sphericity of surface.
+        Based on https://github.com/Washington-University/workbench/blob/\
+7ba3345d161d567a4b628ceb02ab4471fc96cb20/src/Files/SurfaceResamplingHelper.cxx#L503
+        """
+        dists = np.linalg.norm(self._coords, axis=1)
+        return (dists.min() * tolerance) > dists.max()
+
+    def set_radius(self, radius=100):
+        if not self.check_sphere():
+            raise ValueError("You should only set the radius on spherical surfaces.")
+        dists = np.linalg.norm(self._coords, axis=1)
+        self._coords = self._coords * (radius / dists).reshape((-1, 1))
+
+    @classmethod
+    def from_arrays(cls, coordinates, triangles):
+        darrays = [
+            nb.gifti.GiftiDataArray(
+                coordinates.astype(np.float32),
+                intent=nb.nifti1.intent_codes['NIFTI_INTENT_POINTSET'],
+                datatype=nb.nifti1.data_type_codes['NIFTI_TYPE_FLOAT32'],
+            ),
+            nb.gifti.GiftiDataArray(
+                triangles.astype(np.int32),
+                intent=nb.nifti1.intent_codes['NIFTI_INTENT_TRIANGLE'],
+                datatype=nb.nifti1.data_type_codes['NIFTI_TYPE_INT32'],
+            ),
+        ]
+        gii = nb.gifti.GiftiImage(darrays=darrays)
+        return cls(gii)
 
 
 class ImageGrid(SampledSpatialData):
