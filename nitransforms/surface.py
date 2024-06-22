@@ -18,9 +18,6 @@ from scipy.spatial.distance import cdist
 from nitransforms.base import (
     SurfaceMesh
 )
-import nibabel as nb
-from scipy.spatial import KDTree
-from scipy.spatial.distance import cdist
 
 
 class SurfaceTransformBase():
@@ -231,12 +228,11 @@ class SurfaceResampler(SurfaceTransformBase):
         # transform
         if mat is None:
             self.__calculate_mat()
-            r_tree = KDTree(self.reference._coords)
             m_tree = KDTree(self.moving._coords)
-            kmr_dists, kmr_closest = m_tree.query(self.reference._coords, k=10)
+            _, kmr_closest = m_tree.query(self.reference._coords, k=10)
 
             # invert the triangles to generate a lookup table from vertices to triangle index
-            tri_lut = dict()
+            tri_lut = {}
             for i, idxs in enumerate(self.moving._triangles):
                 for x in idxs:
                     if not x in tri_lut:
@@ -247,7 +243,7 @@ class SurfaceResampler(SurfaceTransformBase):
             # calculate the barycentric interpolation weights
             bc_weights = []
             enclosing = []
-            for sidx, (point, kmrv) in enumerate(zip(self.reference._coords, kmr_closest)):
+            for point, kmrv in zip(self.reference._coords, kmr_closest):
                 close_tris = _find_close_tris(kmrv, tri_lut, self.moving)
                 ww, ee = _find_weights(point, close_tris, m_tree)
                 bc_weights.append(ww)
