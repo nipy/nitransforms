@@ -186,13 +186,13 @@ class SurfaceCoordinateTransform(SurfaceTransformBase):
         return cls(reference, moving)
 
 class SurfaceResampler(SurfaceTransformBase):
-    """Represents transformations in which the coordinate space remains the same and the indicies
-     change.
-     To achieve surface project-unproject functionality:
+    """
+    Represents transformations in which the coordinate space remains the same and the indices change.
+    To achieve surface project-unproject functionality:
         sphere_in as the reference
         sphere_project_to as the moving
-     Then apply the transformation to sphere_unproject_from
-      """
+    Then apply the transformation to sphere_unproject_from
+    """
 
     __slots__ = ("_reference", "_moving", "mat", 'interpolation_method')
 
