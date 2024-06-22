@@ -84,9 +84,9 @@ def test_SurfaceCoordinateTransform(testdata_path):
         sct = SurfaceCoordinateTransform(fslr_sphere, pial)
 
     # test loading from filenames
-    sct = SurfaceCoordinateTransform(sphere_reg, pial)
-    sctf = SurfaceCoordinateTransform.from_filename(reference_path=sphere_reg_path,
-                                                    moving_path=pial_path)
+    sct = SurfaceCoordinateTransform(pial, sphere_reg)
+    sctf = SurfaceCoordinateTransform.from_filename(reference_path=pial_path,
+                                                    moving_path=sphere_reg_path)
     assert sct == sctf
 
     # test mapping
