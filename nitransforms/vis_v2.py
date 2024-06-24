@@ -37,44 +37,56 @@ class PlotDenseField():
 
         Parameters
         ----------
-        index: :obj:`int`
-            Indexing for plotting (default: index=100). The index defines the interval to be used when selecting datapoints, such that are only plotted elements [0::index].
+        xslice: :obj:`int`
+            x plane to select for axial projection of the transform.
+        yslice: :obj:`int`
+            y plane to select for coronary prjection of the transform.
+        zslice: :obj:`int`
+            z plane to select for sagittal prjection of the transform.
+        gridstep: :obj:`int`
+            Interval to be used between distortion grid lines (efault: 10). 
         scaling: :obj:`float`
             Fraction by which the quiver plot arrows are to be scaled (default: 1).
         save_to_path: :obj:`str`
-            Path to which the output plot is to be saved.
-            
+            Path to which the output plot is to be saved (default: None).
+
         Examples
         --------
         >>> PlotDenseField(
         ...     test_dir / "someones_displacement_field.nii.gz"
-        ... ).show_transform()
+        ... ).show_transform(50, 50, 50)
         >>> plt.show()
 
         >>> PlotDenseField(
         ...     path_to_file = test_dir / "someones_displacement_field.nii.gz",
-        ...     is_deltas = True
+        ...     is_deltas = True,
         ... ).show_transform(
-        ...     index = 10,
-        ...     save_to_path = str(save_to_dir / "template.jpg")
+        ...     xslice = 70,
+        ...     yslice = 60
+        ...     zslice = 90,
+        ...     gridstep = 2,
+        ...     scaling = 3,
+        ...     save_to_path = str(save_to_dir / "template.jpg"),
         ... )
+        >>> plt.show()
         """
 
         axes = format_fig(
-            figsize=(8,8), #(20, 5) if include 3d plot
+            figsize=(8,8),
             gs_rows=3,
-            gs_cols=3, #change to 5 if include 3d plot, un-hash in format_axes
-            suptitle="Non-Linear DenseFieldTransform field"
-            )
+            gs_cols=3,
+            suptitle="Dense Field Transform \n" + os.path.basename(self._path_to_file),
+        )
 
-        titles=["Axial", "Coronary", "Sagittal"]
+        projections=["Axial\n(z = "+str(zslice)+")", "Coronary\n(y = "+str(yslice)+")", "Sagittal\n(x = "+str(xslice)+")"]
         for i, ax in enumerate(axes):
             if i < 3:
-                ylabel = titles[i]
                 xlabel = None
+                ylabel = projections[i]
             else:
+                xlabel=None
                 ylabel=None
-            format_axes(ax, xlabel=xlabel, ylabel=ylabel)
+            format_axes(ax, xlabel=xlabel, ylabel=ylabel, labelsize=14)
             
         self.plot_dsm((axes[2], axes[1], axes[0]), xslice, yslice, zslice)
         self.plot_grid((axes[5], axes[4], axes[3]), xslice, yslice, zslice, step=gridstep)
@@ -89,13 +101,19 @@ class PlotDenseField():
     def plot_dsm(self, ax, xslice, yslice, zslice):
         """
         Plot the Diffusion Scalar Map (dsm).
+        
         Parameters
         ----------
         axis :obj:`tuple`
-            Tuple of two axes on which the dsm should be plotted. Requires TWO axes to illustrate both x-y and x-z planes (ax1, ax2)
-        index: :obj:`int`
-            Indexing for plotting (default: index=100). The index defines the interval to be used when selecting datapoints, such that are only plotted elements [0::index].
+            Tuple of three axes on which the dsm should be plotted. Requires THREE axes to illustrate all projections (eg ax1: Axial, ax2: Coronary, ax3: Sagittal)
+        xslice: :obj:`int`
+            x plane to select for axial projection of the transform.
+        yslice: :obj:`int`
+            y plane to select for coronary prjection of the transform.
+        zslice: :obj:`int`
+            z plane to select for sagittal prjection of the transform.
         """
+        
         planes = self.map_coords(xslice, yslice, zslice)
         
         for index, plane in enumerate(planes):
@@ -138,10 +156,17 @@ class PlotDenseField():
         Parameters
         ----------
         axis :obj:`tuple`
-            Tuple of two axes on which the distortion grid should be plotted. Requires TWO axes to illustrate both x-y and x-z planes (ax1, ax2)
-        index: :obj:`int`
-            Indexing for plotting (default: index=100). The index defines the interval to be used when selecting datapoints, such that are only plotted elements [0::index].
+            Tuple of three axes on which the grid should be plotted. Requires THREE axes to illustrate all projections (eg ax1: Axial, ax2: Coronary, ax3: Sagittal)
+        xslice: :obj:`int`
+            x plane to select for axial projection of the transform.
+        yslice: :obj:`int`
+            y plane to select for coronary prjection of the transform.
+        zslice: :obj:`int`
+            z plane to select for sagittal prjection of the transform.
+        step: :obj:`int`
+            Interval to be used between distortion grid lines (efault: 10). 
         """
+
         planes = self.map_coords(xslice, yslice, zslice)
         
         for index, plane in enumerate(planes):
@@ -167,30 +192,13 @@ class PlotDenseField():
                     y_moved.append(xy[1][ind] + j)
                 except IndexError:
                     break
-            """
-            for ind, (i, k) in enumerate(zip(uw, w)):
-                try:
-                    xz_moved.append(xz[0][ind] + i)
-                    z_moved.append(xz[1][ind] + k)
-                except IndexError:
-                    break
-            """
+
             for ind, i in enumerate(x_moved):
                 if ind%leny == 0:
                     ax[index].plot(x_moved[ind:leny+ind], y_moved[ind:leny+ind], c='k', lw=0.1)
                 ax[index].plot(x_moved[ind::leny], y_moved[ind::leny], c='k', lw=0.1)
-            
-            """
-            # Plot grid
-            for ind, i in enumerate(xy_moved):
-                if ind%leny==0:
-                    ax[0].plot(xy_moved[ind:leny+ind], y_moved[ind:leny+ind], c='k', lw=0.1)
-                if ind%lenz==0:
-                    ax[1].plot(xz_moved[ind:lenz+ind], z_moved[ind:lenz+ind], c='k', lw=0.1)
-                ax[0].plot(xy_moved[ind::leny], y_moved[ind::leny], c='k', lw=0.1)
-                ax[1].plot(xz_moved[ind::lenz], z_moved[ind::lenz], c='k', lw=0.1)
-            """
-    def plot_quiver(self, ax, xslice, yslice, zslice, scaling=1):
+
+    def plot_quiver(self, ax, xslice, yslice, zslice, scaling=1, three_D=False):
         """
         Plot the dense field as a quiver plot. 
         The direction of each arrow indicates the local orientation of the displacement field. 
@@ -207,28 +215,27 @@ class PlotDenseField():
             Fraction by which the quiver plot arrows are to be scaled (default: 1).
         """
         planes = self.map_coords(xslice, yslice, zslice)
-        
-        for i, j in enumerate(planes):
-            x, y, z, u, v, w = j
 
-            if i == 0:
-                dim1, dim2, vec1, vec2 = y, z, v, w
-            elif i==1:
-                dim1, dim2, vec1, vec2 = x, z, u, w
-            else:
-                dim1, dim2, vec1, vec2 = x, y, u, v
-            
-            c = np.hypot(vec1, vec2)
-            #import pdb; pdb.set_trace()
-            """magnitude = np.sqrt(u**2 + v**2 + w**2)
+        if three_D is not False:
+            for i, j in enumerate(planes):
+                x, y, z, u, v, w = j
+            magnitude = np.sqrt(u**2 + v**2 + w**2)
             clr3d = plt.cm.viridis(magnitude/magnitude.max())
-            try:
-                if ax.name=='3d':
-                    xyz = ax.quiver(x, y, z, u, v, w, colors=clr3d, length=1/scaling)
-                    plt.colorbar(xyz)
-            except:"""
-            plot = ax[i].quiver(dim1, dim2, vec1, vec2, c, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
-            #plt.colorbar(plot)
+            xyz = ax.quiver(x, y, z, u, v, w, colors=clr3d, length=1/scaling)
+            plt.colorbar(xyz)
+        else:
+            for i, j in enumerate(planes):
+                x, y, z, u, v, w = j
+
+                if i == 0:
+                    dim1, dim2, vec1, vec2 = y, z, v, w
+                elif i==1:
+                    dim1, dim2, vec1, vec2 = x, z, u, w
+                else:
+                    dim1, dim2, vec1, vec2 = x, y, u, v
+                c = np.hypot(vec1, vec2)
+                plot = ax[i].quiver(dim1, dim2, vec1, vec2, c, cmap='viridis', angles='xy', scale_units='xy', scale=scaling)
+                plt.colorbar(plot)
 
     def map_coords(self, xslice, yslice, zslice):
         planes = [0]*3
@@ -246,7 +253,9 @@ class PlotDenseField():
             s = [xslice, slice(None), slice(None), None] if ind == 0 else s
             s = [slice(None), yslice, slice(None), None] if ind == 1 else s
             s = [slice(None), slice(None), zslice, None] if ind == 2 else s
-            
+            #Full 3d quiver:
+            s = [slice(None), slice(None), slice(None), None] if xslice == yslice == zslice == None else s
+
             #computing coordinates wihtin each plane
             x = self._xfm.reference.ndcoords[0].reshape(np.shape(self._xfm._field[...,-1]))[s[0], s[1], s[2]]
             y = self._xfm.reference.ndcoords[1].reshape(np.shape(self._xfm._field[...,-1]))[s[0], s[1], s[2]]
@@ -263,13 +272,13 @@ class PlotDenseField():
             w = w.flatten()
 
             #check indexing has retrived correct dimensions
-            if ind==0:
+            if ind==0 and xslice!=None:
                 assert x.shape == u.shape == np.shape(self._xfm._field[-1,...,-1].flatten())
-            elif ind==1:
+            elif ind==1 and yslice!=None:
                 assert y.shape == v.shape == np.shape(self._xfm._field[:,-1,:,-1].flatten())
-            else:
+            elif ind==2 and zslice!=None:
                 assert z.shape == w.shape == np.shape(self._xfm._field[...,-1,-1].flatten())
-            
+
             #store 3 slices of datapoints, with overall shape [3 x [6 x [data]]]
             planes[ind] = [x, y, z, u, v, w]
 
@@ -295,7 +304,7 @@ def format_fig(figsize, gs_rows, gs_cols, **kwargs):
 
     fig = plt.figure(figsize=figsize)
     fig.suptitle(
-        str("Non-Linear DenseFieldTransform field"),
+        params['suptitle'],
         fontsize='20',
         weight='bold')
     
@@ -319,6 +328,9 @@ def format_axes(axis, **kwargs):
         'xlabel':"x",
         'ylabel':"y",
         'zlabel':"z",
+        'xticks':[],
+        'yticks':[],
+        'zticks':[],
         'rotate_3dlabel':False,
         'labelsize':16,
         'ticksize':14,
@@ -327,14 +339,15 @@ def format_axes(axis, **kwargs):
 
     '''Format the figure axes. For 2D plots, zlabel and zticks parameters are None.'''
     #axis.tick_params(labelsize=params['ticksize'])
-    axis.set_xticks([])
-    axis.set_yticks([])
     axis.set_title(params['title'], weight='bold')
+    axis.set_xticks(params['xticks'])
+    axis.set_yticks(params['yticks'])
     axis.set_xlabel(params['xlabel'], fontsize=params['labelsize'])
     axis.set_ylabel(params['ylabel'], fontsize=params['labelsize'])
 
     '''if 3d projection plot'''
     try:
+        axis.set_zticks(params['zticks'])
         axis.set_zlabel(params['zlabel'])
         axis.xaxis.set_rotate_label(params['rotate_3dlabel'])
         axis.yaxis.set_rotate_label(params['rotate_3dlabel'])
@@ -362,28 +375,27 @@ plt.show()
 
 """
 #Example 2a: plot_quiver (2d)
-fig, axes = plt.subplots(1, 2, figsize=(10, 4), tight_layout=True)
-PlotDenseField(path_to_file, is_deltas=True).plot_dsm([axes[0], axes[1]], zslice=90) #works the same for plot_grid, plot_scatter
-format_axes(axes[0], xlabel="x", ylabel="y", labelsize=14)
-format_axes(axes[1], xlabel="x", ylabel="z", labelsize=14)
+fig, axes = plt.subplots(1, 3, figsize=(10, 4), tight_layout=True)
+PlotDenseField(path_to_file, is_deltas=True).plot_grid(
+    [axes[2], axes[1], axes[0]],
+    xslice=50,
+    yslice=75,
+    zslice=90,
+)
 plt.show()
 """
 """
 #Example 2b: plot_quiver (3d)
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
-PlotDenseField(path_to_file, is_deltas=True).plot_quiver(ax, index=100)
-format_axes(ax)
-plt.show()
-"""
-"""
-fig, axes = plt.subplots(1, 3, figsize=(10, 4), tight_layout=True)
-PlotDenseField(path_to_file, is_deltas=True).plot_grid(
-    [axes[0], axes[1], axes[2]],
-    xslice=50,
-    yslice=75,
-    zslice=90,
-    step=5
+PlotDenseField(path_to_file, is_deltas=True).plot_quiver(
+    ax,
+    xslice=None,
+    yslice=None,
+    zslice=None,
+    scaling=10,
+    three_D=True,
 )
+format_axes(ax) #, xticks=[-250, -200, -150, -100, -50, 0], yticks=[-200, -150, -100, -50, 0], zticks=[-200, -150, -100, -50, 0]
 plt.show()
 """
