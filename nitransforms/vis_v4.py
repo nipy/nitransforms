@@ -73,11 +73,18 @@ class PlotDenseField():
         """
 
         fig, axes = format_fig(
-            figsize=(10,8),
+            figsize=(12,8),
             gs_rows=3,
-            gs_cols=4,
+            gs_cols=5,
             suptitle="Dense Field Transform \n" + os.path.basename(self._path_to_file),
         )
+        fig.subplots_adjust(bottom=0.15)
+
+        sliders = self.sliders(fig, xslice, yslice, zslice)
+        
+        #sliders[0].on_changed(self.update(axes, xslice, yslice, xsliders[0].val))
+        #sliders[1].on_changed(self.update(axes, xslice, sliders[1].val, zslice))
+        #sliders[2].on_changed(self.update(axes, sliders[2].val, yslice, zslice))
 
         projections=["Axial\n(z = "+str(zslice)+")", "Coronary\n(y = "+str(yslice)+")", "Sagittal\n(x = "+str(xslice)+")"]
         for i, ax in enumerate(axes):
@@ -91,7 +98,8 @@ class PlotDenseField():
         self.plot_grid((axes[2], axes[1], axes[0]), xslice, yslice, zslice, step=gridstep)
         self.plot_deltas((axes[5], axes[4], axes[3]), xslice, yslice, zslice)
         self.plot_quiverdsm((axes[11], axes[10], axes[9], axes[8], axes[7], axes[6]), xslice, yslice, zslice, scaling=scaling)
-        
+        self.plot_div([axes[14], axes[13], axes[12]], xslice, yslice, zslice)
+       
         if save_to_path is not None:
             assert os.path.isdir(os.path.dirname(save_to_path))
             plt.savefig(str(save_to_path), dpi=300)
@@ -104,7 +112,9 @@ class PlotDenseField():
 
         for i, j in enumerate(planes):
             x, y, z, u, v, w = j
-            c = u + v + w
+            #c = u + v + w
+            c = np.sqrt(u**2 + v**2 + w**2)
+            c = c/c.max()
             
             if i == 0:
                 dim1, dim2, vec1, vec2 = y, z, v, w
@@ -113,8 +123,31 @@ class PlotDenseField():
             else:
                 dim1, dim2, vec1, vec2 = x, y, u, v
 
-            axes[i].hist2d(dim1, dim2, bins=(50, 50), weights=c, norm=mpl.colors.CenteredNorm(), cmap='seismic')
-        
+            #axes[i].hist2d(dim1, dim2, bins=(50, 50), weights=c, norm=mpl.colors.CenteredNorm(), cmap='seismic')
+            axes[i].hist2d(dim1, dim2, bins=(50, 50), weights=c, cmap='binary')
+
+    def plot_div(self, axes, xslice, yslice, zslice):
+        planes = self.map_coords(xslice, yslice, zslice)
+
+        for i, j in enumerate(planes):
+            x, y, z, u, v, w = j
+
+            if i == 0:
+                dim1, dim2, vec1, vec2 = y, z, v, w
+            elif i == 1:
+                dim1, dim2, vec1, vec2 = x, z, u, w
+            else:
+                dim1, dim2, vec1, vec2 = x, y, u, v
+
+            #gradient of individual field components, Fx=u, Fy=v, Fz=w
+            partial_Fx = np.gradient(u)
+            partial_Fy = np.gradient(v)
+            partial_Fz = np.gradient(w)
+            div = partial_Fx + partial_Fy + partial_Fz
+            
+            quiv = axes[i].quiver(dim1, dim2, vec1, vec2, div, norm=mpl.colors.CenteredNorm(), cmap='seismic')
+            #plt.colorbar(quiv)
+
 
     def plot_quiverdsm(self, ax, xslice, yslice, zslice, scaling=1, three_D=False):
         """
@@ -274,8 +307,41 @@ class PlotDenseField():
             planes[ind] = [x, y, z, u, v, w]
 
         return planes
+    
+    def sliders(self, fig, xslice, yslice, zslice):
+        slices = [
+            [zslice, len(self._xfm._field[0][0]), "zslice"],
+            [yslice, len(self._xfm._field[0]), "yslice"],
+            [xslice, len(self._xfm._field), "xslice"],
+            ]
+        axes = [
+            [1/7, 0.1, 1/7, 0.025],
+            [3/7, 0.1, 1/7, 0.025],
+            [5/7, 0.1, 1/7, 0.025],
+            ]
+        sliders = []
 
-
+        for index, slider_axis in enumerate(axes):
+            slice_dim = slices[index][0]
+            sax = fig.add_axes(slider_axis)
+            slider = Slider(
+                ax=sax,
+                valmin=0,
+                valmax=slices[index][1],
+                valinit=slice_dim,
+                valstep=1,
+                label=slices[index][2],
+                orientation="horizontal"
+            )
+            sliders.append(slider)
+        
+        return sliders
+    
+    def update(self, axes, new_xslice, new_yslice, new_zslice):
+        #self.plot_grid((axes[2], axes[1], axes[0]), xslice, yslice, zslice, step=gridstep)
+        self.plot_deltas((axes[5], axes[4], axes[3]), new_xslice, new_yslice, new_zslice)
+        #self.plot_quiverdsm((axes[11], axes[10], axes[9], axes[8], axes[7], axes[6]), xslice, yslice, zslice, scaling=scaling)
+    
 """Formatting"""
 
 def get_2dcenters(x, y, step=10):
