@@ -470,7 +470,7 @@ PlotDenseField(path_to_file, is_deltas=True).show_transform(
     yslice=75,
     zslice=90,
     gridstep=5,
-    save_to_path=str(save_to_dir / "template_v3.jpg")
+    save_to_path=str(save_to_dir / "template_v4.jpg")
     #save_to_path=None
 )
 plt.show()

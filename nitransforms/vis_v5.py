@@ -2,6 +2,8 @@ import os
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import nibabel as nb
+
 from matplotlib.gridspec import GridSpec
 from matplotlib.widgets import Button, Slider
 
@@ -14,10 +16,27 @@ from nitransforms.nonlinear import DenseFieldTransform
 
 class PlotDenseField():
     """
-    NotImplented: description of class object here
+    Vizualisation of a transformation file using nitransform's DenseFielTransform module. Generates four sorts of plots:
+        i) the deformed grid\n
+        ii) the normalised deformation field density map\n
+        iii) the quiver map of the field, coloured according to its diffusion scalar map\n
+        iv) the quiver map of the field, coloured according to the jacobian of the coordinate matrices\n
+    for 3 image projections:
+        i) axial (fixed z slice)\n
+        ii) saggital (fixed y slice)\n
+        iii) coronal (fixed x slice)\n
+    Outputs the resulting 3 x 4 image grid.
+
+    Parameters
+    ----------
+
+    path_to_file: :obj:`str`
+        Path from which the trasnformation file should be read.
+    is_deltas: :obj:`bool`
+        Whether the field is a displacement field or a deformations field. Default = True
     """
 
-    __slots__ = ('_path_to_file', '_xfm')
+    __slots__ = ('_path_to_file', '_xfm', '_voxel_size')
 
     def __init__(self, path_to_file, is_deltas=True):
         self._path_to_file = path_to_file
@@ -25,6 +44,7 @@ class PlotDenseField():
             self._path_to_file,
             is_deltas=is_deltas,
         )
+        self._voxel_size = nb.load(path_to_file).header.get_zooms()
 
         if self._xfm._field.shape[-1] != self._xfm.ndim:
             raise TransformError(
@@ -41,7 +61,7 @@ class PlotDenseField():
         xslice: :obj:`int`
             x plane to select for axial projection of the transform.
         yslice: :obj:`int`
-            y plane to select for coronary prjection of the transform.
+            y plane to select for coronal prjection of the transform.
         zslice: :obj:`int`
             z plane to select for sagittal prjection of the transform.
         gridstep: :obj:`int`
@@ -80,7 +100,7 @@ class PlotDenseField():
         )
         fig.subplots_adjust(bottom=0.15)
 
-        projections=["Axial", "Coronary", "Sagittal"]
+        projections=["Axial", "coronal", "Sagittal"]
         for i, ax in enumerate(axes):
             if i < 3:
                 xlabel = None
@@ -88,12 +108,12 @@ class PlotDenseField():
             else:
                 xlabel = ylabel = None
             format_axes(ax, xlabel=xlabel, ylabel=ylabel, labelsize=14)
-            
+
         self.plot_grid((axes[2], axes[1], axes[0]), xslice, yslice, zslice, step=gridstep)
         self.plot_deltas((axes[5], axes[4], axes[3]), xslice, yslice, zslice)
         self.plot_quiverdsm((axes[8], axes[7], axes[6]), xslice, yslice, zslice, scaling=scaling)
-        self.plot_div([axes[11], axes[10], axes[9]], xslice, yslice, zslice)
-               
+        self.plot_jacobian([axes[11], axes[10], axes[9]], xslice, yslice, zslice)
+
         sliders = self.sliders(fig, xslice, yslice, zslice)
         """
         for i, j in enumerate(sliders):
@@ -116,19 +136,17 @@ class PlotDenseField():
         Parameters
         ----------
         axis :obj:`tuple`
-            Axes on which the grid should be plotted. Requires 3 axes to illustrate all projections (eg ax1: Axial, ax2: Coronary, ax3: Sagittal)
+            Axes on which the grid should be plotted. Requires 3 axes to illustrate all projections (eg ax1: Axial, ax2: coronal, ax3: Sagittal)
         xslice: :obj:`int`
             x plane to select for axial projection of the transform.
         yslice: :obj:`int`
-            y plane to select for coronary prjection of the transform.
+            y plane to select for coronal prjection of the transform.
         zslice: :obj:`int`
             z plane to select for sagittal prjection of the transform.
         step: :obj:`int`
             Interval to be used between distortion grid lines (efault: 10). 
         """
-
-        planes = self.map_coords(xslice, yslice, zslice)
-        
+        planes = self.get_planes(xslice, yslice, zslice)
         for index, plane in enumerate(planes):
             x,y,z,u,v,w = plane
 
@@ -166,11 +184,11 @@ class PlotDenseField():
         Parameters
         ----------
         axis :obj:`tuple`
-            Axes on which the quiver should be plotted. Requires 3 axes to illustrate each projection (eg ax1: Axial, ax2: Coronary, ax3: Sagittal)
+            Axes on which the quiver should be plotted. Requires 3 axes to illustrate each projection (eg ax1: Axial, ax2: coronal, ax3: Sagittal)
         xslice: :obj:`int`
             x plane to select for axial projection of the transform.
         yslice: :obj:`int`
-            y plane to select for coronary prjection of the transform.
+            y plane to select for coronal prjection of the transform.
         zslice: :obj:`int`
             z plane to select for sagittal prjection of the transform.
         scaling: :obj:`float`
@@ -178,7 +196,7 @@ class PlotDenseField():
         three_D: :obj:`bool`
             Whether the quiver plot is to be projected onto a 3D axis (default: False)
         """
-        planes = self.map_coords(xslice, yslice, zslice)
+        planes = self.get_planes(xslice, yslice, zslice)
 
         for i, j in enumerate(planes):
             x, y, z, u, v, w = j
@@ -192,7 +210,6 @@ class PlotDenseField():
             else:
                 dim1, dim2, vec1, vec2 = x, y, u, v
 
-            #axes[i].hist2d(dim1, dim2, bins=(100, 100), weights=c, cmap='binary')
             axes[i].scatter(dim1, dim2, c=c, cmap='binary')
 
 
@@ -207,15 +224,15 @@ class PlotDenseField():
         xslice: :obj:`int`
             x plane to select for axial projection of the transform.
         yslice: :obj:`int`
-            y plane to select for coronary prjection of the transform.
+            y plane to select for coronal projection of the transform.
         zslice: :obj:`int`
-            z plane to select for sagittal prjection of the transform.
+            z plane to select for sagittal projection of the transform.
         scaling: :obj:`float`
             Fraction by which the quiver plot arrows are to be scaled (default: 1).  
         three_D: :obj:`bool`
             Whether the quiver plot is to be projected onto a 3D axis (default: False)
         """
-        planes = self.map_coords(xslice, yslice, zslice)
+        planes = self.get_planes(xslice, yslice, zslice)
         
         if three_D is not False:
             for i, j in enumerate(planes):
@@ -259,48 +276,121 @@ class PlotDenseField():
                 axes[index].quiver(c_blues[:, dim1], c_blues[:, dim2], c_blues[:, vec1], c_blues[:, vec2], c_blues[:, -1], cmap='Blues')
                 
 
-    def plot_div(self, axes, xslice, yslice, zslice):
+    def plot_jacobian(self, axes, xslice, yslice, zslice):
         """
         Map the divergence of the transformation field using a quiver plot.
         
         Parameters
         ----------
         axis :obj:`tuple`
-            Axes on which the quiver should be plotted. Requires 3 axes to illustrate each projection (eg ax1: Axial, ax2: Coronary, ax3: Sagittal)
+            Axes on which the quiver should be plotted. Requires 3 axes to illustrate each projection (eg ax1: Axial, ax2: coronal, ax3: Sagittal)
         xslice: :obj:`int`
             x plane to select for axial projection of the transform.
         yslice: :obj:`int`
-            y plane to select for coronary prjection of the transform.
+            y plane to select for coronal projection of the transform.
         zslice: :obj:`int`
-            z plane to select for sagittal prjection of the transform.
+            z plane to select for sagittal projection of the transform.
         scaling: :obj:`float`
             Fraction by which the quiver plot arrows are to be scaled (default: 1).  
         three_D: :obj:`bool`
             Whether the quiver plot is to be projected onto a 3D axis (default: False)
         """
-        planes = self.map_coords(xslice, yslice, zslice)
+        planes = self.get_planes(xslice, yslice, zslice)
+        slices = [
+            [False, False, False, False],  # [:,:,index]
+            [False, False, False, False],  # [:,index,:]
+            [False, False, False, False],  # [index,:,:]
+        ]
+        jacobians = np.zeros((3), dtype=np.ndarray)
 
-        for i, j in enumerate(planes):
-            x, y, z, u, v, w = j
+        #iterating through the three chosen planes to calculate corresponding coordinates
+        for ind, s in enumerate(slices):
+            s = [xslice, slice(None), slice(None), None] if ind == 0 else s
+            s = [slice(None), yslice, slice(None), None] if ind == 1 else s
+            s = [slice(None), slice(None), zslice, None] if ind == 2 else s
+            J = self.get_jacobian().reshape(self._xfm._field[..., -1].shape)[s[0], s[1], s[2]]
+            jacobians[ind] = J.flatten()
 
-            if i == 0:
+        #plotting
+        for index, plane in enumerate(planes):
+            x, y, z, u, v, w = plane
+            
+            if index == 0:
                 dim1, dim2, vec1, vec2 = y, z, v, w
-            elif i == 1:
+            elif index == 1:
                 dim1, dim2, vec1, vec2 = x, z, u, w
             else:
                 dim1, dim2, vec1, vec2 = x, y, u, v
 
-            #gradient of individual field components, Fx=u, Fy=v, Fz=w
-            partial_Fx = np.gradient(u)
-            partial_Fy = np.gradient(v)
-            partial_Fz = np.gradient(w)
-            div = partial_Fx + partial_Fy + partial_Fz
+            c = jacobians[index]
             
-            quiv = axes[i].quiver(dim1, dim2, vec1, vec2, div, norm=mpl.colors.CenteredNorm(), cmap='seismic')
-            #plt.colorbar(quiv)
+            #quiv = axes[index].quiver(dim1, dim2, vec1, vec2, jacobians[index], norm=mpl.colors.CenteredNorm(), cmap='seismic')
+            axes[index].scatter(dim1, dim2, c=c, norm=mpl.colors.CenteredNorm(), cmap='seismic')
+
+    
+    def get_coords(self):
+            """Calculate vector components of the field using the reference coordinates"""
+            x = self._xfm.reference.ndcoords[0].reshape(np.shape(self._xfm._field[...,-1]))
+            y = self._xfm.reference.ndcoords[1].reshape(np.shape(self._xfm._field[...,-1]))
+            z = self._xfm.reference.ndcoords[2].reshape(np.shape(self._xfm._field[...,-1]))
+            u = self._xfm._field[..., 0] - x
+            v = self._xfm._field[..., 1] - y
+            w = self._xfm._field[..., 2] - z
+            return x, y, z, u, v, w
 
 
-    def map_coords(self, xslice, yslice, zslice):
+    def get_jacobian(self):
+        """Calculate the Jacobian matrix of the field"""
+        x, y, z, u, v, w = self.get_coords()
+        voxx, voxy, voxz, _ = self._voxel_size
+
+        shape = self._xfm._field[..., -1].shape
+        zeros = np.zeros(shape)
+        jacobians = zeros.flatten()
+        
+        dxdx = (np.diff(u, axis=0) / voxx)
+        dydx = (np.diff(v, axis=0) / voxx)
+        dzdx = (np.diff(w, axis=0) / voxx)
+
+        dxdy = (np.diff(u, axis=1) / voxy)
+        dydy = (np.diff(v, axis=1) / voxy)
+        dzdy = (np.diff(w, axis=1) / voxy)
+        
+        dxdz = (np.diff(u, axis=2) / voxz)
+        dydz = (np.diff(v, axis=2) / voxz)
+        dzdz = (np.diff(w, axis=2) / voxz)
+        
+        partials = [dxdx, dydx, dzdx, dxdy, dydy, dzdy, dxdz, dydz, dzdz]
+        
+        for idx, j in enumerate(partials):
+            if idx < 3:
+                dim = zeros[-1,:,:][None,:,:]
+                ax=0
+            elif idx >=3 and idx < 6:
+                dim = zeros[:,-1,:][:,None,:]
+                ax=1
+            elif idx >=6:
+                dim = zeros[:,:,-1][:,:,None]
+                ax=2
+            
+            partials[idx] = np.append(j, dim, axis=ax).flatten()
+       
+        dxdx, dydx, dzdx, dxdy, dydy, dzdy, dxdz, dydz, dzdz = partials
+
+        for idx, k in enumerate(jacobians):
+            jacobians[idx] = np.linalg.det(
+                np.array(
+                    [
+                        [dxdx[idx], dxdy[idx], dxdz[idx]],
+                        [dydx[idx], dydy[idx], dydz[idx]],
+                        [dzdx[idx], dzdy[idx], dzdz[idx]]
+                    ]
+                )
+            )
+        return jacobians
+    
+    def get_planes(self, xslice, yslice, zslice):
+        """Define slice selection for visualisation"""
         planes = [0]*3
         slices = [
             [False, False, False, False],  # [:,:,index]
@@ -310,7 +400,7 @@ class PlotDenseField():
         
         #iterating through the three chosen planes to calculate corresponding coordinates
         for ind, s in enumerate(slices):
-            """Calculate vector components of the field using the reference coordinates"""
+            x, y, z, u, v, w = self.get_coords()
             
             #indexing for plane selection [x: sagittal, y: coronal, z: axial, dimension]
             s = [xslice, slice(None), slice(None), None] if ind == 0 else s
@@ -320,9 +410,9 @@ class PlotDenseField():
             s = [slice(None), slice(None), slice(None), None] if xslice == yslice == zslice == None else s
 
             #computing coordinates within each plane
-            x = self._xfm.reference.ndcoords[0].reshape(np.shape(self._xfm._field[...,-1]))[s[0], s[1], s[2]]
-            y = self._xfm.reference.ndcoords[1].reshape(np.shape(self._xfm._field[...,-1]))[s[0], s[1], s[2]]
-            z = self._xfm.reference.ndcoords[2].reshape(np.shape(self._xfm._field[...,-1]))[s[0], s[1], s[2]]
+            x = x[s[0], s[1], s[2]]
+            y = y[s[0], s[1], s[2]]
+            z = z[s[0], s[1], s[2]]
             u = self._xfm._field[s[0], s[1], s[2], 0] - x
             v = self._xfm._field[s[0], s[1], s[2], 1] - y
             w = self._xfm._field[s[0], s[1], s[2], 2] - z
@@ -334,7 +424,7 @@ class PlotDenseField():
             v = v.flatten()
             w = w.flatten()
 
-            #check indexing has retrived correct dimensions
+            #check indexing has retrieved correct dimensions
             if ind==0 and xslice!=None:
                 assert x.shape == u.shape == np.shape(self._xfm._field[-1,...,-1].flatten())
             elif ind==1 and yslice!=None:
@@ -344,7 +434,6 @@ class PlotDenseField():
 
             #store 3 slices of datapoints, with overall shape [3 x [6 x [data]]]
             planes[ind] = [x, y, z, u, v, w]
-
         return planes
     
 
@@ -465,20 +554,26 @@ save_to_dir = Path("/Users/julienmarabotto/workspace/Neuroimaging/plots/quiver")
 """___EXAMPLES___"""
 
 #Example 1: plot_template
-PlotDenseField(path_to_file, is_deltas=True).show_transform(
+a = PlotDenseField(path_to_file, is_deltas=True).show_transform(
     xslice=50,
     yslice=75,
     zslice=90,
     gridstep=5,
-    save_to_path=str(save_to_dir / "template_v3.jpg")
+    save_to_path=str(save_to_dir / "template_v5.jpg")
     #save_to_path=None
 )
 plt.show()
 
 """
 #Example 2a: plot_quiver (2d)
-fig, axes = plt.subplots(1, 3, figsize=(10, 4), tight_layout=True)
+fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)#, sharex=True, sharey=True)
 PlotDenseField(path_to_file, is_deltas=True).plot_grid(
+    [axes[2], axes[1], axes[0]],
+    xslice=50,
+    yslice=75,
+    zslice=90,
+)
+PlotDenseField(path_to_file, is_deltas=True).plot_deltas(
     [axes[2], axes[1], axes[0]],
     xslice=50,
     yslice=75,
