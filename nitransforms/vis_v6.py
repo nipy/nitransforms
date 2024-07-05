@@ -52,7 +52,7 @@ class PlotDenseField():
                 "the number of dimensions (%d)" % (self._xfm._field.shape[-1], self._xfm.ndim)
             )
 
-    def show_transform(self, xslice, yslice, zslice, gridstep=10, scaling=1, save_to_path=None):
+    def show_transform(self, xslice, yslice, zslice, gridstep=2, scaling=1, save_to_path=None):
         """
         Plot output field from DenseFieldTransform class.
 
@@ -109,7 +109,7 @@ class PlotDenseField():
                 xlabel = ylabel = None
             format_axes(ax, xlabel=xlabel, ylabel=ylabel, labelsize=14)
 
-        self.plot_grid((axes[2], axes[1], axes[0]), xslice, yslice, zslice, step=gridstep)
+        self.plot_distortion((axes[2], axes[1], axes[0]), xslice, yslice, zslice, step=gridstep)
         self.plot_quiverdsm((axes[5], axes[4], axes[3]), xslice, yslice, zslice, scaling=scaling)
         self.plot_jacobian((axes[8], axes[7], axes[6]), xslice, yslice, zslice)
 
@@ -128,7 +128,7 @@ class PlotDenseField():
             pass
     
     
-    def plot_grid(self, ax, xslice, yslice, zslice, grid=True, step=10):
+    def plot_distortion(self, ax, xslice, yslice, zslice, show_brain=True, show_grid=True, step=2):
         """
         Plot the distortion grid. 
 
@@ -146,40 +146,44 @@ class PlotDenseField():
             Interval to be used between distortion grid lines (efault: 10). 
         """
         planes = self.get_planes(xslice, yslice, zslice)
+        voxx,voxy,voxz,_ = self._voxel_size
+
         for index, plane in enumerate(planes):
             x,y,z,u,v,w = plane
-            c = np.sqrt(u**2 + v**2 + w**2)
-            c = c/c.max()
 
             if index == 0:
-                dim1, dim2, vec1, vec2 = y, z, v, w
+                dim1, dim2, vec1, vec2, voxdim = y, z, v, w, [int(voxy), int(voxz)]
             elif index == 1:
-                dim1, dim2, vec1, vec2 = x, z, u, w
+                dim1, dim2, vec1, vec2, voxdim = x, z, u, w, [int(voxx), int(voxz)]
             else:
-                dim1, dim2, vec1, vec2 = x, y, u, v
+                dim1, dim2, vec1, vec2, voxdim = x, y, u, v, [int(voxx), int(voxy)]
 
-            if grid==True:
-                gc_xy, lenx, leny = get_2dcenters(dim1, dim2, step=step)
-                xy = list(gc_xy)
+            c = np.sqrt(vec1**2 + vec2**2)
+            c = c/c.max()
 
-                axx = vec1[0::int(len(vec1)/(lenx * leny))]
-                axy = vec2[0::int(len(vec2)/(lenx * leny))]
+            if show_grid==True:
+                gc_xy, lenx, leny = get_2dcenters(dim1, dim2, step=2*voxdim[0])
+                xy = np.asanyarray(list(gc_xy))
                 
+                #compute the shift in the coordinate
+                e_i = vec1[0::2*voxdim[0]]
+                e_j = vec2[0::2*voxdim[1]]
+
                 x_moved, y_moved = [], []
-                for ind, (i, j) in enumerate(zip(axx, axy)):
-                    try:
-                        x_moved.append(xy[0][ind] + i)
-                        y_moved.append(xy[1][ind] + j)
-                    except IndexError:
-                        break
-
-                for ind, i in enumerate(x_moved):
-                    if ind%leny == 0:
-                        ax[index].plot(x_moved[ind:leny+ind], y_moved[ind:leny+ind], c='k', lw=0.1)
-                    ax[index].plot(x_moved[ind::leny], y_moved[ind::leny], c='k', lw=0.1)
+                for idx, (i, j) in enumerate(zip(e_i, e_j)):
+                    x_moved.append(xy[0][idx] + i)
+                    y_moved.append(xy[1][idx] + j)
                 
-            ax[index].scatter(dim1, dim2, c=c, cmap='binary')
+                #import pdb;pdb.set_trace()
 
+                for idx, (_,_) in enumerate(zip(x_moved, y_moved)):
+                    if idx%leny == 0:
+                        ax[index].plot(x_moved[idx:leny+idx], y_moved[idx:leny+idx], c='k', lw=0.1)
+                    ax[index].plot(x_moved[idx::leny], y_moved[idx::leny], c='k', lw=0.1)
+            
+            if show_brain==True:    
+                ax[index].scatter(dim1, dim2/2, c=c, cmap='RdPu')
+            break
 
     def plot_quiverdsm(self, axes, xslice, yslice, zslice, scaling=1, three_D=False):
         """
@@ -445,7 +449,7 @@ class PlotDenseField():
     
 """Formatting"""
 
-def get_2dcenters(x, y, step=10):
+def get_2dcenters(x, y, step=2):
         samples_x = np.arange(x.min(), x.max(), step=step).astype(int)
         samples_y = np.arange(y.min(), y.max(), step=step).astype(int)
 
@@ -535,12 +539,16 @@ plt.show()
 
 #Example 2a: plot_quiver (2d)
 fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)#, sharex=True, sharey=True)
-PlotDenseField(path_to_file, is_deltas=True).plot_grid(
+PlotDenseField(path_to_file, is_deltas=True).plot_distortion(
     [axes[2], axes[1], axes[0]],
     xslice=50,
     yslice=75,
     zslice=90,
+    show_brain=True,
+    show_grid=True,
+    step=4,
 )
+plt.savefig(str(save_to_dir)+"/deformationgrid.jpg", dpi=300)
 plt.show()
 
 """
