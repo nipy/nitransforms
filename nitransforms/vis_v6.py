@@ -93,9 +93,9 @@ class PlotDenseField():
         """
 
         fig, axes = format_fig(
-            figsize=(10,8),
+            figsize=(15,15),
             gs_rows=3,
-            gs_cols=4,
+            gs_cols=3,
             suptitle="Dense Field Transform \n" + os.path.basename(self._path_to_file),
         )
         fig.subplots_adjust(bottom=0.15)
@@ -109,7 +109,7 @@ class PlotDenseField():
                 xlabel = ylabel = None
             format_axes(ax, xlabel=xlabel, ylabel=ylabel, labelsize=14)
 
-        self.plot_distortion((axes[2], axes[1], axes[0]), xslice, yslice, zslice, step=gridstep)
+        self.plot_distortion((axes[2], axes[1], axes[0]), xslice, yslice, zslice, show_grid=True, show_brain=True, lw=0.1)
         self.plot_quiverdsm((axes[5], axes[4], axes[3]), xslice, yslice, zslice, scaling=scaling)
         self.plot_jacobian((axes[8], axes[7], axes[6]), xslice, yslice, zslice)
 
@@ -128,7 +128,7 @@ class PlotDenseField():
             pass
     
     
-    def plot_distortion(self, ax, xslice, yslice, zslice, show_brain=True, show_grid=True, step=2):
+    def plot_distortion(self, ax, xslice, yslice, zslice, show_brain=True, show_grid=True, lw=0.1):
         """
         Plot the distortion grid. 
 
@@ -150,45 +150,39 @@ class PlotDenseField():
 
         for index, plane in enumerate(planes):
             x,y,z,u,v,w = plane
+            shape = self._xfm._field.shape[:-1]
 
             if index == 0:
-                dim1, dim2, vec1, vec2, voxdim = y, z, v, w, [int(voxy), int(voxz)]
+                dim1, dim2, vec1, vec2 = y, z, v, w
+                len1, len2, voxdim = shape[1], shape[2], [int(voxy), int(voxz)]
             elif index == 1:
-                dim1, dim2, vec1, vec2, voxdim = x, z, u, w, [int(voxx), int(voxz)]
+                dim1, dim2, vec1, vec2 = x, z, u, w
+                len1, len2, voxdim = shape[0], shape[2], [int(voxx), int(voxz)]
             else:
-                dim1, dim2, vec1, vec2, voxdim = x, y, u, v, [int(voxx), int(voxy)]
+                dim1, dim2, vec1, vec2 = x, y, u, v
+                len1, len2, voxdim = shape[0], shape[1], [int(voxx), int(voxy)]
 
             c = np.sqrt(vec1**2 + vec2**2)
             c = c/c.max()
 
             if show_grid==True:
-                gc_xy, lenx, leny = get_2dcenters(dim1, dim2, step=2*voxdim[0])
-                xy = np.asanyarray(list(gc_xy))
-                
-                #compute the shift in the coordinate
-                e_i = vec1[0::2*voxdim[0]]
-                e_j = vec2[0::2*voxdim[1]]
+                x_moved = dim1+vec1
+                y_moved = dim2+vec2
 
-                x_moved, y_moved = [], []
-                for idx, (i, j) in enumerate(zip(e_i, e_j)):
-                    x_moved.append(xy[0][idx] + i)
-                    y_moved.append(xy[1][idx] + j)
-                
-                #import pdb;pdb.set_trace()
+                for idx in range(0, len1, 1):
+                    ax[index].plot(x_moved[idx*len2:(idx+1)*len2], y_moved[idx*len2:(idx+1)*len2], c='k', lw=lw)
+                for idx in range(0, len2, 1):
+                    ax[index].plot(x_moved[idx::len2], y_moved[idx::len2], c='k', lw=lw)
 
-                for idx, (_,_) in enumerate(zip(x_moved, y_moved)):
-                    if idx%leny == 0:
-                        ax[index].plot(x_moved[idx:leny+idx], y_moved[idx:leny+idx], c='k', lw=0.1)
-                    ax[index].plot(x_moved[idx::leny], y_moved[idx::leny], c='k', lw=0.1)
-            
-            if show_brain==True:    
-                ax[index].scatter(dim1, dim2/2, c=c, cmap='RdPu')
-            break
+            if show_brain==True:
+                #ax[index].imshow(dim1.reshape(len1, len2), cmap='RdPu')
+                ax[index].scatter(dim1, dim2, c=c, cmap='RdPu')
+
 
     def plot_quiverdsm(self, axes, xslice, yslice, zslice, scaling=1, three_D=False):
         """
         Plot the Diffusion Scalar Map (dsm) as a quiver plot.
-        
+
         Parameters
         ----------
         axis :obj:`tuple`
@@ -200,12 +194,11 @@ class PlotDenseField():
         zslice: :obj:`int`
             z plane to select for sagittal projection of the transform.
         scaling: :obj:`float`
-            Fraction by which the quiver plot arrows are to be scaled (default: 1).  
+            Fraction by which the quiver plot arrows are to be scaled (default: 1).
         three_D: :obj:`bool`
             Whether the quiver plot is to be projected onto a 3D axis (default: False)
         """
         planes = self.get_planes(xslice, yslice, zslice)
-        
         if three_D is not False:
             for i, j in enumerate(planes):
                 x, y, z, u, v, w = j
@@ -246,7 +239,7 @@ class PlotDenseField():
                 axes[index].quiver(c_reds[:, dim1], c_reds[:, dim2], c_reds[:, vec1], c_reds[:, vec2], c_reds[:, -1], cmap='Reds')
                 axes[index].quiver(c_greens[:, dim1], c_greens[:, dim2], c_greens[:, vec1], c_greens[:, vec2], c_greens[:, -1], cmap='Greens')
                 axes[index].quiver(c_blues[:, dim1], c_blues[:, dim2], c_blues[:, vec1], c_blues[:, vec2], c_blues[:, -1], cmap='Blues')
-                
+
 
     def plot_jacobian(self, axes, xslice, yslice, zslice):
         """
@@ -263,7 +256,7 @@ class PlotDenseField():
         zslice: :obj:`int`
             z plane to select for sagittal projection of the transform.
         scaling: :obj:`float`
-            Fraction by which the quiver plot arrows are to be scaled (default: 1).  
+            Fraction by which the quiver plot arrows are to be scaled (default: 1).
         three_D: :obj:`bool`
             Whether the quiver plot is to be projected onto a 3D axis (default: False)
         """
@@ -286,7 +279,7 @@ class PlotDenseField():
         #plotting
         for index, plane in enumerate(planes):
             x, y, z, u, v, w = plane
-            
+
             if index == 0:
                 dim1, dim2, vec1, vec2 = y, z, v, w
             elif index == 1:
@@ -295,11 +288,9 @@ class PlotDenseField():
                 dim1, dim2, vec1, vec2 = x, y, u, v
 
             c = jacobians[index]
-            
-            #quiv = axes[index].quiver(dim1, dim2, vec1, vec2, jacobians[index], norm=mpl.colors.CenteredNorm(), cmap='seismic')
             axes[index].scatter(dim1, dim2, c=c, norm=mpl.colors.CenteredNorm(), cmap='seismic')
 
-    
+
     def get_coords(self):
             """Calculate vector components of the field using the reference coordinates"""
             x = self._xfm.reference.ndcoords[0].reshape(np.shape(self._xfm._field[...,-1]))
@@ -319,7 +310,7 @@ class PlotDenseField():
         shape = self._xfm._field[..., -1].shape
         zeros = np.zeros(shape)
         jacobians = zeros.flatten()
-        
+
         dxdx = (np.diff(u, axis=0) / voxx)
         dydx = (np.diff(v, axis=0) / voxx)
         dzdx = (np.diff(w, axis=0) / voxx)
@@ -327,13 +318,13 @@ class PlotDenseField():
         dxdy = (np.diff(u, axis=1) / voxy)
         dydy = (np.diff(v, axis=1) / voxy)
         dzdy = (np.diff(w, axis=1) / voxy)
-        
+
         dxdz = (np.diff(u, axis=2) / voxz)
         dydz = (np.diff(v, axis=2) / voxz)
         dzdz = (np.diff(w, axis=2) / voxz)
-        
+
         partials = [dxdx, dydx, dzdx, dxdy, dydy, dzdy, dxdz, dydz, dzdz]
-        
+
         for idx, j in enumerate(partials):
             if idx < 3:
                 dim = zeros[-1,:,:][None,:,:]
@@ -344,9 +335,9 @@ class PlotDenseField():
             elif idx >=6:
                 dim = zeros[:,:,-1][:,:,None]
                 ax=2
-            
+
             partials[idx] = np.append(j, dim, axis=ax).flatten()
-       
+
         dxdx, dydx, dzdx, dxdy, dydy, dzdy, dxdz, dydz, dzdz = partials
 
         for idx, k in enumerate(jacobians):
@@ -360,7 +351,8 @@ class PlotDenseField():
                 )
             )
         return jacobians
-    
+
+
     def get_planes(self, xslice, yslice, zslice):
         """Define slice selection for visualisation"""
         planes = [0]*3
@@ -369,11 +361,11 @@ class PlotDenseField():
             [False, False, False, False],  # [:,index,:]
             [False, False, False, False],   # [index,:,:]
         ]
-        
+
         #iterating through the three chosen planes to calculate corresponding coordinates
         for ind, s in enumerate(slices):
             x, y, z, u, v, w = self.get_coords()
-            
+
             #indexing for plane selection [x: sagittal, y: coronal, z: axial, dimension]
             s = [xslice, slice(None), slice(None), None] if ind == 0 else s
             s = [slice(None), yslice, slice(None), None] if ind == 1 else s
@@ -407,7 +399,7 @@ class PlotDenseField():
             #store 3 slices of datapoints, with overall shape [3 x [6 x [data]]]
             planes[ind] = [x, y, z, u, v, w]
         return planes
-    
+
 
     def sliders(self, fig, xslice, yslice, zslice):
         slices = [
@@ -436,9 +428,9 @@ class PlotDenseField():
                 orientation="horizontal"
             )
             sliders.append(slider)
-        
+
         return sliders
-    
+
 
     def update_sliders(self, slider):
         new_slider = slider.val
@@ -446,8 +438,7 @@ class PlotDenseField():
         #import pdb; pdb.set_trace()
         print(new_slider)
         return new_slider
-    
-"""Formatting"""
+
 
 def get_2dcenters(x, y, step=2):
         samples_x = np.arange(x.min(), x.max(), step=step).astype(int)
@@ -470,7 +461,7 @@ def format_fig(figsize, gs_rows, gs_cols, **kwargs):
         params['suptitle'],
         fontsize='20',
         weight='bold')
-    
+
     gs = GridSpec(
         gs_rows,
         gs_cols,
@@ -520,23 +511,24 @@ def format_axes(axis, **kwargs):
         pass
     return
 
+
 path_to_file = Path("/Users/julienmarabotto/workspace/nitransforms/nitransforms/tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
 save_to_dir = Path("/Users/julienmarabotto/workspace/Neuroimaging/plots/quiver")
 
 """___EXAMPLES___"""
-"""
+
 #Example 1: plot_template
 a = PlotDenseField(path_to_file, is_deltas=True).show_transform(
     xslice=50,
     yslice=75,
     zslice=90,
     gridstep=5,
-    save_to_path=str(save_to_dir / "template_v5.jpg")
+    save_to_path=str(save_to_dir / "template_v6.jpg")
     #save_to_path=None
 )
 plt.show()
-"""
 
+"""
 #Example 2a: plot_quiver (2d)
 fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)#, sharex=True, sharey=True)
 PlotDenseField(path_to_file, is_deltas=True).plot_distortion(
@@ -546,11 +538,11 @@ PlotDenseField(path_to_file, is_deltas=True).plot_distortion(
     zslice=90,
     show_brain=True,
     show_grid=True,
-    step=4,
+    lw=0.2,
 )
 plt.savefig(str(save_to_dir)+"/deformationgrid.jpg", dpi=300)
 plt.show()
-
+"""
 """
 #Example 2b: plot_quiver (3d)
 fig = plt.figure()
