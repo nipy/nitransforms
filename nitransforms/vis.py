@@ -16,15 +16,14 @@ from nitransforms.nonlinear import DenseFieldTransform
 class PlotDenseField():
     """
     Vizualisation of a transformation file using nitransform's DenseFielTransform module. Generates four sorts of plots:
-        i) the deformed grid\n
-        ii) the normalised deformation field density map\n
+        i) the deformed grid superimposed on the normalised deformation field density map\n
         iii) the quiver map of the field, coloured according to its diffusion scalar map\n
         iv) the quiver map of the field, coloured according to the jacobian of the coordinate matrices\n
     for 3 image projections:
         i) axial (fixed z slice)\n
         ii) saggital (fixed y slice)\n
         iii) coronal (fixed x slice)\n
-    Outputs the resulting 3 x 4 image grid.
+    Outputs the resulting 3 x 3 image grid.
 
     Parameters
     ----------
@@ -33,17 +32,6 @@ class PlotDenseField():
         Path from which the trasnformation file should be read.
     is_deltas: :obj:`bool`
         Whether the field is a displacement field or a deformations field. Default = True
-    
-    Example:
-    path_to_file = Path("/test-directory/someones-anatomy.nii.gz")
-    PlotDenseField(path_to_file=path_to_file, is_deltas=True).show_transform(
-        xslice=50,
-        yslice=75,
-        zslice=90,
-        gridstep=5,
-        save_to_path=str("test-directory/vis-someones-anatomy.jpg")
-    )
-    plt.show()
     """
     __slots__ = ('_path_to_file', '_xfm', '_voxel_size')
 
