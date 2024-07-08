@@ -11,7 +11,6 @@ from pathlib import Path
 from itertools import product
 
 from nitransforms.base import TransformError
-from nitransforms.linear import Affine
 from nitransforms.nonlinear import DenseFieldTransform
 
 class PlotDenseField():
@@ -34,8 +33,18 @@ class PlotDenseField():
         Path from which the trasnformation file should be read.
     is_deltas: :obj:`bool`
         Whether the field is a displacement field or a deformations field. Default = True
+    
+    Example:
+    path_to_file = Path("/test-directory/someones-anatomy.nii.gz")
+    PlotDenseField(path_to_file=path_to_file, is_deltas=True).show_transform(
+        xslice=50,
+        yslice=75,
+        zslice=90,
+        gridstep=5,
+        save_to_path=str("test-directory/vis-someones-anatomy.jpg")
+    )
+    plt.show()
     """
-
     __slots__ = ('_path_to_file', '_xfm', '_voxel_size')
 
     def __init__(self, path_to_file, is_deltas=True):
@@ -52,7 +61,7 @@ class PlotDenseField():
                 "the number of dimensions (%d)" % (self._xfm._field.shape[-1], self._xfm.ndim)
             )
 
-    def show_transform(self, xslice, yslice, zslice, gridstep=2, scaling=1, save_to_path=None):
+    def show_transform(self, xslice, yslice, zslice, scaling=1, show_brain=True, show_grid=True, lw=0.1, save_to_path=None):
         """
         Plot output field from DenseFieldTransform class.
 
@@ -64,8 +73,6 @@ class PlotDenseField():
             y plane to select for coronal prjection of the transform.
         zslice: :obj:`int`
             z plane to select for sagittal prjection of the transform.
-        gridstep: :obj:`int`
-            Interval to be used between distortion grid lines (efault: 10). 
         scaling: :obj:`float`
             Fraction by which the quiver plot arrows are to be scaled (default: 1).
         save_to_path: :obj:`str`
@@ -74,53 +81,48 @@ class PlotDenseField():
         Examples
         --------
         >>> PlotDenseField(
-        ...     test_dir / "someones_displacement_field.nii.gz"
+        ...     test_dir / "someones-displacement-field.nii.gz"
         ... ).show_transform(50, 50, 50)
         >>> plt.show()
 
         >>> PlotDenseField(
-        ...     path_to_file = test_dir / "someones_displacement_field.nii.gz",
+        ...     path_to_file = "test_dir/someones-displacement-field.nii.gz",
         ...     is_deltas = True,
         ... ).show_transform(
         ...     xslice = 70,
         ...     yslice = 60
         ...     zslice = 90,
-        ...     gridstep = 2,
         ...     scaling = 3,
-        ...     save_to_path = str(save_to_dir / "template.jpg"),
+        ...     show_brain=False,
+        ...     lw = 0.2
+        ...     save_to_path = str("test_dir/my_file.jpg"),
         ... )
         >>> plt.show()
         """
-
         fig, axes = format_fig(
-            figsize=(15,15),
+            figsize=(9,9),
             gs_rows=3,
             gs_cols=3,
             suptitle="Dense Field Transform \n" + os.path.basename(self._path_to_file),
         )
         fig.subplots_adjust(bottom=0.15)
 
-        projections=["Axial", "coronal", "Sagittal"]
+        projections=["Axial", "Coronal", "Sagittal"]
         for i, ax in enumerate(axes):
             if i < 3:
                 xlabel = None
                 ylabel = projections[i]
             else:
                 xlabel = ylabel = None
-            format_axes(ax, xlabel=xlabel, ylabel=ylabel, labelsize=14)
+            format_axes(ax, xlabel=xlabel, ylabel=ylabel, labelsize=16)
 
-        self.plot_distortion((axes[2], axes[1], axes[0]), xslice, yslice, zslice, show_grid=True, show_brain=True, lw=0.1)
-        self.plot_quiverdsm((axes[5], axes[4], axes[3]), xslice, yslice, zslice, scaling=scaling)
-        self.plot_jacobian((axes[8], axes[7], axes[6]), xslice, yslice, zslice)
+        self.plot_distortion((axes[2], axes[1], axes[0]), xslice, yslice, zslice, show_grid=show_grid, show_brain=show_brain, lw=lw, show_titles=False)
+        self.plot_quiverdsm((axes[5], axes[4], axes[3]), xslice, yslice, zslice, scaling=scaling, show_titles=False)
+        self.plot_jacobian((axes[8], axes[7], axes[6]), xslice, yslice, zslice, show_titles=False)
 
         sliders = self.sliders(fig, xslice, yslice, zslice)
-        """
-        for i, j in enumerate(sliders):
-            val = j.val
-            j.on_changed(self.update_sliders(val))
-            sliders[i] = j.val
-        print(sliders)
-        """
+        #NotImplemented: Interactive slider update here:
+
         if save_to_path is not None:
             assert os.path.isdir(os.path.dirname(save_to_path))
             plt.savefig(str(save_to_path), dpi=300)
@@ -128,7 +130,7 @@ class PlotDenseField():
             pass
     
     
-    def plot_distortion(self, ax, xslice, yslice, zslice, show_brain=True, show_grid=True, lw=0.1):
+    def plot_distortion(self, axes, xslice, yslice, zslice, show_brain=True, show_grid=True, lw=0.1, show_titles=True):
         """
         Plot the distortion grid. 
 
@@ -142,11 +144,31 @@ class PlotDenseField():
             y plane to select for coronal prjection of the transform.
         zslice: :obj:`int`
             z plane to select for sagittal prjection of the transform.
-        step: :obj:`int`
-            Interval to be used between distortion grid lines (efault: 10). 
+        show_brain: :obj:`bool`
+            Whether the normalised density map of the distortions should be plotted (Default: True).
+        show_grid: :obj:`bool`
+            Whether the distorted grid lines should be plotted (Default: True).
+        lw: :obj:`float`
+            Line width used for gridlines (Default: 0.1).
+
+        Example:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
+        PlotDenseField(
+            path_to_file="test_dir/someones-displacement-field.nii.gz",
+            is_deltas=True,
+        ).plot_distortion(
+            axes=[axes[2], axes[1], axes[0]],
+            xslice=50,
+            yslice=75,
+            zslice=90,
+            show_brain=True,
+            show_grid=True,
+            lw=0.2,
+        )
+        plt.savefig(str("test_dir/deformationgrid.jpg", dpi=300)
+        plt.show()
         """
-        planes = self.get_planes(xslice, yslice, zslice)
-        voxx,voxy,voxz,_ = self._voxel_size
+        planes, titles = self.get_planes(xslice, yslice, zslice)
 
         for index, plane in enumerate(planes):
             x,y,z,u,v,w = plane
@@ -154,13 +176,13 @@ class PlotDenseField():
 
             if index == 0:
                 dim1, dim2, vec1, vec2 = y, z, v, w
-                len1, len2, voxdim = shape[1], shape[2], [int(voxy), int(voxz)]
+                len1, len2 = shape[1], shape[2]
             elif index == 1:
                 dim1, dim2, vec1, vec2 = x, z, u, w
-                len1, len2, voxdim = shape[0], shape[2], [int(voxx), int(voxz)]
+                len1, len2 = shape[0], shape[2]
             else:
                 dim1, dim2, vec1, vec2 = x, y, u, v
-                len1, len2, voxdim = shape[0], shape[1], [int(voxx), int(voxy)]
+                len1, len2 = shape[0], shape[1]
 
             c = np.sqrt(vec1**2 + vec2**2)
             c = c/c.max()
@@ -170,16 +192,18 @@ class PlotDenseField():
                 y_moved = dim2+vec2
 
                 for idx in range(0, len1, 1):
-                    ax[index].plot(x_moved[idx*len2:(idx+1)*len2], y_moved[idx*len2:(idx+1)*len2], c='k', lw=lw)
+                    axes[index].plot(x_moved[idx*len2:(idx+1)*len2], y_moved[idx*len2:(idx+1)*len2], c='k', lw=lw)
                 for idx in range(0, len2, 1):
-                    ax[index].plot(x_moved[idx::len2], y_moved[idx::len2], c='k', lw=lw)
+                    axes[index].plot(x_moved[idx::len2], y_moved[idx::len2], c='k', lw=lw)
 
             if show_brain==True:
-                #ax[index].imshow(dim1.reshape(len1, len2), cmap='RdPu')
-                ax[index].scatter(dim1, dim2, c=c, cmap='RdPu')
+                axes[index].scatter(dim1, dim2, c=c, cmap='RdPu')
+            
+            if show_titles==True:
+                axes[index].set_title(titles[index], fontsize=14, weight='bold')
 
 
-    def plot_quiverdsm(self, axes, xslice, yslice, zslice, scaling=1, three_D=False):
+    def plot_quiverdsm(self, axes, xslice, yslice, zslice, scaling=1, three_D=False, show_titles=True):
         """
         Plot the Diffusion Scalar Map (dsm) as a quiver plot.
 
@@ -197,9 +221,41 @@ class PlotDenseField():
             Fraction by which the quiver plot arrows are to be scaled (default: 1).
         three_D: :obj:`bool`
             Whether the quiver plot is to be projected onto a 3D axis (default: False)
+        
+        Example:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
+        PlotDenseField(
+            path_to_file="test_dir/someones-displacement-field.nii.gz",
+            is_deltas=True,
+        ).plot_quiverdsm(
+            axes=[axes[2], axes[1], axes[0]],
+            xslice=50,
+            yslice=75,
+            zslice=90,
+            scaling=2,
+        )
+        plt.savefig(str("test_dir/quiverdsm.jpg", dpi=300)
+        plt.show()
+
+        #Example 2: 3D quiver
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        PlotDenseField(path_to_file, is_deltas=True).plot_quiverdsm(
+            ax,
+            xslice=None,
+            yslice=None,
+            zslice=None,
+            scaling=10,
+            three_D=True,
+        )
+        format_axes(ax) #, xticks=[-250, -200, -150, -100, -50, 0], yticks=[-200, -150, -100, -50, 0], zticks=[-200, -150, -100, -50, 0]
+        plt.show()
         """
-        planes = self.get_planes(xslice, yslice, zslice)
+        planes, titles = self.get_planes(xslice, yslice, zslice)
         if three_D is not False:
+            raise NotImplementedError("3d Quiver plot not finalised.")
+        
+            #finalise 3d quiver below:
             for i, j in enumerate(planes):
                 x, y, z, u, v, w = j
 
@@ -240,8 +296,11 @@ class PlotDenseField():
                 axes[index].quiver(c_greens[:, dim1], c_greens[:, dim2], c_greens[:, vec1], c_greens[:, vec2], c_greens[:, -1], cmap='Greens')
                 axes[index].quiver(c_blues[:, dim1], c_blues[:, dim2], c_blues[:, vec1], c_blues[:, vec2], c_blues[:, -1], cmap='Blues')
 
+                if show_titles==True:
+                    axes[index].set_title(titles[index], fontsize=14, weight='bold')
 
-    def plot_jacobian(self, axes, xslice, yslice, zslice):
+
+    def plot_jacobian(self, axes, xslice, yslice, zslice, show_titles=True):
         """
         Map the divergence of the transformation field using a quiver plot.
         
@@ -255,12 +314,22 @@ class PlotDenseField():
             y plane to select for coronal projection of the transform.
         zslice: :obj:`int`
             z plane to select for sagittal projection of the transform.
-        scaling: :obj:`float`
-            Fraction by which the quiver plot arrows are to be scaled (default: 1).
-        three_D: :obj:`bool`
-            Whether the quiver plot is to be projected onto a 3D axis (default: False)
+
+        Example:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
+        PlotDenseField(
+            path_to_file="test_dir/someones-displacement-field.nii.gz",
+            is_deltas=True,
+        ).plot_jacobian(
+            axes=[axes[2], axes[1], axes[0]],
+            xslice=50,
+            yslice=75,
+            zslice=90,
+        )
+        plt.savefig(str("test_dir/jacobians.jpg", dpi=300)
+        plt.show()
         """
-        planes = self.get_planes(xslice, yslice, zslice)
+        planes, titles = self.get_planes(xslice, yslice, zslice)
         slices = [
             [False, False, False, False],  # [:,:,index]
             [False, False, False, False],  # [:,index,:]
@@ -276,7 +345,6 @@ class PlotDenseField():
             J = self.get_jacobian().reshape(self._xfm._field[..., -1].shape)[s[0], s[1], s[2]]
             jacobians[ind] = J.flatten()
 
-        #plotting
         for index, plane in enumerate(planes):
             x, y, z, u, v, w = plane
 
@@ -289,6 +357,9 @@ class PlotDenseField():
 
             c = jacobians[index]
             axes[index].scatter(dim1, dim2, c=c, norm=mpl.colors.CenteredNorm(), cmap='seismic')
+
+            if show_titles==True:
+                axes[index].set_title(titles[index], fontsize=14, weight='bold')
 
 
     def get_coords(self):
@@ -355,6 +426,7 @@ class PlotDenseField():
 
     def get_planes(self, xslice, yslice, zslice):
         """Define slice selection for visualisation"""
+        titles = ["Sagittal", "Coronal", "Axial"]
         planes = [0]*3
         slices = [
             [False, False, False, False],  # [:,:,index]
@@ -362,7 +434,6 @@ class PlotDenseField():
             [False, False, False, False],   # [index,:,:]
         ]
 
-        #iterating through the three chosen planes to calculate corresponding coordinates
         for ind, s in enumerate(slices):
             x, y, z, u, v, w = self.get_coords()
 
@@ -398,7 +469,7 @@ class PlotDenseField():
 
             #store 3 slices of datapoints, with overall shape [3 x [6 x [data]]]
             planes[ind] = [x, y, z, u, v, w]
-        return planes
+        return planes, titles
 
 
     def sliders(self, fig, xslice, yslice, zslice):
@@ -433,10 +504,9 @@ class PlotDenseField():
 
 
     def update_sliders(self, slider):
+        raise NotImplementedError("Sliders not implemented.")
+        
         new_slider = slider.val
-        #fig.canvas.draw_idle()
-        #import pdb; pdb.set_trace()
-        print(new_slider)
         return new_slider
 
 
@@ -493,7 +563,6 @@ def format_axes(axis, **kwargs):
     params.update(kwargs)
 
     '''Format the figure axes. For 2D plots, zlabel and zticks parameters are None.'''
-    #axis.tick_params(labelsize=params['ticksize'])
     axis.set_title(params['title'], weight='bold')
     axis.set_xticks(params['xticks'])
     axis.set_yticks(params['yticks'])
@@ -510,51 +579,3 @@ def format_axes(axis, **kwargs):
     except:
         pass
     return
-
-
-path_to_file = Path("/Users/julienmarabotto/workspace/nitransforms/nitransforms/tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
-save_to_dir = Path("/Users/julienmarabotto/workspace/Neuroimaging/plots/quiver")
-
-"""___EXAMPLES___"""
-
-#Example 1: plot_template
-a = PlotDenseField(path_to_file, is_deltas=True).show_transform(
-    xslice=50,
-    yslice=75,
-    zslice=90,
-    gridstep=5,
-    save_to_path=str(save_to_dir / "template_v6.jpg")
-    #save_to_path=None
-)
-plt.show()
-
-"""
-#Example 2a: plot_quiver (2d)
-fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)#, sharex=True, sharey=True)
-PlotDenseField(path_to_file, is_deltas=True).plot_distortion(
-    [axes[2], axes[1], axes[0]],
-    xslice=50,
-    yslice=75,
-    zslice=90,
-    show_brain=True,
-    show_grid=True,
-    lw=0.2,
-)
-plt.savefig(str(save_to_dir)+"/deformationgrid.jpg", dpi=300)
-plt.show()
-"""
-"""
-#Example 2b: plot_quiver (3d)
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-PlotDenseField(path_to_file, is_deltas=True).plot_quiverdsm(
-    ax,
-    xslice=None,
-    yslice=None,
-    zslice=None,
-    scaling=10,
-    three_D=True,
-)
-format_axes(ax) #, xticks=[-250, -200, -150, -100, -50, 0], yticks=[-200, -150, -100, -50, 0], zticks=[-200, -150, -100, -50, 0]
-plt.show()
-"""
