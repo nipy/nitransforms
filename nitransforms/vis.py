@@ -568,18 +568,3 @@ def format_axes(axis, **kwargs):
     except:
         pass
     return
-
-path = "tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
-
-fig, axes = plt.subplots(1, 3, figsize=(12,4))
-PlotDenseField(
-    path_to_file=path,
-    is_deltas=True,
-).plot_quiverdsm(
-    axes=[axes[2], axes[1], axes[0]],
-    xslice=102,
-    yslice=90,
-    zslice=88,
-)
-
-plt.show()
