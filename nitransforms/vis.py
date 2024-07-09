@@ -333,21 +333,22 @@ class PlotDenseField():
             J = self.get_jacobian().reshape(self._xfm._field[..., -1].shape)[s[0], s[1], s[2]]
             jacobians[ind] = J.flatten()
 
-        for index, plane in enumerate(planes):
-            x, y, z, u, v, w = plane
+        for index, (ax, plane) in enumerate(zip(axes, planes)):
+            x, y, z, _, _, _ = plane
 
             if index == 0:
-                dim1, dim2, vec1, vec2 = y, z, v, w
+                dim1, dim2 = y, z
             elif index == 1:
-                dim1, dim2, vec1, vec2 = x, z, u, w
+                dim1, dim2 = x, z
             else:
-                dim1, dim2, vec1, vec2 = x, y, u, v
+                dim1, dim2 = x, y
 
             c = jacobians[index]
-            axes[index].scatter(dim1, dim2, c=c, norm=mpl.colors.CenteredNorm(), cmap='seismic')
+            plot = ax.scatter(dim1, dim2, c=c, norm=mpl.colors.CenteredNorm(), cmap='seismic')
 
             if show_titles==True:
-                axes[index].set_title(titles[index], fontsize=14, weight='bold')
+                ax.set_title(titles[index], fontsize=14, weight='bold')
+                plt.colorbar(plot, location='bottom', orientation='horizontal', label=str(r'$J$'))
 
 
     def get_coords(self):
@@ -567,3 +568,18 @@ def format_axes(axis, **kwargs):
     except:
         pass
     return
+
+path = "tests/data/ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
+
+fig, axes = plt.subplots(1, 3, figsize=(12,4))
+PlotDenseField(
+    path_to_file=path,
+    is_deltas=True,
+).plot_quiverdsm(
+    axes=[axes[2], axes[1], axes[0]],
+    xslice=102,
+    yslice=90,
+    zslice=88,
+)
+
+plt.show()
