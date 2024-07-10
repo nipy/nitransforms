@@ -5,9 +5,8 @@ import matplotlib.pyplot as plt
 import nibabel as nb
 
 from matplotlib.gridspec import GridSpec
-from matplotlib.widgets import Button, Slider
+from matplotlib.widgets import Slider
 
-from pathlib import Path
 from itertools import product
 
 from nitransforms.base import TransformError
@@ -87,6 +86,8 @@ class PlotDenseField():
         ... )
         >>> plt.show()
         """
+        xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
+
         fig, axes = format_fig(
             figsize=(9,9),
             gs_rows=3,
@@ -156,6 +157,7 @@ class PlotDenseField():
         plt.savefig(str("test_dir/deformationgrid.jpg", dpi=300)
         plt.show()
         """
+        xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
         planes, titles = self.get_planes(xslice, yslice, zslice)
 
         for index, plane in enumerate(planes):
@@ -239,7 +241,9 @@ class PlotDenseField():
         format_axes(ax) #, xticks=[-250, -200, -150, -100, -50, 0], yticks=[-200, -150, -100, -50, 0], zticks=[-200, -150, -100, -50, 0]
         plt.show()
         """
+        xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
         planes, titles = self.get_planes(xslice, yslice, zslice)
+
         if three_D is not False:
             raise NotImplementedError("3d Quiver plot not finalised.")
         
@@ -317,6 +321,7 @@ class PlotDenseField():
         plt.savefig(str("test_dir/jacobians.jpg", dpi=300)
         plt.show()
         """
+        xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
         planes, titles = self.get_planes(xslice, yslice, zslice)
         slices = [
             [False, False, False, False],  # [:,:,index]
@@ -349,6 +354,22 @@ class PlotDenseField():
             if show_titles==True:
                 ax.set_title(titles[index], fontsize=14, weight='bold')
                 plt.colorbar(plot, location='bottom', orientation='horizontal', label=str(r'$J$'))
+
+
+    def test_slices(self, xslice, yslice, zslice):
+        xfm = self._xfm._field
+
+        if xslice < 0 or yslice < 0 or zslice < 0:
+            raise ValueError("Slice values must be positive integers")
+
+        if int(xslice) > xfm.shape[0]:
+            raise IndexError(f"x-slice {xslice} out of range for transform object with x-dimension of length {xfm.shape[0]}")
+        if int(yslice) > xfm.shape[1]:
+            raise IndexError(f"y-slice {yslice} out of range for transform object with y-dimension of length {xfm.shape[1]}")
+        if int(zslice) > xfm.shape[2]:
+            raise IndexError(f"z-slice {zslice} out of range for transform object with z-dimension of length {xfm.shape[2]}")
+
+        return(int(xslice), int(yslice), int(zslice))
 
 
     def get_coords(self):
@@ -415,6 +436,7 @@ class PlotDenseField():
 
     def get_planes(self, xslice, yslice, zslice):
         """Define slice selection for visualisation"""
+        xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
         titles = ["Sagittal", "Coronal", "Axial"]
         planes = [0]*3
         slices = [
@@ -426,14 +448,14 @@ class PlotDenseField():
         for ind, s in enumerate(slices):
             x, y, z, u, v, w = self.get_coords()
 
-            #indexing for plane selection [x: sagittal, y: coronal, z: axial, dimension]
+            """indexing for plane selection [x: sagittal, y: coronal, z: axial, dimension]"""
             s = [xslice, slice(None), slice(None), None] if ind == 0 else s
             s = [slice(None), yslice, slice(None), None] if ind == 1 else s
             s = [slice(None), slice(None), zslice, None] if ind == 2 else s
-            #Full 3d quiver:
+            #For 3d quiver:
             s = [slice(None), slice(None), slice(None), None] if xslice == yslice == zslice == None else s
 
-            #computing coordinates within each plane
+            """computing coordinates within each plane"""
             x = x[s[0], s[1], s[2]]
             y = y[s[0], s[1], s[2]]
             z = z[s[0], s[1], s[2]]
@@ -448,7 +470,7 @@ class PlotDenseField():
             v = v.flatten()
             w = w.flatten()
 
-            #check indexing has retrieved correct dimensions
+            """check indexing has retrieved correct dimensions"""
             if ind==0 and xslice!=None:
                 assert x.shape == u.shape == np.shape(self._xfm._field[-1,...,-1].flatten())
             elif ind==1 and yslice!=None:
@@ -456,12 +478,17 @@ class PlotDenseField():
             elif ind==2 and zslice!=None:
                 assert z.shape == w.shape == np.shape(self._xfm._field[...,-1,-1].flatten())
 
-            #store 3 slices of datapoints, with overall shape [3 x [6 x [data]]]
+            """store 3 slices of datapoints, with overall shape [3 x [6 x [data]]]"""
             planes[ind] = [x, y, z, u, v, w]
         return planes, titles
 
 
     def sliders(self, fig, xslice, yslice, zslice):
+        #This successfully generates a slider, but it cannot be used.
+        #Currently, slider only acts as a label to show slice values.
+        #raise NotImplementedError("Slider implementation not finalised. Static slider can be generated but is not interactive")
+
+        xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
         slices = [
             [zslice, len(self._xfm._field[0][0]), "zslice"],
             [yslice, len(self._xfm._field[0]), "yslice"],
@@ -493,7 +520,7 @@ class PlotDenseField():
 
 
     def update_sliders(self, slider):
-        raise NotImplementedError("Sliders not implemented.")
+        raise NotImplementedError("Interactive sliders not implemented.")
         
         new_slider = slider.val
         return new_slider
