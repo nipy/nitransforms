@@ -9,7 +9,6 @@ from matplotlib.widgets import Slider
 
 from itertools import product
 
-from nitransforms.base import TransformError
 from nitransforms.nonlinear import DenseFieldTransform
 
 class PlotDenseField():
@@ -27,26 +26,35 @@ class PlotDenseField():
     Parameters
     ----------
 
-    path_to_file: :obj:`str`
+    transform: :obj:`str`
         Path from which the trasnformation file should be read.
     is_deltas: :obj:`bool`
         Whether the field is a displacement field or a deformations field. Default = True
     """
-    __slots__ = ('_path_to_file', '_xfm', '_voxel_size')
+    __slots__ = ('_transform', '_xfm', '_voxel_size')
 
-    def __init__(self, path_to_file, is_deltas=True):
-        self._path_to_file = path_to_file
+    def __init__(self, transform, is_deltas=True, reference=None):
+        self._transform = transform
         self._xfm = DenseFieldTransform(
-            self._path_to_file,
+            field=self._transform,
             is_deltas=is_deltas,
+            reference=reference
         )
-        self._voxel_size = nb.load(path_to_file).header.get_zooms()
+        try:
+            """if field provided by path"""
+            self._voxel_size = nb.load(transform).header.get_zooms()
+        except:
+            """if field provided by numpy array (eg tests)"""
+            deltas = []
+            for i in range(self._xfm.ndim):
+                deltas.append((np.max(self._xfm._field[i]) - np.min(self._xfm._field[i])) / len(self._xfm._field[i]))
+            
+            assert np.all(deltas == deltas[0])
+            assert np.mean(deltas) == deltas[0]
+            
+            deltas.append(0)
+            self._voxel_size = deltas        
 
-        if self._xfm._field.shape[-1] != self._xfm.ndim:
-            raise TransformError(
-                "The number of components of the field (%d) does not match "
-                "the number of dimensions (%d)" % (self._xfm._field.shape[-1], self._xfm.ndim)
-            )
 
     def show_transform(self, xslice, yslice, zslice, scaling=1, show_brain=True, show_grid=True, lw=0.1, save_to_path=None):
         """
@@ -73,7 +81,7 @@ class PlotDenseField():
         >>> plt.show()
 
         >>> PlotDenseField(
-        ...     path_to_file = "test_dir/someones-displacement-field.nii.gz",
+        ...     transform = "test_dir/someones-displacement-field.nii.gz",
         ...     is_deltas = True,
         ... ).show_transform(
         ...     xslice = 70,
@@ -92,7 +100,7 @@ class PlotDenseField():
             figsize=(9,9),
             gs_rows=3,
             gs_cols=3,
-            suptitle="Dense Field Transform \n" + os.path.basename(self._path_to_file),
+            suptitle="Dense Field Transform \n" + os.path.basename(self._transform),
         )
         fig.subplots_adjust(bottom=0.15)
 
@@ -143,7 +151,7 @@ class PlotDenseField():
         Example:
         fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
         PlotDenseField(
-            path_to_file="test_dir/someones-displacement-field.nii.gz",
+            transform="test_dir/someones-displacement-field.nii.gz",
             is_deltas=True,
         ).plot_distortion(
             axes=[axes[2], axes[1], axes[0]],
@@ -215,7 +223,7 @@ class PlotDenseField():
         Example:
         fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
         PlotDenseField(
-            path_to_file="test_dir/someones-displacement-field.nii.gz",
+            transform="test_dir/someones-displacement-field.nii.gz",
             is_deltas=True,
         ).plot_quiverdsm(
             axes=[axes[2], axes[1], axes[0]],
@@ -230,7 +238,7 @@ class PlotDenseField():
         #Example 2: 3D quiver
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
-        PlotDenseField(path_to_file, is_deltas=True).plot_quiverdsm(
+        PlotDenseField(transform, is_deltas=True).plot_quiverdsm(
             ax,
             xslice=None,
             yslice=None,
@@ -310,7 +318,7 @@ class PlotDenseField():
         Example:
         fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
         PlotDenseField(
-            path_to_file="test_dir/someones-displacement-field.nii.gz",
+            transform="test_dir/someones-displacement-field.nii.gz",
             is_deltas=True,
         ).plot_jacobian(
             axes=[axes[2], axes[1], axes[0]],
