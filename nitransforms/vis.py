@@ -75,24 +75,24 @@ class PlotDenseField():
 
         Examples
         --------
-        >>> PlotDenseField(
-        ...     test_dir / "someones-displacement-field.nii.gz"
-        ... ).show_transform(50, 50, 50)
-        >>> plt.show()
+        PlotDenseField(
+            test_dir / "someones-displacement-field.nii.gz"
+        ).show_transform(50, 50, 50)
+        plt.show()
 
-        >>> PlotDenseField(
-        ...     transform = "test_dir/someones-displacement-field.nii.gz",
-        ...     is_deltas = True,
-        ... ).show_transform(
-        ...     xslice = 70,
-        ...     yslice = 60
-        ...     zslice = 90,
-        ...     scaling = 3,
-        ...     show_brain=False,
-        ...     lw = 0.2
-        ...     save_to_path = str("test_dir/my_file.jpg"),
-        ... )
-        >>> plt.show()
+        PlotDenseField(
+            transform = test_dir / "someones-displacement-field.nii.gz",
+            is_deltas = True,
+        ).show_transform(
+            xslice = 70,
+            yslice = 60
+            zslice = 90,
+            scaling = 3,
+            show_brain=False,
+            lw = 0.2
+            save_to_path = str("test_dir/my_file.jpg"),
+        )
+        plt.show()
         """
         xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
 
@@ -371,7 +371,7 @@ class PlotDenseField():
         try:
             if xslice < 0 or yslice < 0 or zslice < 0:
                 raise ValueError("Slice values must be positive integers")
-            
+
             if int(xslice) > xfm.shape[0]:
                 raise IndexError(f"x-slice {xslice} out of range for transform object with x-dimension of length {xfm.shape[0]}")
             if int(yslice) > xfm.shape[1]:
@@ -380,11 +380,11 @@ class PlotDenseField():
                 raise IndexError(f"z-slice {zslice} out of range for transform object with z-dimension of length {xfm.shape[2]}")
 
             return(int(xslice), int(yslice), int(zslice))
-        
+
         except TypeError as e:
             """exception for case of 3d quiver plot"""
             assert str(e) == "'<' not supported between instances of 'NoneType' and 'int'"
-            
+
             return(xslice, yslice, zslice)
 
 
