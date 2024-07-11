@@ -365,19 +365,27 @@ class PlotDenseField():
 
 
     def test_slices(self, xslice, yslice, zslice):
+        """Ensure slices are positive and within range of image dimensions"""
         xfm = self._xfm._field
 
-        if xslice < 0 or yslice < 0 or zslice < 0:
-            raise ValueError("Slice values must be positive integers")
+        try:
+            if xslice < 0 or yslice < 0 or zslice < 0:
+                raise ValueError("Slice values must be positive integers")
+            
+            if int(xslice) > xfm.shape[0]:
+                raise IndexError(f"x-slice {xslice} out of range for transform object with x-dimension of length {xfm.shape[0]}")
+            if int(yslice) > xfm.shape[1]:
+                raise IndexError(f"y-slice {yslice} out of range for transform object with y-dimension of length {xfm.shape[1]}")
+            if int(zslice) > xfm.shape[2]:
+                raise IndexError(f"z-slice {zslice} out of range for transform object with z-dimension of length {xfm.shape[2]}")
 
-        if int(xslice) > xfm.shape[0]:
-            raise IndexError(f"x-slice {xslice} out of range for transform object with x-dimension of length {xfm.shape[0]}")
-        if int(yslice) > xfm.shape[1]:
-            raise IndexError(f"y-slice {yslice} out of range for transform object with y-dimension of length {xfm.shape[1]}")
-        if int(zslice) > xfm.shape[2]:
-            raise IndexError(f"z-slice {zslice} out of range for transform object with z-dimension of length {xfm.shape[2]}")
-
-        return(int(xslice), int(yslice), int(zslice))
+            return(int(xslice), int(yslice), int(zslice))
+        
+        except TypeError as e:
+            """exception for case of 3d quiver plot"""
+            assert str(e) == "'<' not supported between instances of 'NoneType' and 'int'"
+            
+            return(xslice, yslice, zslice)
 
 
     def get_coords(self):

@@ -65,7 +65,7 @@ def test_plot_distortion(data_path, output_path):
         zslice=50,
     )
     if output_path is not None:
-        plt.savefig(output_path / "show_transform.svg", bbox_inches="tight")
+        plt.savefig(output_path / "plot_distortion.svg", bbox_inches="tight")
     else:
         plt.show()
 
@@ -80,8 +80,9 @@ def test_plot_quiverdsm(data_path, output_path):
         yslice=50,
         zslice=50,
     )
+
     if output_path is not None:
-        plt.savefig(output_path / "show_transform.svg", bbox_inches="tight")
+        plt.savefig(output_path / "plot_quiverdsm.svg", bbox_inches="tight")
     else:
         plt.show()
 
@@ -89,19 +90,25 @@ def test_plot_quiverdsm(data_path, output_path):
 def test_3dquiver(data_path, output_path):
     with pytest.raises(NotImplementedError):
         fig = plt.figure()
-        axes = plt.subplots(projection='3d')
+        axes = fig.add_subplot(projection='3d')
         PlotDenseField(
-            transform = data_path / "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
-        ).plot_quiverdsm(axes=axes, three_D=True)
+            transform = data_path / "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz",
+        ).plot_quiverdsm(
+            axes=axes,
+            xslice=None,
+            yslice=None,
+            zslice=None,
+            three_D=True
+        )
 
     if output_path is not None:
-        plt.savefig(output_path / "show_transform.svg", bbox_inches="tight")
+        plt.savefig(output_path / "plot_3dquiver.svg", bbox_inches="tight")
     else:
         plt.show()
-
+    
 
 def test_plot_jacobian(data_path, output_path):
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    fig, axes = plt.subplots(1, 3, figsize=(12, 5))
     PlotDenseField(
         transform = data_path / "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
     ).plot_jacobian(
@@ -110,11 +117,11 @@ def test_plot_jacobian(data_path, output_path):
         yslice=50,
         zslice=50,
     )
+
     if output_path is not None:
-        plt.savefig(output_path / "show_transform.svg", bbox_inches="tight")
+        plt.savefig(output_path / "plot_jacobian.svg", bbox_inches="tight")
     else:
         plt.show()
-
 
 if __name__ == "__main__":
     pytest.main([__file__])
