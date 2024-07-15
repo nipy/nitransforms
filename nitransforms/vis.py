@@ -607,7 +607,7 @@ class PlotDenseField():
                 orientation="horizontal"
             )
             sliders.append(slider)
-        
+
             assert sliders[index].val == slices[index][0]
 
         return sliders
@@ -617,15 +617,6 @@ class PlotDenseField():
 
         new_slider = slider.val
         return new_slider
-
-
-def get_2dcenters(x, y, step=2):
-    samples_x = np.arange(x.min(), x.max(), step=step).astype(int)
-    samples_y = np.arange(y.min(), y.max(), step=step).astype(int)
-
-    lenx = len(samples_x)
-    leny = len(samples_y)
-    return zip(*product(samples_x, samples_y)), lenx, leny
 
 
 def format_fig(figsize, gs_rows, gs_cols, **kwargs):
