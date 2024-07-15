@@ -14,7 +14,7 @@ from nitransforms.nonlinear import DenseFieldTransform
 
 class PlotDenseField():
     """
-    Vizualisation of a transformation file using nitransform's DenseFielTransform module. 
+    Vizualisation of a transformation file using nitransform's DenseFielTransform module.
     Generates four sorts of plots:
         i) deformed grid superimposed on the normalised deformation field density map\n
         iii) quiver map of the field coloured by its diffusion scalar map\n
@@ -49,15 +49,14 @@ class PlotDenseField():
             """if field provided by numpy array (eg tests)"""
             deltas = []
             for i in range(self._xfm.ndim):
-                deltas.append((np.max(self._xfm._field[i]) - np.min(self._xfm._field[i])) 
+                deltas.append((np.max(self._xfm._field[i]) - np.min(self._xfm._field[i]))
                               / len(self._xfm._field[i]))
-            
+
             assert np.all(deltas == deltas[0])
             assert np.mean(deltas) == deltas[0]
 
             deltas.append(0)
-            self._voxel_size = deltas        
-
+            self._voxel_size = deltas
 
     def show_transform(
             self,
@@ -69,7 +68,7 @@ class PlotDenseField():
             show_grid=True,
             lw=0.1,
             save_to_path=None,
-        ):
+    ):
         """
         Plot output field from DenseFieldTransform class.
 
@@ -171,7 +170,7 @@ class PlotDenseField():
             show_grid=True,
             lw=0.1,
             show_titles=True,
-        ):
+    ):
         """
         Plot the distortion grid.
 
@@ -251,7 +250,7 @@ class PlotDenseField():
 
             if show_brain:
                 axes[index].scatter(dim1, dim2, c=c, cmap='RdPu')
-            
+
             if show_titles:
                 axes[index].set_title(titles[index], fontsize=14, weight='bold')
 
@@ -264,7 +263,7 @@ class PlotDenseField():
             scaling=1,
             three_D=False,
             show_titles=True,
-        ):
+    ):
         """
         Plot the Diffusion Scalar Map (dsm) as a quiver plot.
 
@@ -447,7 +446,6 @@ class PlotDenseField():
                 ax.set_title(titles[index], fontsize=14, weight='bold')
                 plt.colorbar(plot, location='bottom', orientation='horizontal', label=str(r'$J$'))
 
-
     def test_slices(self, xslice, yslice, zslice):
         """Ensure slices are positive and within range of image dimensions"""
         xfm = self._xfm._field
@@ -511,10 +509,10 @@ class PlotDenseField():
             if idx < 3:
                 dim = zeros[-1,:,:][None,:,:]
                 ax = 0
-            elif idx >=3 and idx < 6:
+            elif idx >= 3 and idx < 6:
                 dim = zeros[:,-1,:][:,None,:]
                 ax = 1
-            elif idx >=6:
+            elif idx >= 6:
                 dim = zeros[:,:,-1][:,:,None]
                 ax = 2
 
@@ -554,7 +552,7 @@ class PlotDenseField():
             s = [slice(None), slice(None), zslice, None] if ind == 2 else s
             # For 3d quiver:
             if xslice == yslice == zslice is None:
-                s = [slice(None), slice(None), slice(None), None] 
+                s = [slice(None), slice(None), slice(None), None]
 
             """computing coordinates within each plane"""
             x = x[s[0], s[1], s[2]]
@@ -586,7 +584,7 @@ class PlotDenseField():
     def sliders(self, fig, xslice, yslice, zslice):
         # This successfully generates a slider, but it cannot be used.
         # Currently, slider only acts as a label to show slice values.
-        # raise NotImplementedError("Slider implementation not finalised. 
+        # raise NotImplementedError("Slider implementation not finalised.
         # Static slider can be generated but is not interactive")
 
         xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
@@ -636,9 +634,9 @@ def get_2dcenters(x, y, step=2):
 
 
 def format_fig(figsize, gs_rows, gs_cols, **kwargs):
-    params={
+    params = {
         'gs_wspace' : 0,
-        'gs_hspace': 1 / 8,    
+        'gs_hspace' : 1 / 8,
         'suptitle': None,
     }
     params.update(kwargs)
@@ -657,7 +655,7 @@ def format_fig(figsize, gs_rows, gs_cols, **kwargs):
         hspace=params['gs_hspace']
     )
 
-    axes=[]
+    axes = []
     for j in range(0, gs_cols):
         for i in range(0, gs_rows):
             axes.append(fig.add_subplot(gs[i,j]))
@@ -665,7 +663,7 @@ def format_fig(figsize, gs_rows, gs_cols, **kwargs):
 
 
 def format_axes(axis, **kwargs):
-    params={
+    params = {
         'title':None,
         'xlabel':"x",
         'ylabel':"y",
@@ -676,7 +674,7 @@ def format_axes(axis, **kwargs):
         'rotate_3dlabel':False,
         'labelsize':16,
         'ticksize':14,
-        }
+    }
     params.update(kwargs)
 
     '''Format the figure axes. For 2D plots, zlabel and zticks parameters are None.'''
