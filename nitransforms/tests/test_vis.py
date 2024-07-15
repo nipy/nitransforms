@@ -26,28 +26,36 @@ def test_slice_values():
         )
 
     "Check that IndexError is issued if provided slices are beyond range of transform dimensions"
-    with pytest.raises(IndexError):
-        xfm = DenseFieldTransform(
-            field=np.zeros((10, 10, 10, 3)),
-            reference=nb.Nifti1Image(np.zeros((10, 10, 10, 3)), np.eye(4), None),
-        )
-        PlotDenseField(
-            transform=xfm._field,
-            reference=xfm._reference,
-        ).test_slices(
-            xslice=xfm._field.shape[0] + 1,
-            yslice=xfm._field.shape[1] + 1,
-            zslice=xfm._field.shape[2] + 1,
-        )
+    xfm = DenseFieldTransform(
+        field=np.zeros((10, 10, 10, 3)),
+        reference=nb.Nifti1Image(np.zeros((10, 10, 10, 3)), np.eye(4), None),
+    )
+    for idx in range(0,3):
+        if idx == 0:
+            i, j, k = 1, 0, 0
+        elif idx == 1:
+            i, j, k = 0, 1, 0
+        elif idx == 2:
+            i, j, k = 0, 0, 1
+
+        with pytest.raises(IndexError):
+            PlotDenseField(
+                transform=xfm._field,
+                reference=xfm._reference,
+            ).test_slices(
+                xslice=xfm._field.shape[0] + i,
+                yslice=xfm._field.shape[1] + j,
+                zslice=xfm._field.shape[2] + k,
+            )
 
 
 def test_show_transform(data_path, output_path):
     PlotDenseField(
         transform=data_path / "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
     ).show_transform(
-        xslice=50,
+        xslice=45,
         yslice=50,
-        zslice=50,
+        zslice=55,
     )
     if output_path is not None:
         plt.savefig(output_path / "show_transform.svg", bbox_inches="tight")
@@ -64,6 +72,8 @@ def test_plot_distortion(data_path, output_path):
         xslice=50,
         yslice=50,
         zslice=50,
+        show_grid=True,
+        show_brain=True,
     )
     if output_path is not None:
         plt.savefig(output_path / "plot_distortion.svg", bbox_inches="tight")

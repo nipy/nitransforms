@@ -53,7 +53,6 @@ class PlotDenseField():
                               / len(self._xfm._field[i]))
 
             assert np.all(deltas == deltas[0])
-            assert np.mean(deltas) == deltas[0]
 
             deltas.append(0)
             self._voxel_size = deltas
@@ -151,14 +150,8 @@ class PlotDenseField():
             show_titles=False,
         )
 
-        # sliders = self.sliders(fig, xslice, yslice, zslice)
+        self.sliders(fig, xslice, yslice, zslice)
         # NotImplemented: Interactive slider update here:
-
-        if save_to_path is not None:
-            assert os.path.isdir(os.path.dirname(save_to_path))
-            plt.savefig(str(save_to_path), dpi=300)
-        else:
-            pass
 
     def plot_distortion(
             self,
@@ -614,6 +607,8 @@ class PlotDenseField():
                 orientation="horizontal"
             )
             sliders.append(slider)
+        
+            assert sliders[index].val == slices[index][0]
 
         return sliders
 
