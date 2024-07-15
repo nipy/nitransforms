@@ -7,8 +7,6 @@ import nibabel as nb
 from matplotlib.gridspec import GridSpec
 from matplotlib.widgets import Slider
 
-from itertools import product
-
 from nitransforms.nonlinear import DenseFieldTransform
 
 
