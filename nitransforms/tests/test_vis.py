@@ -74,7 +74,7 @@ def test_plot_distortion(data_path, output_path):
 def test_plot_quiverdsm(data_path, output_path):
     fig, axes = plt.subplots(1, 3, figsize=(12, 4))
     PlotDenseField(
-        transform=data_path/ "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
+        transform=data_path / "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
     ).plot_quiverdsm(
         axes=axes,
         xslice=50,
@@ -111,7 +111,7 @@ def test_3dquiver(data_path, output_path):
 def test_plot_jacobian(data_path, output_path):
     fig, axes = plt.subplots(1, 3, figsize=(12, 5))
     PlotDenseField(
-        transform=data_path/ "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
+        transform=data_path / "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
     ).plot_jacobian(
         axes=axes,
         xslice=50,

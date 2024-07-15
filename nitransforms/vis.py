@@ -635,8 +635,8 @@ def get_2dcenters(x, y, step=2):
 
 def format_fig(figsize, gs_rows, gs_cols, **kwargs):
     params = {
-        'gs_wspace' : 0,
-        'gs_hspace' : 1 / 8,
+        'gs_wspace': 0,
+        'gs_hspace': 1 / 8,
         'suptitle': None,
     }
     params.update(kwargs)
