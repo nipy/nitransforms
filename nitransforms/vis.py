@@ -340,8 +340,8 @@ class PlotDenseField():
                 if np.shape(c_blues) == (0,):
                     c_blues = np.zeros((1, 7))
                 elif (
-                    np.shape(c_reds) != (0,) and \
-                    np.shape(c_greens) != (0,) and \
+                    np.shape(c_reds) != (0,) and
+                    np.shape(c_greens) != (0,) and
                     np.shape(c_blues) != (0,)
                 ):
                     assert len(np.concatenate((c_reds, c_greens, c_blues))) == len(x) - len(zeros)
