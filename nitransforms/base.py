@@ -178,13 +178,47 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ("_reference", "_ndim",)
+    __slots__ = ("_reference", "_ndim", "_affine", "_shape", "_header",
+        "_grid", "_mapping", "_hdf5_dct", "_x5_dct")
 
-    def __init__(self, reference=None):
+    x5_struct = {
+        'TransformGroup/0': {
+            'Type': None,
+            'Transform': None,
+            'Metadata': None,
+            'Inverse': None
+        },
+        'TransformGroup/0/Domain': {
+            'Grid': None,
+            'Size': None,
+            'Mapping': None
+        },
+        'TransformGroup/1': {},
+        'TransformChain': {}
+    }
+
+    def __init__(self, x5=None, hdf5=None, nifti=None, shape=None, affine=None, 
+        header=None, reference=None):
         """Instantiate a transform."""
+
         self._reference = None
         if reference:
             self.reference = reference
+
+        if nifti is not None:
+            self._x5_dct = self.init_x5_structure(nifti)
+        elif hdf5:
+            self.update_x5_structure(hdf5)
+        elif x5:
+            self.update_x5_structure(x5)
+        
+        self._shape = shape
+        self._affine = affine
+        self._header = header
+
+        # TO-DO
+        self._grid = None
+        self._mapping = None
 
     def __call__(self, x, inverse=False):
         """Apply y = f(x)."""
@@ -221,6 +255,12 @@ class TransformBase:
     def ndim(self):
         """Access the dimensions of the reference space."""
         raise TypeError("TransformBase has no dimensions")
+
+    def init_x5_structure(self, xfm_data=None):
+        self.x5_struct['TransformGroup/0/Transform'] = xfm_data
+    
+    def update_x5_structure(self, hdf5_struct=None):
+        self.x5_struct.update(hdf5_struct)
 
     def apply(
         self,
@@ -337,65 +377,6 @@ class TransformBase:
 
         """
         return x
-
-    def to_filename(self, filename, fmt="X5"):
-        """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-        with h5py.File(filename, "w") as out_file:
-            out_file.attrs["Format"] = "X5"
-            out_file.attrs["Version"] = np.uint16(1)
-            root = out_file.create_group("/0")
-            self._to_hdf5(root)
-
-        return filename
-
-    def _to_hdf5(self, x5_root):
-        """Serialize this object into the x5 file format."""
-        transform_group = x5_root.create_group("TransformGroup")
-
-        """Group '0' containing Affine transform"""
-        transform_0 = transform_group.create_group("0")
-        
-        transform_0.attrs["Type"] = "Affine"
-        transform_0.create_dataset("Transform", data=self._matrix)
-        transform_0.create_dataset("Inverse", data=np.linalg.inv(self._matrix))
-
-        metadata = {"key": "value"}
-        transform_0.attrs["Metadata"] = str(metadata)
-
-        """sub-group 'Domain' contained within group '0' """
-        domain_group = transform_0.create_group("Domain")
-        domain_group.attrs["Grid"] = self.grid
-        domain_group.create_dataset("Size", data=_as_homogeneous(self._reference.shape))
-        domain_group.create_dataset("Mapping", data=self.map)
-        
-        raise NotImplementedError
-    
-    def read_x5(self, x5_root):
-        variables = {}
-        with h5py.File(x5_root, "r") as f:
-            f.visititems(lambda filename, x5_root: self._from_hdf5(filename, x5_root, variables))
-
-        _transform = variables["TransformGroup/0/Transform"]
-        _inverse = variables["TransformGroup/0/Inverse"]
-        _size = variables["TransformGroup/0/Domain/Size"]
-        _map = variables["TransformGroup/0/Domain/Mapping"]
-
-        return _transform, _inverse, _size, _map
-        
-    def _from_hdf5(self, name, x5_root, storage):
-        if isinstance(x5_root, h5py.Dataset):
-            storage[name] = {
-                'type': 'dataset',
-                'attrs': dict(x5_root.attrs),
-                'shape': x5_root.shape,
-                'data': x5_root[()]  # Read the data
-            } 
-        elif isinstance(x5_root, h5py.Group):
-            storage[name] = {
-                'type': 'group',
-                'attrs': dict(x5_root.attrs),
-                'members': {}
-            }
 
 
 def _as_homogeneous(xyz, dtype="float32", dim=3):
