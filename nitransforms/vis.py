@@ -635,9 +635,9 @@ class PlotDenseField():
         titles = ["Sagittal", "Coronal", "Axial"]
         planes = [0] * 3
         slices = [
-            [False, False, False, False]
-            [False, False, False, False]
-            [False, False, False, False]
+            [False, False, False, False],
+            [False, False, False, False],
+            [False, False, False, False],
         ]
 
         for idx, s in enumerate(slices):
