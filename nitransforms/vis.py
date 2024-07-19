@@ -395,7 +395,7 @@ class PlotDenseField():
 
     def plot_coeffs(self, fig, axes, xslice, yslice, zslice, s=0.1, show_titles=True):
         """
-        Plot linear, planar and spherical coefficients. 
+        Plot linear, planar and spherical coefficients.
         Parameters
         ----------
         fig :obj:`figure`
@@ -430,7 +430,7 @@ class PlotDenseField():
         """
         xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
         planes, titles = self.get_planes(xslice, yslice, zslice)
-        
+
         for index, plane in enumerate(planes):
             x, y, z, u, v, w = plane
 
@@ -466,7 +466,7 @@ class PlotDenseField():
             c = axes[2, index].scatter(dim1, dim2, c=cs_arr, cmap='Blues', s=s)
 
             if show_titles:
-                    axes[0, index].set_title(titles[index], fontsize=14, weight='bold')
+                axes[0, index].set_title(titles[index], fontsize=14, weight='bold')
 
         cb = fig.colorbar(a, ax=axes[0,:], location='right')
         cb.set_label(label=r"$c_l$",weight='bold', fontsize=14)
