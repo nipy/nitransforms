@@ -30,7 +30,10 @@ class PlotDenseField():
         Path from which the trasnformation file should be read.
     is_deltas: :obj:`bool`
         Whether the field is a displacement field or a deformations field. Default = True
-    """
+    reference : :obj:`ImageGrid`
+        Defines the domain of the transform. If not provided, the domain is defined from
+        the ``field`` input."""
+
     __slots__ = ('_transform', '_xfm', '_voxel_size')
 
     def __init__(self, transform, is_deltas=True, reference=None):
@@ -42,7 +45,8 @@ class PlotDenseField():
         )
         try:
             """if field provided by path"""
-            self._voxel_size = nb.load(transform).header.get_zooms()
+            self._voxel_size = nb.load(transform).header.get_zooms()[:3]
+            assert len(self._voxel_size) == 3
         except TypeError:
             """if field provided by numpy array (eg tests)"""
             deltas = []
@@ -51,8 +55,7 @@ class PlotDenseField():
                               / len(self._xfm._field[i]))
 
             assert np.all(deltas == deltas[0])
-
-            deltas.append(0)
+            assert len(deltas) == 3
             self._voxel_size = deltas
 
     def show_transform(
@@ -64,7 +67,6 @@ class PlotDenseField():
             show_brain=True,
             show_grid=True,
             lw=0.1,
-            save_to_path=None,
     ):
         """
         Plot output field from DenseFieldTransform class.
@@ -79,8 +81,10 @@ class PlotDenseField():
             z plane to select for sagittal prjection of the transform.
         scaling: :obj:`float`
             Fraction by which the quiver plot arrows are to be scaled (default: 1).
-        save_to_path: :obj:`str`
-            Path to which the output plot is to be saved (default: None).
+        show_brain: :obj:`bool`
+            Whether to show the brain image with the deformation grid (default: True).
+        show_grid: :obj:`bool`
+            Whether to show the deformation grid with the brain deformation (default: True)
 
         Examples
         --------
@@ -182,6 +186,8 @@ class PlotDenseField():
             Whether the distorted grid lines should be plotted (Default: True).
         lw: :obj:`float`
             Line width used for gridlines (Default: 0.1).
+        show_titles :obj:`bool`
+            Show plane names as titles (default: True)
 
         Example:
         fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
@@ -220,10 +226,10 @@ class PlotDenseField():
             c = np.sqrt(vec1**2 + vec2**2)
             c = c / c.max()
 
-            if show_grid:
-                x_moved = dim1 + vec1
-                y_moved = dim2 + vec2
+            x_moved = dim1 + vec1
+            y_moved = dim2 + vec2
 
+            if show_grid:
                 for idx in range(0, len1, 1):
                     axes[index].plot(
                         x_moved[idx * len2:(idx + 1) * len2],
@@ -240,7 +246,7 @@ class PlotDenseField():
                     )
 
             if show_brain:
-                axes[index].scatter(dim1, dim2, c=c, cmap='RdPu')
+                axes[index].scatter(x_moved, y_moved, c=c, cmap='RdPu')
 
             if show_titles:
                 axes[index].set_title(titles[index], fontsize=14, weight='bold')
@@ -273,6 +279,8 @@ class PlotDenseField():
             Fraction by which the quiver plot arrows are to be scaled (default: 1).
         three_D: :obj:`bool`
             Whether the quiver plot is to be projected onto a 3D axis (default: False)
+        show_titles :obj:`bool`
+            Show plane names as titles (default: True)
 
         Example:
         fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
@@ -322,13 +330,13 @@ class PlotDenseField():
                 c_reds, c_greens, c_blues, zeros = [], [], [], []
 
                 # Optimise here, matrix operations
-                for ind, (i, j, k, l, m, n) in enumerate(zip(x, y, z, u, v, w)):
-                    if np.abs(u[ind]) > [np.abs(v[ind]) and np.abs(w[ind])]:
-                        c_reds.append((i, j, k, l, m, n, u[ind]))
-                    elif np.abs(v[ind]) > [np.abs(u[ind]) and np.abs(w[ind])]:
-                        c_greens.append((i, j, k, l, m, n, v[ind]))
-                    elif np.abs(w[ind]) > [np.abs(u[ind]) and np.abs(v[ind])]:
-                        c_blues.append((i, j, k, l, m, n, w[ind]))
+                for idx, (i, j, k, l, m, n) in enumerate(zip(x, y, z, u, v, w)):
+                    if np.abs(u[idx]) > [np.abs(v[idx]) and np.abs(w[idx])]:
+                        c_reds.append((i, j, k, l, m, n, np.abs(u[idx])))
+                    elif np.abs(v[idx]) > [np.abs(u[idx]) and np.abs(w[idx])]:
+                        c_greens.append((i, j, k, l, m, n, np.abs(v[idx])))
+                    elif np.abs(w[idx]) > [np.abs(u[idx]) and np.abs(v[idx])]:
+                        c_blues.append((i, j, k, l, m, n, np.abs(w[idx])))
                     else:
                         zeros.append(0)
 
@@ -385,6 +393,90 @@ class PlotDenseField():
                 if show_titles:
                     axes[index].set_title(titles[index], fontsize=14, weight='bold')
 
+    def plot_coeffs(self, fig, axes, xslice, yslice, zslice, s=0.1, show_titles=True):
+        """
+        Plot linear, planar and spherical coefficients. 
+        Parameters
+        ----------
+        fig :obj:`figure`
+            Figure to use for mapping the coefficients.
+        axis :obj:`tuple`
+            Axes on which the quiver should be plotted. Requires 3 axes to illustrate
+            the dsm mapped as a quiver plot for each projection.
+        xslice: :obj:`int`
+            x plane to select for axial projection of the transform.
+        yslice: :obj:`int`
+            y plane to select for coronal projection of the transform.
+        zslice: :obj:`int`
+            z plane to select for sagittal projection of the transform.
+        s: :obj:`float`
+            Size of scatter points (default: 0.1).
+        show_titles :obj:`bool`
+            Show plane names as titles (default: True)
+
+        Example:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
+        PlotDenseField(
+            transform="test_dir/someones-displacement-field.nii.gz",
+            is_deltas=True,
+        ).plot_coeffs(
+            fig=fig
+            axes=axes,
+            xslice=50,
+            yslice=75,
+            zslice=90,
+        )
+        plt.show()
+        """
+        xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
+        planes, titles = self.get_planes(xslice, yslice, zslice)
+        
+        for index, plane in enumerate(planes):
+            x, y, z, u, v, w = plane
+
+            if index == 0:
+                dim1, dim2 = y, z
+            elif index == 1:
+                dim1, dim2 = x, z
+            else:
+                dim1, dim2 = x, y
+
+            cl_arr, cp_arr, cs_arr = [], [], []
+
+            for idx, (i, j, k) in enumerate(zip(u, v, w)):
+                i, j, k = abs(i), abs(j), abs(k)
+                L1, L2, L3 = sorted([i, j, k], reverse=True)
+                asum = np.sum([i, j, k])
+                if L1 == L2 == L3 == 0:
+                    pass
+                else:
+                    assert L2 <= L1 and L2 >= L3
+
+                cl = (L1 - L2) / asum
+                cl_arr.append(cl) if cl != np.nan else cl.append(0)
+
+                cp = 2 * (L2 - L3) / asum
+                cp_arr.append(cp) if cp != np.nan else cp.append(0)
+
+                cs = 3 * L3 / asum
+                cs_arr.append(cs) if cs != np.nan else cs.append(0)
+
+            a = axes[0, index].scatter(dim1, dim2, c=cl_arr, cmap='Reds', s=s)
+            b = axes[1, index].scatter(dim1, dim2, c=cp_arr, cmap='Greens', s=s)
+            c = axes[2, index].scatter(dim1, dim2, c=cs_arr, cmap='Blues', s=s)
+
+            if show_titles:
+                    axes[0, index].set_title(titles[index], fontsize=14, weight='bold')
+
+        cb = fig.colorbar(a, ax=axes[0,:], location='right')
+        cb.set_label(label=r"$c_l$",weight='bold', fontsize=14)
+
+        cb = fig.colorbar(b, ax=axes[1,:], location='right')
+        cb.set_label(label=r"$c_p$",weight='bold', fontsize=14)
+
+        cb = fig.colorbar(c, ax=axes[2,:], location='right')
+        cb.set_label(label=r"$c_s$",weight='bold', fontsize=14)
+
     def plot_jacobian(self, axes, xslice, yslice, zslice, show_titles=True):
         """
         Map the divergence of the transformation field using a quiver plot.
@@ -400,6 +492,8 @@ class PlotDenseField():
             y plane to select for coronal projection of the transform.
         zslice: :obj:`int`
             z plane to select for sagittal projection of the transform.
+        show_titles :obj:`bool`
+            Show plane names as titles (default: True)
 
         Example:
         fig, axes = plt.subplots(1, 3, figsize=(15, 5), tight_layout=True)
@@ -418,19 +512,19 @@ class PlotDenseField():
         xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
         planes, titles = self.get_planes(xslice, yslice, zslice)
         slices = [
-            [False, False, False, False],  # [:,:,index]
-            [False, False, False, False],  # [:,index,:]
-            [False, False, False, False],  # [index,:,:]
+            [False, False, False, False],
+            [False, False, False, False],
+            [False, False, False, False],
         ]
         jacobians = np.zeros((3), dtype=np.ndarray)
 
-        # iterating through the three chosen planes to calculate corresponding coordinates
-        for ind, s in enumerate(slices):
-            s = [xslice, slice(None), slice(None), None] if ind == 0 else s
-            s = [slice(None), yslice, slice(None), None] if ind == 1 else s
-            s = [slice(None), slice(None), zslice, None] if ind == 2 else s
+        """iterating through the three chosen planes to calculate corresponding coordinates"""
+        for idx, s in enumerate(slices):
+            s = [xslice, slice(None), slice(None), None] if idx == 0 else s
+            s = [slice(None), yslice, slice(None), None] if idx == 1 else s
+            s = [slice(None), slice(None), zslice, None] if idx == 2 else s
             J = self.get_jacobian().reshape(self._xfm._field[..., -1].shape)[s[0], s[1], s[2]]
-            jacobians[ind] = J.flatten()
+            jacobians[idx] = J.flatten()
 
         for index, (ax, plane) in enumerate(zip(axes, planes)):
             x, y, z, _, _, _ = plane
@@ -488,7 +582,7 @@ class PlotDenseField():
     def get_jacobian(self):
         """Calculate the Jacobian matrix of the field"""
         x, y, z, u, v, w = self.get_coords()
-        voxx, voxy, voxz, _ = self._voxel_size
+        voxx, voxy, voxz = self._voxel_size
 
         shape = self._xfm._field[..., -1].shape
         zeros = np.zeros(shape)
@@ -541,18 +635,18 @@ class PlotDenseField():
         titles = ["Sagittal", "Coronal", "Axial"]
         planes = [0] * 3
         slices = [
-            [False, False, False, False],  # [:,:,index]
-            [False, False, False, False],  # [:,index,:]
-            [False, False, False, False],  # [index,:,:]
+            [False, False, False, False]
+            [False, False, False, False]
+            [False, False, False, False]
         ]
 
-        for ind, s in enumerate(slices):
+        for idx, s in enumerate(slices):
             x, y, z, u, v, w = self.get_coords()
 
             """indexing for plane selection [x: sagittal, y: coronal, z: axial, dimension]"""
-            s = [xslice, slice(None), slice(None), None] if ind == 0 else s
-            s = [slice(None), yslice, slice(None), None] if ind == 1 else s
-            s = [slice(None), slice(None), zslice, None] if ind == 2 else s
+            s = [xslice, slice(None), slice(None), None] if idx == 0 else s
+            s = [slice(None), yslice, slice(None), None] if idx == 1 else s
+            s = [slice(None), slice(None), zslice, None] if idx == 2 else s
             # For 3d quiver:
             if xslice == yslice == zslice is None:
                 s = [slice(None), slice(None), slice(None), None]
@@ -573,15 +667,15 @@ class PlotDenseField():
             w = w.flatten()
 
             """check indexing has retrieved correct dimensions"""
-            if ind == 0 and xslice is not None:
+            if idx == 0 and xslice is not None:
                 assert x.shape == u.shape == np.shape(self._xfm._field[-1,...,-1].flatten())
-            elif ind == 1 and yslice is not None:
+            elif idx == 1 and yslice is not None:
                 assert y.shape == v.shape == np.shape(self._xfm._field[:,-1,:,-1].flatten())
-            elif ind == 2 and zslice is not None:
+            elif idx == 2 and zslice is not None:
                 assert z.shape == w.shape == np.shape(self._xfm._field[...,-1,-1].flatten())
 
             """store 3 slices of datapoints, with overall shape [3 x [6 x [data]]]"""
-            planes[ind] = [x, y, z, u, v, w]
+            planes[idx] = [x, y, z, u, v, w]
         return planes, titles
 
     def sliders(self, fig, xslice, yslice, zslice):
