@@ -4,7 +4,7 @@ import pytest
 
 import nibabel as nb
 from nitransforms.nonlinear import DenseFieldTransform
-from nitransforms.vis import PlotDenseField
+from nitransforms.vis import PlotDenseField, format_axes
 
 
 def test_read_path(data_path):
@@ -81,6 +81,19 @@ def test_plot_distortion(data_path, output_path):
         plt.show()
 
 
+def test_empty_quiver():
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4), tight_layout=True)
+    PlotDenseField(
+        transform=np.zeros((10, 10, 10, 3)),
+        reference=nb.Nifti1Image(np.zeros((10, 10, 10, 3)), np.eye(4), None),
+    ).plot_quiverdsm(
+        axes=axes,
+        xslice=5,
+        yslice=5,
+        zslice=5,
+    )
+
+
 def test_plot_quiverdsm(data_path, output_path):
     fig, axes = plt.subplots(1, 3, figsize=(12, 4))
     PlotDenseField(
@@ -111,9 +124,28 @@ def test_3dquiver(data_path, output_path):
             zslice=None,
             three_D=True
         )
+        format_axes(axes)
 
     if output_path is not None:
         plt.savefig(output_path / "plot_3dquiver.svg", bbox_inches="tight")
+    else:
+        plt.show()
+
+
+def test_coeffs(data_path, output_path):
+    fig, axes = plt.subplots(3, 3, figsize=(10, 9))
+    PlotDenseField(
+        transform=data_path / "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz"
+    ).plot_coeffs(
+        fig=fig,
+        axes=axes,
+        xslice=50,
+        yslice=50,
+        zslice=50,
+    )
+
+    if output_path is not None:
+        plt.savefig(output_path / "plot_coeffs.svg", bbox_inches="tight")
     else:
         plt.show()
 
