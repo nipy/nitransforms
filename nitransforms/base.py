@@ -338,7 +338,7 @@ class TransformBase:
         message = (
             "The `apply` method is deprecated. Please use `nitransforms.resampling.apply` instead."
         )
-        warnings.warn(message, DeprecationWarning, level=2)
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
         from .resampling import apply
 
         return apply(self, *args, **kwargs)
