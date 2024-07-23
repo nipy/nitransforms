@@ -165,7 +165,3 @@ def test_plot_jacobian(data_path, output_path):
         plt.savefig(output_path / "plot_jacobian.svg", bbox_inches="tight")
     else:
         plt.show()
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
