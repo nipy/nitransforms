@@ -10,7 +10,7 @@ from matplotlib.widgets import Slider
 from nitransforms.nonlinear import DenseFieldTransform
 
 
-class PlotDenseField():
+class PlotDenseField:
     """
     Vizualisation of a transformation file using nitransform's DenseFielTransform module.
     Generates four sorts of plots:
