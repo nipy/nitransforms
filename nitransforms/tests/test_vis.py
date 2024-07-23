@@ -8,8 +8,8 @@ from nitransforms.vis import PlotDenseField, format_axes
 
 
 def test_read_path(data_path):
-    "Check that filepaths are a supported method for loading "
-    "and reading transforms with PlotDenseField"
+    """Check that filepaths are a supported method for loading
+    and reading transforms with PlotDenseField"""
     PlotDenseField(transform=data_path / "ds-005_sub-01_from-OASIS_to-T1_warp_fsl.nii.gz")
 
 
