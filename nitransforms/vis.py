@@ -447,10 +447,6 @@ class PlotDenseField:
                 i, j, k = abs(i), abs(j), abs(k)
                 L1, L2, L3 = sorted([i, j, k], reverse=True)
                 asum = np.sum([i, j, k])
-                if L1 == L2 == L3 == 0:
-                    pass
-                else:
-                    assert L2 <= L1 and L2 >= L3
 
                 cl = (L1 - L2) / asum
                 cl_arr.append(cl) if cl != np.nan else cl.append(0)
