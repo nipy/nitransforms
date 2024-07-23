@@ -515,12 +515,13 @@ class PlotDenseField:
         jacobians = np.zeros((3), dtype=np.ndarray)
 
         """iterating through the three chosen planes to calculate corresponding coordinates"""
-        for idx, s in enumerate(slices):
-            s = [xslice, slice(None), slice(None), None] if idx == 0 else s
-            s = [slice(None), yslice, slice(None), None] if idx == 1 else s
-            s = [slice(None), slice(None), zslice, None] if idx == 2 else s
-            J = self.get_jacobian().reshape(self._xfm._field[..., -1].shape)[s[0], s[1], s[2]]
-            jacobians[idx] = J.flatten()
+        jac =  self.get_jacobian().reshape(self._xfm._field[..., -1].shape)
+        for idx, slicer in enumerate((
+            (xslice, slice(None), slice(None), None),
+            (slice(None), yslice, slice(None), None),
+            (slice(None), slice(None), zslice, None),
+        )):
+            jacobians[idx] = jac[slicer].flatten()
 
         for index, (ax, plane) in enumerate(zip(axes, planes)):
             x, y, z, _, _, _ = plane
