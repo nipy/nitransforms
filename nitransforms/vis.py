@@ -507,15 +507,11 @@ class PlotDenseField:
         """
         xslice, yslice, zslice = self.test_slices(xslice, yslice, zslice)
         planes, titles = self.get_planes(xslice, yslice, zslice)
-        slices = [
-            [False, False, False, False],
-            [False, False, False, False],
-            [False, False, False, False],
-        ]
+
         jacobians = np.zeros((3), dtype=np.ndarray)
 
         """iterating through the three chosen planes to calculate corresponding coordinates"""
-        jac =  self.get_jacobian().reshape(self._xfm._field[..., -1].shape)
+        jac = self.get_jacobian().reshape(self._xfm._field[..., -1].shape)
         for idx, slicer in enumerate((
             (xslice, slice(None), slice(None), None),
             (slice(None), yslice, slice(None), None),
