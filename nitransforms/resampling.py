@@ -7,6 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Resampling utilities."""
+from warnings import warn
 from pathlib import Path
 import numpy as np
 from nibabel.loadsave import load as _nbload
@@ -19,6 +20,9 @@ from nitransforms.base import (
     _as_homogeneous,
 )
 
+SERIALIZE_VOLUME_WINDOW_WIDTH : int = 8
+"""Minimum number of volumes to automatically serialize 4D transforms."""
+
 
 def apply(
     transform,
@@ -29,6 +33,8 @@ def apply(
     cval=0.0,
     prefilter=True,
     output_dtype=None,
+    serialize_nvols=SERIALIZE_VOLUME_WINDOW_WIDTH,
+    njobs=None,
 ):
     """
     Apply a transformation to an image, resampling on the reference spatial object.
@@ -89,14 +95,20 @@ def apply(
         spatialimage = _nbload(str(spatialimage))
 
     data = np.asanyarray(spatialimage.dataobj)
+    data_nvols = 1 if data.ndim < 4 else data.shape[-1]
+    xfm_nvols = len(transforms)
 
-    if data.ndim == 4 and data.shape[-1] != len(transform):
+    if data_nvols == 1 and xfm_nvols > 1:
+        data = data[..., np.newaxis]
+    elif data_nvols != xfm_nvols:
         raise ValueError(
             "The fourth dimension of the data does not match the tranform's shape."
         )
 
-    if data.ndim < transform.ndim:
-        data = data[..., np.newaxis]
+    serialize_nvols = serialize_nvols if serialize_nvols and serialize_nvols > 1 else np.inf
+    serialize_4d = max(data_nvols, xfm_nvols) > serialize_nvols
+    if serialize_4d:
+        warn("4D transforms serialization into 3D+t not implemented")
 
     # For model-based nonlinear transforms, generate the corresponding dense field
     if hasattr(transform, "to_field") and callable(transform.to_field):
