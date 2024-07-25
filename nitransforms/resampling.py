@@ -13,7 +13,7 @@ from nibabel.loadsave import load as _nbload
 from nibabel.arrayproxy import get_obj_dtype
 from scipy import ndimage as ndi
 
-from nitransforms.linear import Affine, get
+from nitransforms.linear import Affine, LinearTransformsMapping
 from nitransforms.base import (
     ImageGrid,
     TransformError,
@@ -97,12 +97,24 @@ def apply(
 
     data = np.asanyarray(spatialimage.dataobj)
     data_nvols = 1 if data.ndim < 4 else data.shape[-1]
-    xfm_nvols = len(transform)
-    assert xfm_nvols == transform.ndim == _ref.ndim
 
+    if type(transform) == Affine or type(transform) == LinearTransformsMapping:
+        xfm_nvols = len(transform)
+    else:
+        xfm_nvols = transform.ndim
+    """
     if data_nvols == 1 and xfm_nvols > 1:
         data = data[..., np.newaxis]
     elif data_nvols != xfm_nvols:
+        raise ValueError(
+            "The fourth dimension of the data does not match the transform's shape."
+        )
+    RESAMPLING FAILS. SUGGEST:
+    """
+    if data.ndim < transform.ndim:
+        data = data[..., np.newaxis]
+    elif data_nvols > 1 and data_nvols != xfm_nvols:
+        import pdb; pdb.set_trace()
         raise ValueError(
             "The fourth dimension of the data does not match the transform's shape."
         )
