@@ -114,7 +114,6 @@ def apply(
     if data.ndim < transform.ndim:
         data = data[..., np.newaxis]
     elif data_nvols > 1 and data_nvols != xfm_nvols:
-        import pdb; pdb.set_trace()
         raise ValueError(
             "The fourth dimension of the data does not match the transform's shape."
         )

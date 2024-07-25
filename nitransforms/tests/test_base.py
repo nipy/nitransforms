@@ -186,7 +186,6 @@ def test_SurfaceMesh(testdata_path):
 
     with pytest.raises(ValueError):
         SurfaceMesh(nb.load(img_path))
-    """
+
     with pytest.raises(TypeError):
         SurfaceMesh(nb.load(shape_path))
-    """
