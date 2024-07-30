@@ -1,6 +1,8 @@
 """Tests of the base module."""
 import numpy as np
 import nibabel as nb
+from nibabel.arrayproxy import get_obj_dtype
+
 import pytest
 import h5py
 
@@ -97,7 +99,7 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     fname = testdata_path / "someones_anatomy.nii.gz"
 
     img = nb.load(fname)
-    imgdata = np.asanyarray(img.dataobj, dtype=img.get_data_dtype())
+    imgdata = np.asanyarray(img.dataobj, dtype=get_obj_dtype(img.dataobj))
 
     # Test identity transform - setting reference
     xfm = TransformBase()
@@ -111,7 +113,8 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     xfm = nitl.Affine()
     xfm.reference = fname
     moved = apply(xfm, fname, order=0)
-    assert np.all(imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype()))
+
+    assert np.all(imgdata == np.asanyarray(moved.dataobj, dtype=get_obj_dtype(moved.dataobj)))
 
     # Test ndim returned by affine
     assert nitl.Affine().ndim == 3
