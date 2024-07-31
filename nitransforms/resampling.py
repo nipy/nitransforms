@@ -98,9 +98,10 @@ def apply(
     # Avoid opening the data array just yet
     input_dtype = get_obj_dtype(spatialimage.dataobj)
 
-    # Number of transformations
+    # Number of data volumes
     data_nvols = 1 if spatialimage.ndim < 4 else spatialimage.shape[-1]
-    xfm_nvols = len(transform)
+    # Number of transforms: transforms chains (e.g., affine + field, are a single transform)
+    xfm_nvols = 1 if transform.ndim < 4 else len(transform)
 
     if data_nvols != xfm_nvols and min(data_nvols, xfm_nvols) > 1:
         raise ValueError(
