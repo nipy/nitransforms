@@ -1,4 +1,5 @@
 """Tests of the base module."""
+
 import numpy as np
 import nibabel as nb
 from nibabel.arrayproxy import get_obj_dtype
@@ -114,7 +115,9 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     xfm.reference = fname
     moved = apply(xfm, fname, order=0)
 
-    assert np.all(imgdata == np.asanyarray(moved.dataobj, dtype=get_obj_dtype(moved.dataobj)))
+    assert np.all(
+        imgdata == np.asanyarray(moved.dataobj, dtype=get_obj_dtype(moved.dataobj))
+    )
 
     # Test ndim returned by affine
     assert nitl.Affine().ndim == 3
@@ -168,7 +171,10 @@ def test_concatenation(testdata_path):
 
 def test_SurfaceMesh(testdata_path):
     surf_path = testdata_path / "sub-200148_hemi-R_pial.surf.gii"
-    shape_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
+    shape_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
+    )
     img_path = testdata_path / "bold.nii.gz"
 
     mesh = SurfaceMesh(nb.load(surf_path))

@@ -1,6 +1,7 @@
 # emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """Exercise the standalone ``apply()`` implementation."""
+
 import os
 import pytest
 import numpy as np
@@ -50,9 +51,19 @@ applywarp -i {moving} -r {reference} -o {output} {extra}\
 }
 
 
-@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", 'oblique', ])
+@pytest.mark.parametrize(
+    "image_orientation",
+    [
+        "RAS",
+        "LAS",
+        "LPS",
+        "oblique",
+    ],
+)
 @pytest.mark.parametrize("sw_tool", ["itk", "fsl", "afni", "fs"])
-def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orientation, sw_tool):
+def test_apply_linear_transform(
+    tmpdir, get_testdata, get_testmask, image_orientation, sw_tool
+):
     """Check implementation of exporting affines to formats."""
     tmpdir.chdir()
 
@@ -107,7 +118,7 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     nt_moved_mask.to_filename("ntmask.nii.gz")
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
 
-    assert np.sqrt((diff ** 2).mean()) < RMSE_TOL_LINEAR
+    assert np.sqrt((diff**2).mean()) < RMSE_TOL_LINEAR
     brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
 
     cmd = APPLY_LINEAR_CMD[sw_tool](
@@ -123,19 +134,17 @@ def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orient
     sw_moved.set_data_dtype(img.get_data_dtype())
 
     nt_moved = apply(xfm, img, order=0)
-    diff = (
-        np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
-        - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
-    )
+    diff = np.asanyarray(
+        sw_moved.dataobj, dtype=sw_moved.get_data_dtype()
+    ) - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
 
     # A certain tolerance is necessary because of resampling at borders
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
     nt_moved = apply(xfm, "img.nii.gz", order=0)
-    diff = (
-        np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
-        - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
-    )
+    diff = np.asanyarray(
+        sw_moved.dataobj, dtype=sw_moved.get_data_dtype()
+    ) - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
     # A certain tolerance is necessary because of resampling at borders
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
@@ -281,7 +290,8 @@ def test_apply_transformchain(tmp_path, testdata_path):
 
     ref_fname = tmp_path / "reference.nii.gz"
     nb.Nifti1Image(
-        np.zeros(xfm.reference.shape, dtype="uint16"), xfm.reference.affine,
+        np.zeros(xfm.reference.shape, dtype="uint16"),
+        xfm.reference.affine,
     ).to_filename(str(ref_fname))
 
     # Then apply the transform and cross-check with software
@@ -310,7 +320,9 @@ def test_apply_transformchain(tmp_path, testdata_path):
 
 
 @pytest.mark.parametrize("serialize_4d", [True, False])
-def test_LinearTransformsMapping_apply(tmp_path, data_path, testdata_path, serialize_4d):
+def test_LinearTransformsMapping_apply(
+    tmp_path, data_path, testdata_path, serialize_4d
+):
     """Apply transform mappings."""
     hmc = nitl.load(
         data_path / "hmc-itk.tfm", fmt="itk", reference=testdata_path / "sbref.nii.gz"
@@ -333,7 +345,8 @@ def test_LinearTransformsMapping_apply(tmp_path, data_path, testdata_path, seria
     )
 
     nii = apply(
-        hmcinv, testdata_path / "fmap.nii.gz",
+        hmcinv,
+        testdata_path / "fmap.nii.gz",
         order=1,
         serialize_nvols=2 if serialize_4d else np.inf,
     )

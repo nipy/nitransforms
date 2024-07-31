@@ -188,7 +188,11 @@ def apply(
         )
 
     if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
-        hdr = _ref.header.copy() if _ref.header is not None else spatialimage.header.__class__()
+        hdr = (
+            _ref.header.copy()
+            if _ref.header is not None
+            else spatialimage.header.__class__()
+        )
         hdr.set_data_dtype(output_dtype or spatialimage.header.get_data_dtype())
 
         moved = spatialimage.__class__(

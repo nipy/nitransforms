@@ -1,12 +1,11 @@
 # emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """Tests of linear transforms."""
-import os
+
 import pytest
 import numpy as np
 import h5py
 
-import nibabel as nb
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from nitransforms import linear as nitl
@@ -14,7 +13,14 @@ from nitransforms import io
 from .utils import assert_affines_by_filename
 
 
-@pytest.mark.parametrize("matrix", [[0.0], np.ones((3, 3, 3)), np.ones((3, 4)), ])
+@pytest.mark.parametrize(
+    "matrix",
+    [
+        [0.0],
+        np.ones((3, 3, 3)),
+        np.ones((3, 4)),
+    ],
+)
 def test_linear_typeerrors1(matrix):
     """Exercise errors in Affine creation."""
     with pytest.raises(TypeError):
@@ -136,7 +142,9 @@ def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
 
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(
+                fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file
+            ).matrix,
         )
     else:
         assert xfm == nitl.load(fname, fmt=supplied_fmt, reference=ref_file)
@@ -146,7 +154,9 @@ def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(
+                fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file
+            ).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
@@ -160,7 +170,9 @@ def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(
+                fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file
+            ).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
@@ -170,7 +182,9 @@ def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(
+                fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file
+            ).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
@@ -190,12 +204,15 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
         T = np.linalg.inv(T)
 
     xfm = (
-        nitl.Affine(T) if (sw_tool, image_orientation) != ("afni", "oblique") else
+        nitl.Affine(T)
+        if (sw_tool, image_orientation) != ("afni", "oblique")
         # AFNI is special when moving or reference are oblique - let io do the magic
-        nitl.Affine(io.afni.AFNILinearTransform.from_ras(T).to_ras(
-            reference=img,
-            moving=img,
-        ))
+        else nitl.Affine(
+            io.afni.AFNILinearTransform.from_ras(T).to_ras(
+                reference=img,
+                moving=img,
+            )
+        )
     )
     xfm.reference = img
 
