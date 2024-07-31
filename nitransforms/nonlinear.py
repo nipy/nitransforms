@@ -94,10 +94,6 @@ class DenseFieldTransform(TransformBase):
         """Beautify the python representation."""
         return f"<{self.__class__.__name__}[{self._field.shape[-1]}D] {self._field.shape[:3]}>"
 
-    def __len__(self):
-        """Enable len() -- for compatibility, only len == 1 is supported."""
-        return 1
-
     @property
     def ndim(self):
         """Get the dimensions of the transform."""

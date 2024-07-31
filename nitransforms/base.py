@@ -279,6 +279,16 @@ class TransformBase:
 
         return TransformChain(transforms=[self, b])
 
+    def __len__(self):
+        """
+        Enable ``len()``.
+        
+        By default, all transforms are of length one.
+        This must be overriden by transforms arrays and chains.
+
+        """
+        return 1
+
     @property
     def reference(self):
         """Access a reference space where data will be resampled onto."""
