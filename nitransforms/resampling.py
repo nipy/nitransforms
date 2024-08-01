@@ -11,13 +11,17 @@
 from os import cpu_count
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from typing import Tuple
+
 import numpy as np
 from nibabel.loadsave import load as _nbload
 from nibabel.arrayproxy import get_obj_dtype
+from nibabel.spatialimages import SpatialImage
 from scipy import ndimage as ndi
 
 from nitransforms.base import (
     ImageGrid,
+    TransformBase,
     TransformError,
     SpatialReference,
     _as_homogeneous,
@@ -28,14 +32,49 @@ SERIALIZE_VOLUME_WINDOW_WIDTH: int = 8
 
 
 def _apply_volume(
-    index,
-    data,
-    targets,
-    order=3,
-    mode="constant",
-    cval=0.0,
-    prefilter=True,
-):
+    index: int,
+    data: np.ndarray,
+    targets: np.ndarray,
+    order: int = 3,
+    mode: str = "constant",
+    cval: float = 0.0,
+    prefilter: bool = True,
+) -> Tuple[int, np.ndarray]:
+    """
+    Decorate :obj:`~scipy.ndimage.map_coordinates` to return an order index for parallelization.
+
+    Parameters
+    ----------
+    index : :obj:`int`
+        The index of the volume to apply the interpolation to.
+    data : :obj:`~numpy.ndarray`
+        The input data array.
+    targets : :obj:`~numpy.ndarray`
+        The target coordinates for mapping.
+    order : :obj:`int`, optional
+        The order of the spline interpolation, default is 3.
+        The order has to be in the range 0-5.
+    mode : :obj:`str`, optional
+        Determines how the input image is extended when the resamplings overflows
+        a border. One of ``'constant'``, ``'reflect'``, ``'nearest'``, ``'mirror'``,
+        or ``'wrap'``. Default is ``'constant'``.
+    cval : :obj:`float`, optional
+        Constant value for ``mode='constant'``. Default is 0.0.
+    prefilter: :obj:`bool`, optional
+        Determines if the image's data array is prefiltered with
+        a spline filter before interpolation. The default is ``True``,
+        which will create a temporary *float64* array of filtered values
+        if *order > 1*. If setting this to ``False``, the output will be
+        slightly blurred if *order > 1*, unless the input is prefiltered,
+        i.e. it is the result of calling the spline filter on the original
+        input.
+
+    Returns
+    -------
+    (:obj:`int`, :obj:`~numpy.ndarray`)
+        The index and the array resulting from the interpolation.
+
+    """
     return index, ndi.map_coordinates(
         data,
         targets,
@@ -47,37 +86,38 @@ def _apply_volume(
 
 
 def apply(
-    transform,
-    spatialimage,
-    reference=None,
-    order=3,
-    mode="constant",
-    cval=0.0,
-    prefilter=True,
-    output_dtype=None,
-    serialize_nvols=SERIALIZE_VOLUME_WINDOW_WIDTH,
-    njobs=None,
-):
+    transform: TransformBase,
+    spatialimage: str | Path | SpatialImage,
+    reference: str | Path | SpatialImage = None,
+    order: int = 3,
+    mode: str = "constant",
+    cval: float = 0.0,
+    prefilter: bool = True,
+    output_dtype: np.dtype = None,
+    serialize_nvols: int = SERIALIZE_VOLUME_WINDOW_WIDTH,
+    njobs: int = None,
+) -> SpatialImage | np.ndarray:
     """
     Apply a transformation to an image, resampling on the reference spatial object.
 
     Parameters
     ----------
-    spatialimage : `spatialimage`
+    spatialimage : :obj:`~nibabel.spatialimages.SpatialImage` or `os.pathlike`
         The image object containing the data to be resampled in reference
         space
-    reference : spatial object, optional
+    reference : :obj:`~nibabel.spatialimages.SpatialImage` or `os.pathlike`
         The image, surface, or combination thereof containing the coordinates
         of samples that will be sampled.
-    order : int, optional
+    order : :obj:`int`, optional
         The order of the spline interpolation, default is 3.
         The order has to be in the range 0-5.
-    mode : {'constant', 'reflect', 'nearest', 'mirror', 'wrap'}, optional
+    mode : :obj:`str`, optional
         Determines how the input image is extended when the resamplings overflows
-        a border. Default is 'constant'.
-    cval : float, optional
+        a border. One of ``'constant'``, ``'reflect'``, ``'nearest'``, ``'mirror'``,
+        or ``'wrap'``. Default is ``'constant'``.
+    cval : :obj:`float`, optional
         Constant value for ``mode='constant'``. Default is 0.0.
-    prefilter: bool, optional
+    prefilter: :obj:`bool`, optional
         Determines if the image's data array is prefiltered with
         a spline filter before interpolation. The default is ``True``,
         which will create a temporary *float64* array of filtered values
@@ -85,7 +125,7 @@ def apply(
         slightly blurred if *order > 1*, unless the input is prefiltered,
         i.e. it is the result of calling the spline filter on the original
         input.
-    output_dtype: dtype specifier, optional
+    output_dtype: :obj:`~numpy.dtype`, optional
         The dtype of the returned array or image, if specified.
         If ``None``, the default behavior is to use the effective dtype of
         the input image. If slope and/or intercept are defined, the effective
@@ -97,7 +137,7 @@ def apply(
 
     Returns
     -------
-    resampled : `spatialimage` or ndarray
+    resampled : :obj:`~nibabel.spatialimages.SpatialImage` or :obj:`~numpy.ndarray`
         The data imaged after resampling to reference space.
 
     """
