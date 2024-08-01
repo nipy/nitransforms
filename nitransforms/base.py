@@ -287,6 +287,12 @@ class TransformBase:
         By default, all transforms are of length one.
         This must be overriden by transforms arrays and chains.
 
+        Example
+        -------
+        >>> T1 = TransformBase()
+        >>> len(T1)
+        1
+
         """
         return 1
 

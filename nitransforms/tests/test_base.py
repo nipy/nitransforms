@@ -198,3 +198,18 @@ def test_SurfaceMesh(testdata_path):
 
     with pytest.raises(TypeError):
         SurfaceMesh(nb.load(shape_path))
+
+
+def test_apply_deprecation(monkeypatch):
+    """Make sure a deprecation warning is issued."""
+    from nitransforms import resampling
+
+    def _retval(*args, **kwargs):
+        return 1
+
+    monkeypatch.setattr(resampling, "apply", _retval)
+
+    with pytest.deprecated_call():
+        retval = TransformBase().apply()
+
+    assert retval == 1
