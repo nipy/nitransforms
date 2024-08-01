@@ -156,8 +156,7 @@ def apply(
             else None
         )
 
-        if njobs is None:
-            njobs = cpu_count()
+        njobs = cpu_count() if njobs is None or njobs < 1 else njobs
 
         with ProcessPoolExecutor(max_workers=min(njobs, n_resamplings)) as executor:
             results = []
