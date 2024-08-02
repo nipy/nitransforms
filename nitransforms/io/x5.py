@@ -1,17 +1,10 @@
 """Read/write x5 transforms."""
-import warnings
-import numpy as np
-from scipy.io import loadmat as _read_mat, savemat as _save_mat
+
 from h5py import File as H5File
-from nibabel import Nifti1Header, Nifti1Image
-from nibabel.affines import from_matvec
 from nitransforms.io.base import (
     BaseLinearTransformList,
-    DisplacementsField,
-    LinearParameters,
-    TransformIOError,
-    TransformFileError,
 )
+
 
 class X5Transform:
     """A string-based structure for X5 linear transforms."""
@@ -28,9 +21,9 @@ class X5Transform:
     def from_filename(cls, filename):
         """Read the struct from a X5 file given its path."""
         if str(filename).endswith(".h5"):
-            with H5File(str(filename), 'r') as hdf:
+            with H5File(str(filename), "r") as hdf:
                 return cls.from_h5obj(hdf)
-            
+
     @classmethod
     def from_h5obj(cls, h5obj):
         """Read the transformations in an X5 file."""

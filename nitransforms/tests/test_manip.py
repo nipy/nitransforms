@@ -14,6 +14,7 @@ from .test_nonlinear import (
     RMSE_TOL,
     APPLY_NONLINEAR_CMD,
 )
+from nitransforms.resampling import apply
 
 FMT = {"lta": "fs", "tfm": "itk"}
 
@@ -54,7 +55,7 @@ def test_itk_h5(tmp_path, testdata_path):
     assert exit_code == 0
     sw_moved = nb.load("resampled.nii.gz")
 
-    nt_moved = xfm.apply(img_fname, order=0)
+    nt_moved = apply(xfm, img_fname, order=0)
     nt_moved.to_filename("nt_resampled.nii.gz")
     diff = sw_moved.get_fdata() - nt_moved.get_fdata()
     # A certain tolerance is necessary because of resampling at borders

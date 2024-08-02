@@ -2,11 +2,11 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import os
 from textwrap import dedent
 
+from nitransforms.base import TransformBase
 from nitransforms.io.base import xfm_loader
 from nitransforms.linear import load as linload
 from nitransforms.nonlinear import load as nlinload
-
-from nitransforms.base import TransformBase
+from nitransforms.resampling import apply
 
 import pprint
 
@@ -34,21 +34,39 @@ def cli_apply(pargs):
 
     xfm = (
         nlinload(pargs.transform, fmt=fmt)
-        if pargs.nonlinear else
-        linload(pargs.transform, fmt=fmt)
+        if pargs.nonlinear
+        else linload(pargs.transform, fmt=fmt)
     )
 
     # ensure a reference is set
     xfm.reference = pargs.ref or pargs.moving
 
-    moved = xfm.apply(
+    moved = apply(
+        xfm,
         pargs.moving,
         order=pargs.order,
         mode=pargs.mode,
         cval=pargs.cval,
         prefilter=pargs.prefilter,
     )
-    #moved.to_filename(pargs.out or f"nt_{os.path.basename(pargs.moving)}")
+    # moved.to_filename(pargs.out or f"nt_{os.path.basename(pargs.moving)}")
+
+
+def cli_xfm_util(pargs):
+    """ """
+
+    xfm_data = xfm_loader(pargs.transform)
+    xfm_x5 = TransformBase(**xfm_data)
+
+    if pargs.info:
+        pprint.pprint(xfm_x5.x5_struct)
+        print(f"Shape:\n{xfm_x5._shape}")
+        print(f"Affine:\n{xfm_x5._affine}")
+
+    if pargs.x5:
+        filename = f"{os.path.basename(pargs.transform).split('.')[0]}.x5"
+        xfm_x5.to_filename(filename)
+        print(f"Writing out {filename}")
 
 
 def cli_xfm_util(pargs):
@@ -146,12 +164,12 @@ def get_parser():
     xfm_util = _add_subparser("xfm_util", cli_xfm_util.__doc__)
     xfm_util.set_defaults(func=cli_xfm_util)
     xfm_util.add_argument("transform", help="The transform file")
-    xfm_util.add_argument("--info",
-        action="store_true",
-        help="Get information about the transform")
-    xfm_util.add_argument("--x5",
-        action="store_true",
-        help="Convert transform to .x5 file format.")
+    xfm_util.add_argument(
+        "--info", action="store_true", help="Get information about the transform"
+    )
+    xfm_util.add_argument(
+        "--x5", action="store_true", help="Convert transform to .x5 file format."
+    )
 
     return parser, subparsers
 
