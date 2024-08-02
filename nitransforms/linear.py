@@ -7,6 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Linear transforms."""
+
 import warnings
 import numpy as np
 from pathlib import Path
@@ -189,23 +190,31 @@ should be (0, 0, 0, 1), got %s."""
         if self._reference:
             self.reference._to_hdf5(x5_root.create_group("Reference"))
 
-        return #nothing?
+        return  # nothing?
 
     def _x5group_affine(self, TransformGroup):
         """Create group "0" for affine in x5_root/TransformGroup/ according to x5 file format"""
         aff = TransformGroup.create_group("0")
-        aff.attrs["Type"] = "affine" #Should have shape {scalar}
-        aff.attrs["Metadata"] = 'metadata' #This is a draft for metadata. Should have shape {scalar}
-        aff.create_dataset("Transform", data=[self._matrix]) #Should have shape {3,4}
-        aff.create_dataset("Inverse", data=[(~self).matrix]) #Should have shape {4,3}
+        aff.attrs["Type"] = "affine"  # Should have shape {scalar}
+        aff.attrs["Metadata"] = (
+            "metadata"  # This is a draft for metadata. Should have shape {scalar}
+        )
+        aff.create_dataset("Transform", data=[self._matrix])  # Should have shape {3,4}
+        aff.create_dataset("Inverse", data=[(~self).matrix])  # Should have shape {4,3}
         return aff
 
     def _x5group_domain(self, x, transform):
         """Create group "Domain" in x5_root/TransformGroup/0/ according to x5 file format"""
         coords = transform.create_group("Domain")
-        coords.attrs["Grid"] = "grid" #How do I interpet this 'grid'? Should have shape {scalar}
-        coords.create_dataset("Size", data=_as_homogeneous(x, dim=self._matrix.shape[0] - 1).T) #Should have shape {3}
-        coords.create_dataset("Mapping", data=[self.map(self, x)]) #Should have shape {4,4}
+        coords.attrs["Grid"] = (
+            "grid"  # How do I interpet this 'grid'? Should have shape {scalar}
+        )
+        coords.create_dataset(
+            "Size", data=_as_homogeneous(x, dim=self._matrix.shape[0] - 1).T
+        )  # Should have shape {3}
+        coords.create_dataset(
+            "Mapping", data=[self.map(self, x)]
+        )  # Should have shape {4,4}
         return coords
 
     def to_filename(self, filename, fmt="X5", moving=None):

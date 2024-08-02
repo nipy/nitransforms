@@ -7,6 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
+
 from pathlib import Path
 import numpy as np
 import h5py
@@ -146,13 +147,13 @@ class SurfaceMesh(SampledSpatialData):
         darrays = [
             nb.gifti.GiftiDataArray(
                 coordinates.astype(np.float32),
-                intent=nb.nifti1.intent_codes['NIFTI_INTENT_POINTSET'],
-                datatype=nb.nifti1.data_type_codes['NIFTI_TYPE_FLOAT32'],
+                intent=nb.nifti1.intent_codes["NIFTI_INTENT_POINTSET"],
+                datatype=nb.nifti1.data_type_codes["NIFTI_TYPE_FLOAT32"],
             ),
             nb.gifti.GiftiDataArray(
                 triangles.astype(np.int32),
-                intent=nb.nifti1.intent_codes['NIFTI_INTENT_TRIANGLE'],
-                datatype=nb.nifti1.data_type_codes['NIFTI_TYPE_INT32'],
+                intent=nb.nifti1.intent_codes["NIFTI_INTENT_TRIANGLE"],
+                datatype=nb.nifti1.data_type_codes["NIFTI_TYPE_INT32"],
             ),
         ]
         gii = nb.gifti.GiftiImage(darrays=darrays)
@@ -248,27 +249,40 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ("_reference", "_ndim", "_affine", "_shape", "_header",
-        "_grid", "_mapping", "_hdf5_dct", "_x5_dct")
+    __slots__ = (
+        "_reference",
+        "_ndim",
+        "_affine",
+        "_shape",
+        "_header",
+        "_grid",
+        "_mapping",
+        "_hdf5_dct",
+        "_x5_dct",
+    )
 
     x5_struct = {
-        'TransformGroup/0': {
-            'Type': None,
-            'Transform': None,
-            'Metadata': None,
-            'Inverse': None
+        "TransformGroup/0": {
+            "Type": None,
+            "Transform": None,
+            "Metadata": None,
+            "Inverse": None,
         },
-        'TransformGroup/0/Domain': {
-            'Grid': None,
-            'Size': None,
-            'Mapping': None
-        },
-        'TransformGroup/1': {},
-        'TransformChain': {}
+        "TransformGroup/0/Domain": {"Grid": None, "Size": None, "Mapping": None},
+        "TransformGroup/1": {},
+        "TransformChain": {},
     }
 
-    def __init__(self, x5=None, hdf5=None, nifti=None, shape=None, affine=None, 
-        header=None, reference=None):
+    def __init__(
+        self,
+        x5=None,
+        hdf5=None,
+        nifti=None,
+        shape=None,
+        affine=None,
+        header=None,
+        reference=None,
+    ):
         """Instantiate a transform."""
 
         self._reference = None
@@ -281,7 +295,7 @@ class TransformBase:
             self.update_x5_structure(hdf5)
         elif x5:
             self.update_x5_structure(x5)
-        
+
         self._shape = shape
         self._affine = affine
         self._header = header
@@ -327,8 +341,8 @@ class TransformBase:
         raise TypeError("TransformBase has no dimensions")
 
     def init_x5_structure(self, xfm_data=None):
-        self.x5_struct['TransformGroup/0/Transform'] = xfm_data
-    
+        self.x5_struct["TransformGroup/0/Transform"] = xfm_data
+
     def update_x5_structure(self, hdf5_struct=None):
         self.x5_struct.update(hdf5_struct)
 
@@ -358,9 +372,7 @@ class TransformBase:
 
         Deprecated. Please use ``nitransforms.resampling.apply`` instead.
         """
-        message = (
-            "The `apply` method is deprecated. Please use `nitransforms.resampling.apply` instead."
-        )
+        message = "The `apply` method is deprecated. Please use `nitransforms.resampling.apply` instead."
         warnings.warn(message, DeprecationWarning, stacklevel=2)
         from .resampling import apply
 
@@ -372,7 +384,7 @@ class TransformBase:
 
         """Group '0' containing Affine transform"""
         transform_0 = transform_group.create_group("0")
-        
+
         transform_0.attrs["Type"] = "Affine"
         transform_0.create_dataset("Transform", data=self._matrix)
         transform_0.create_dataset("Inverse", data=np.linalg.inv(self._matrix))
@@ -385,13 +397,15 @@ class TransformBase:
         domain_group.attrs["Grid"] = self.grid
         domain_group.create_dataset("Size", data=_as_homogeneous(self._reference.shape))
         domain_group.create_dataset("Mapping", data=self.map)
-        
+
         raise NotImplementedError
-    
+
     def read_x5(self, x5_root):
         variables = {}
         with h5py.File(x5_root, "r") as f:
-            f.visititems(lambda filename, x5_root: self._from_hdf5(filename, x5_root, variables))
+            f.visititems(
+                lambda filename, x5_root: self._from_hdf5(filename, x5_root, variables)
+            )
 
         _transform = variables["TransformGroup/0/Transform"]
         _inverse = variables["TransformGroup/0/Inverse"]
@@ -399,20 +413,20 @@ class TransformBase:
         _map = variables["TransformGroup/0/Domain/Mapping"]
 
         return _transform, _inverse, _size, _map
-        
+
     def _from_hdf5(self, name, x5_root, storage):
         if isinstance(x5_root, h5py.Dataset):
             storage[name] = {
-                'type': 'dataset',
-                'attrs': dict(x5_root.attrs),
-                'shape': x5_root.shape,
-                'data': x5_root[()]  # Read the data
-            } 
+                "type": "dataset",
+                "attrs": dict(x5_root.attrs),
+                "shape": x5_root.shape,
+                "data": x5_root[()],  # Read the data
+            }
         elif isinstance(x5_root, h5py.Group):
             storage[name] = {
-                'type': 'group',
-                'attrs': dict(x5_root.attrs),
-                'members': {}
+                "type": "group",
+                "attrs": dict(x5_root.attrs),
+                "members": {},
             }
 
 
