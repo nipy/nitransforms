@@ -96,6 +96,7 @@ def apply(
     output_dtype: np.dtype = None,
     serialize_nvols: int = SERIALIZE_VOLUME_WINDOW_WIDTH,
     njobs: int = None,
+    dtype_width: int = 8,
 ) -> SpatialImage | np.ndarray:
     """
     Apply a transformation to an image, resampling on the reference spatial object.
@@ -134,6 +135,10 @@ def apply(
         If ``reference`` is defined, then the return value is an image, with
         a data array of the effective dtype but with the on-disk dtype set to
         the input image's on-disk dtype.
+    dtype_width: :obj:`int`
+        Cap the width of the input data type to the given number of bytes.
+        This argument is intended to work as a way to implement lower memory
+        requirements in resampling.
 
     Returns
     -------
@@ -157,7 +162,7 @@ def apply(
         spatialimage = _nbload(str(spatialimage))
 
     # Avoid opening the data array just yet
-    input_dtype = get_obj_dtype(spatialimage.dataobj)
+    input_dtype = cap_dtype(get_obj_dtype(spatialimage.dataobj), dtype_width)
 
     # Number of data volumes
     data_nvols = 1 if spatialimage.ndim < 4 else spatialimage.shape[-1]
@@ -277,3 +282,35 @@ def apply(
 
     output_dtype = output_dtype or input_dtype
     return resampled.astype(output_dtype)
+
+
+def cap_dtype(dt, nbytes):
+    """
+    Cap the datatype size to shave off memory requirements.
+
+    Examples
+    --------
+    >>> cap_dtype(np.dtype('f8'), 4)
+    dtype('float32')
+
+    >>> cap_dtype(np.dtype('f8'), 16)
+    dtype('float64')
+
+    >>> cap_dtype('float64', 4)
+    dtype('float32')
+
+    >>> cap_dtype(np.dtype('i1'), 4)
+    dtype('int8')
+
+    >>> cap_dtype('int8', 4)
+    dtype('int8')
+
+    >>> cap_dtype('int32', 1)
+    dtype('int8')
+
+    >>> cap_dtype(np.dtype('i8'), 4)
+    dtype('int32')
+
+    """
+    dt = np.dtype(dt)
+    return np.dtype(f"{dt.byteorder}{dt.kind}{min(nbytes, dt.itemsize)}")
