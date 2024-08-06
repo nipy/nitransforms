@@ -15,7 +15,7 @@ from nitransforms import linear as nitl
 from nitransforms import nonlinear as nitnl
 from nitransforms import manip as nitm
 from nitransforms import io
-from nitransforms.resampling import apply, _apply_volume
+from nitransforms.resampling import apply
 
 RMSE_TOL_LINEAR = 0.09
 RMSE_TOL_NONLINEAR = 0.05
@@ -363,16 +363,3 @@ def test_LinearTransformsMapping_apply(
             reference=testdata_path / "sbref.nii.gz",
             serialize_nvols=2 if serialize_4d else np.inf,
         )
-
-
-@pytest.mark.parametrize("t", list(range(4)))
-def test_apply_helper(monkeypatch, t):
-    """Ensure the apply helper function correctly just decorates with index."""
-    from nitransforms.resampling import ndi
-
-    def _retval(*args, **kwargs):
-        return 1
-
-    monkeypatch.setattr(ndi, "map_coordinates", _retval)
-
-    assert _apply_volume(t, None, None) == (t, 1)
