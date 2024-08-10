@@ -7,6 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
+
 from pathlib import Path
 import numpy as np
 import h5py
@@ -146,13 +147,13 @@ class SurfaceMesh(SampledSpatialData):
         darrays = [
             nb.gifti.GiftiDataArray(
                 coordinates.astype(np.float32),
-                intent=nb.nifti1.intent_codes['NIFTI_INTENT_POINTSET'],
-                datatype=nb.nifti1.data_type_codes['NIFTI_TYPE_FLOAT32'],
+                intent=nb.nifti1.intent_codes["NIFTI_INTENT_POINTSET"],
+                datatype=nb.nifti1.data_type_codes["NIFTI_TYPE_FLOAT32"],
             ),
             nb.gifti.GiftiDataArray(
                 triangles.astype(np.int32),
-                intent=nb.nifti1.intent_codes['NIFTI_INTENT_TRIANGLE'],
-                datatype=nb.nifti1.data_type_codes['NIFTI_TYPE_INT32'],
+                intent=nb.nifti1.intent_codes["NIFTI_INTENT_TRIANGLE"],
+                datatype=nb.nifti1.data_type_codes["NIFTI_TYPE_INT32"],
             ),
         ]
         gii = nb.gifti.GiftiImage(darrays=darrays)
@@ -279,6 +280,22 @@ class TransformBase:
 
         return TransformChain(transforms=[self, b])
 
+    def __len__(self):
+        """
+        Enable ``len()``.
+
+        By default, all transforms are of length one.
+        This must be overriden by transforms arrays and chains.
+
+        Example
+        -------
+        >>> T1 = TransformBase()
+        >>> len(T1)
+        1
+
+        """
+        return 1
+
     @property
     def reference(self):
         """Access a reference space where data will be resampled onto."""
@@ -335,10 +352,8 @@ class TransformBase:
 
         Deprecated. Please use ``nitransforms.resampling.apply`` instead.
         """
-        message = (
-            "The `apply` method is deprecated. Please use `nitransforms.resampling.apply` instead."
-        )
-        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        _msg = "This method is deprecated. Please use `nitransforms.resampling.apply` instead."
+        warnings.warn(_msg, DeprecationWarning, stacklevel=2)
         from .resampling import apply
 
         return apply(self, *args, **kwargs)
