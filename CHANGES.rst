@@ -1,3 +1,54 @@
+24.0.0 (August 18, 2024)
+========================
+A new series incorporating several major changes, including bugfixes and taking on several
+housekeeping/maintenance actions.
+One relevant change is the outsourcing of the ``apply()`` member out of
+transformation data structures by @jmarabotto.
+The method ``apply()`` is now a standalone method that operates on one transform
+and images/surfaces/etc. provided as arguments.
+A later major development is the adoption of a foundation for surface transforms by @feilong
+and @Shotgunosine.
+
+New Contributors
+----------------
+
+* @mvdoc made their first contribution in https://github.com/nipy/nitransforms/pull/194
+* @jmarabotto made their first contribution in https://github.com/nipy/nitransforms/pull/197
+* @bpinsard made their first contribution in https://github.com/nipy/nitransforms/pull/182
+* @jbanusco made their first contribution in https://github.com/nipy/nitransforms/pull/188
+* @feilong made their first contribution in https://github.com/nipy/nitransforms/pull/203
+
+CHANGES
+-------
+
+* FIX: Inefficient iterative reloading of reference and moving images by @oesteban in https://github.com/nipy/nitransforms/pull/186
+* FIX: Postpone coordinate mapping on linear array transforms by @oesteban in https://github.com/nipy/nitransforms/pull/187
+* FIX: Remove unsafe cast during ``TransformBase.apply()`` by @effigies in https://github.com/nipy/nitransforms/pull/189
+* FIX: ``_is_oblique()`` by @mvdoc in https://github.com/nipy/nitransforms/pull/194
+* FIX: Update implementation of ``ndim`` property of transforms by @jmarabotto in https://github.com/nipy/nitransforms/pull/197
+* FIX: Output displacement fields by @bpinsard in https://github.com/nipy/nitransforms/pull/182
+* FIX: Composition of deformation fields by @jbanusco in https://github.com/nipy/nitransforms/pull/188
+* FIX: Indexing disallowed in lists introduced by bugfix by @oesteban in https://github.com/nipy/nitransforms/pull/204
+* FIX: Do not transpose (see :obj:`~scipy.ndimage.map_coordinates`) by @oesteban in https://github.com/nipy/nitransforms/pull/207
+* FIX: Forgotten test using ``xfm.apply()`` by @oesteban in https://github.com/nipy/nitransforms/pull/208
+* FIX: Load ITK fields from H5 correctly by @effigies in https://github.com/nipy/nitransforms/pull/211
+* FIX: Wrong warning argument name ``level`` in ``warnings.warn`` by @oesteban in https://github.com/nipy/nitransforms/pull/216
+* ENH: Define ``ndim`` property on nonlinear transforms by @oesteban in https://github.com/nipy/nitransforms/pull/201
+* ENH: Outsource ``apply()`` from transform objects by @jmarabotto in https://github.com/nipy/nitransforms/pull/195
+* ENH: Restore ``apply()`` method, warning of deprecation and calling function by @effigies in https://github.com/nipy/nitransforms/pull/209
+* ENH: ``SurfaceTransform`` class by @feilong in https://github.com/nipy/nitransforms/pull/203
+* ENH: reenable-parallelization-apply-214 (builds on PR #215, solves Issue #214) by @jmarabotto in https://github.com/nipy/nitransforms/pull/217
+* ENH: Parallelize serialized 3D+t transforms by @oesteban in https://github.com/nipy/nitransforms/pull/220
+* ENH: Implement a memory limitation mechanism in loading data by @oesteban in https://github.com/nipy/nitransforms/pull/221
+* ENH: Serialize+parallelize 4D ``apply()`` into 3D+t and add 'low memory' loading by @oesteban in https://github.com/nipy/nitransforms/pull/215
+* MAINT: Loosen dependencies by @mgxd in https://github.com/nipy/nitransforms/pull/164
+* MAINT: Drop Python 3.7 support, test through 3.11 by @effigies in https://github.com/nipy/nitransforms/pull/181
+* MAINT: Update CircleCI's infrastructure (machine image and Python version in Docker image) by @oesteban in https://github.com/nipy/nitransforms/pull/206
+* MAINT: Fix tests for Python 3.12, numpy 2.0, and pytest-xdist by @effigies in https://github.com/nipy/nitransforms/pull/210
+* MAINT: Update ANTs' pinnings by @oesteban in https://github.com/nipy/nitransforms/pull/219
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/23.0.1...24.0.0
+
 23.0.1 (July 10, 2023)
 ======================
 Hotfix release addressing two issues.
