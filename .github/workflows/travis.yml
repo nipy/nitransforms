@@ -1,10 +1,25 @@
 name: Deps & CI
 
-on: [push]
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ master, 'maint/*' ]
+  schedule:
+    - cron: '0 0 * * 1'
+  # Allow job to be triggered manually from GitHub interface
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build-linux:
-    if: "!contains(github.event.head_commit.message, '[skip ci]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != 'nipy/nitransforms'))"
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     env:
       TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
