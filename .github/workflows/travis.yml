@@ -40,7 +40,7 @@ jobs:
         git ls-remote https://gin.g-node.org/oesteban/nitransforms-tests \
           | awk '/HEAD/{ print "SHA=" $1 }' >> $GITHUB_OUTPUT
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: ${{ env.TEST_DATA_HOME }}
         key: data-cache-v2-${{ steps.test-head.outputs.SHA }}
@@ -69,15 +69,15 @@ jobs:
         python-version: ['3.8', '3.9',  '3.10',  '3.11', '3.12']
     steps:
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - uses: actions/cache/restore@v3
+    - uses: actions/cache/restore@v4
       with:
         path: ${{ env.TEST_DATA_HOME }}
         key: data-cache-v2-${{ needs.cache-test-data.outputs.SHA }}
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Install minimal dependencies
       run: |
         pip install .[tests]
@@ -86,6 +86,6 @@ jobs:
         pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
 
     - name: Submit code coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         files: cov.xml
