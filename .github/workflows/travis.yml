@@ -18,16 +18,11 @@ permissions:
   contents: read
 
 jobs:
-  build-linux:
+  cache-test-data:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     env:
       TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
-    strategy:
-      max-parallel: 5
-      matrix:
-        python-version: ['3.8', '3.9',  '3.10',  '3.11']
-
     steps:
     - name: Git settings (pacify DataLad)
       run: |
@@ -48,8 +43,8 @@ jobs:
           python-${{ matrix.python-version }}-
     - name: Install DataLad
       run: |
-        $CONDA/bin/conda install -c conda-forge git-annex datalad pip pytest
-        $CONDA/bin/python -m pip install datalad-osf
+        $CONDA/bin/conda install -c conda-forge git-annex
+        python -m pip install datalad datalad-next datalad-osf
 
     - uses: actions/cache@v3
       with:
@@ -62,19 +57,40 @@ jobs:
       run: |
         export PATH=$CONDA/bin:$PATH
         mkdir -p /home/runner/testdata
-        cd /home/runner/testdata
 
-        $CONDA/bin/datalad install https://gin.g-node.org/oesteban/nitransforms-tests
-        $CONDA/bin/datalad update --merge -d nitransforms-tests/
-        $CONDA/bin/datalad get -d nitransforms-tests/
+        datalad install -s https://gin.g-node.org/oesteban/nitransforms-tests $TEST_DATA_HOME
+        datalad update --merge -d $TEST_DATA_HOME
+        datalad get -J 2 -d $TEST_DATA_HOME
+
+  build-linux:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    needs: [cache-test-data]
+    env:
+      TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
+    strategy:
+      max-parallel: 5
+      matrix:
+        python-version: ['3.8', '3.9',  '3.10',  '3.11']
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: actions/cache@v3
+      with:
+        path: ${{ env.TEST_DATA_HOME }}
+        key: data-cache-v2
+        restore-keys: |
+          data-cache-v2
 
     - uses: actions/checkout@v3
     - name: Install minimal dependencies
       run: |
-        $CONDA/bin/pip install .[tests]
+        pip install .[tests]
     - name: Run pytest
       run: |
-        $CONDA/bin/pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
+        pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
 
     - name: Submit code coverage
       uses: codecov/codecov-action@v3
