@@ -12,7 +12,7 @@ import asyncio
 from os import cpu_count
 from functools import partial
 from pathlib import Path
-from typing import Callable, TypeVar
+from typing import Callable, TypeVar, Union
 
 import numpy as np
 from nibabel.loadsave import load as _nbload
@@ -144,8 +144,8 @@ async def _apply_serial(
 
 def apply(
     transform: TransformBase,
-    spatialimage: str | Path | SpatialImage,
-    reference: str | Path | SpatialImage = None,
+    spatialimage: Union[str, Path, SpatialImage],
+    reference: Union[str, Path, SpatialImage] = None,
     order: int = 3,
     mode: str = "constant",
     cval: float = 0.0,
@@ -154,7 +154,7 @@ def apply(
     dtype_width: int = 8,
     serialize_nvols: int = SERIALIZE_VOLUME_WINDOW_WIDTH,
     max_concurrent: int = min(cpu_count(), 12),
-) -> SpatialImage | np.ndarray:
+) -> Union[SpatialImage, np.ndarray]:
     """
     Apply a transformation to an image, resampling on the reference spatial object.
 

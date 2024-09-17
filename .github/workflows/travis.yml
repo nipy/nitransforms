@@ -1,65 +1,89 @@
 name: Deps & CI
 
-on: [push]
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ master, 'maint/*' ]
+  schedule:
+    - cron: '0 0 * * 1'
+  # Allow job to be triggered manually from GitHub interface
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  build-linux:
-    if: "!contains(github.event.head_commit.message, '[skip ci]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != 'nipy/nitransforms'))"
+  cache-test-data:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     env:
       TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
-    strategy:
-      max-parallel: 5
-      matrix:
-        python-version: ['3.8', '3.9',  '3.10',  '3.11']
-
+    outputs:
+      SHA: ${{ steps.test-head.outputs.SHA }}
     steps:
     - name: Git settings (pacify DataLad)
       run: |
         git config --global user.name 'NiPreps Bot'
         git config --global user.email 'nipreps@gmail.com'
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - uses: actions/cache@v3
-      id: conda
-      with:
-        path: |
-          /usr/share/miniconda/pkgs
-          /home/runner/.cache/pip
-        key: python-${{ matrix.python-version }}-v1
-        restore-keys: |
-          python-${{ matrix.python-version }}-
     - name: Install DataLad
       run: |
-        $CONDA/bin/conda install -c conda-forge git-annex datalad pip pytest
-        $CONDA/bin/python -m pip install datalad-osf
+        $CONDA/bin/conda install -c conda-forge git-annex
+        python -m pip install datalad datalad-next datalad-osf
+    - name: Check remote HEAD
+      id: test-head
+      run: |
+        git ls-remote https://gin.g-node.org/oesteban/nitransforms-tests \
+          | awk '/HEAD/{ print "SHA=" $1 }' >> $GITHUB_OUTPUT
 
     - uses: actions/cache@v3
       with:
         path: ${{ env.TEST_DATA_HOME }}
-        key: data-cache-v2
+        key: data-cache-v2-${{ steps.test-head.outputs.SHA }}
         restore-keys: |
+          data-cache-v2-${{ steps.test-head.outputs.SHA }}
           data-cache-v2
 
     - name: Install test data
       run: |
         export PATH=$CONDA/bin:$PATH
         mkdir -p /home/runner/testdata
-        cd /home/runner/testdata
 
-        $CONDA/bin/datalad install https://gin.g-node.org/oesteban/nitransforms-tests
-        $CONDA/bin/datalad update --merge -d nitransforms-tests/
-        $CONDA/bin/datalad get -d nitransforms-tests/
+        datalad install -s https://gin.g-node.org/oesteban/nitransforms-tests $TEST_DATA_HOME
+        datalad update --merge -d $TEST_DATA_HOME
+        datalad get -J 2 -d $TEST_DATA_HOME
+
+  build-linux:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    needs: [cache-test-data]
+    env:
+      TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
+    strategy:
+      max-parallel: 5
+      matrix:
+        python-version: ['3.8', '3.9',  '3.10',  '3.11', '3.12']
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: actions/cache/restore@v3
+      with:
+        path: ${{ env.TEST_DATA_HOME }}
+        key: data-cache-v2-${{ needs.cache-test-data.outputs.SHA }}
 
     - uses: actions/checkout@v3
     - name: Install minimal dependencies
       run: |
-        $CONDA/bin/pip install .[tests]
+        pip install .[tests]
     - name: Run pytest
       run: |
-        $CONDA/bin/pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
+        pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
 
     - name: Submit code coverage
       uses: codecov/codecov-action@v3
