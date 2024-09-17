@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
+    outputs:
+      SHA: ${{ steps.test-head.outputs.SHA }}
     steps:
     - name: Git settings (pacify DataLad)
       run: |
@@ -46,16 +48,17 @@ jobs:
         $CONDA/bin/conda install -c conda-forge git-annex
         python -m pip install datalad datalad-next datalad-osf
     - name: Check remote HEAD
+      id: test-head
       run: |
         git ls-remote https://gin.g-node.org/oesteban/nitransforms-tests \
-          | awk '/HEAD/{ print "HEAD=" $1 }' >> $GITHUB_ENV
+          | awk '/HEAD/{ print "SHA=" $1 }' >> $GITHUB_OUTPUT
 
     - uses: actions/cache@v3
       with:
         path: ${{ env.TEST_DATA_HOME }}
-        key: data-cache-v2-${{ env.HEAD }}
+        key: data-cache-v2-${{ steps.test-head.outputs.SHA }}
         restore-keys: |
-          data-cache-v2-${{ env.HEAD }}
+          data-cache-v2-${{ steps.test-head.outputs.SHA }}
           data-cache-v2
 
     - name: Install test data
@@ -82,12 +85,10 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    - uses: actions/cache@v3
+    - uses: actions/cache/restore@v3
       with:
         path: ${{ env.TEST_DATA_HOME }}
-        key: data-cache-v2
-        restore-keys: |
-          data-cache-v2
+        key: data-cache-v2-${{ needs.cache-test-data.outputs.SHA }}
 
     - uses: actions/checkout@v3
     - name: Install minimal dependencies
