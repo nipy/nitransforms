@@ -45,12 +45,17 @@ jobs:
       run: |
         $CONDA/bin/conda install -c conda-forge git-annex
         python -m pip install datalad datalad-next datalad-osf
+    - name: Check remote HEAD
+      run: |
+        git ls-remote https://gin.g-node.org/oesteban/nitransforms-tests \
+          | awk '/HEAD/{ print "HEAD=" $1 }' >> $GITHUB_ENV
 
     - uses: actions/cache@v3
       with:
         path: ${{ env.TEST_DATA_HOME }}
-        key: data-cache-v2
+        key: data-cache-v2-${{ env.HEAD }}
         restore-keys: |
+          data-cache-v2-${{ env.HEAD }}
           data-cache-v2
 
     - name: Install test data
