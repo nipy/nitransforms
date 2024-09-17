@@ -86,6 +86,6 @@ jobs:
         pytest -v --cov nitransforms --cov-config .coveragerc --cov-report xml:cov.xml --doctest-modules nitransforms/
 
     - name: Submit code coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         files: cov.xml
