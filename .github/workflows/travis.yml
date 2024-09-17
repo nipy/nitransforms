@@ -30,19 +30,6 @@ jobs:
       run: |
         git config --global user.name 'NiPreps Bot'
         git config --global user.email 'nipreps@gmail.com'
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - uses: actions/cache@v3
-      id: conda
-      with:
-        path: |
-          /usr/share/miniconda/pkgs
-          /home/runner/.cache/pip
-        key: python-${{ matrix.python-version }}-v1
-        restore-keys: |
-          python-${{ matrix.python-version }}-
     - name: Install DataLad
       run: |
         $CONDA/bin/conda install -c conda-forge git-annex
