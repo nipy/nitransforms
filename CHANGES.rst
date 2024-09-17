@@ -1,3 +1,21 @@
+24.0.1 (September 17, 2024)
+===========================
+Bug-fix release in the 24.0.x series.
+
+New Contributors
+----------------
+* @shnizzedy made their first contribution in https://github.com/nipy/nitransforms/pull/222
+
+CHANGES
+-------
+
+* FIX: Use standard library ``pathlib`` by @shnizzedy in https://github.com/nipy/nitransforms/pull/222
+* MAINT: Support pre-``__or__`` types by @effigies in https://github.com/nipy/nitransforms/pull/223
+* MAINT: Bump the actions-infrastructure group with 3 updates by @dependabot in https://github.com/nipy/nitransforms/pull/224
+* MAINT: Bump codecov/codecov-action from 3 to 4 by @dependabot in https://github.com/nipy/nitransforms/pull/225
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.0.0...24.0.1
+
 24.0.0 (August 18, 2024)
 ========================
 A new series incorporating several major changes, including bugfixes and taking on several
