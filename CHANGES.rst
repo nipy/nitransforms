@@ -1,3 +1,14 @@
+24.0.2 (September 21, 2024)
+===========================
+Bug-fix release in the 24.0.x series.
+
+CHANGES
+-------
+
+* FIX: Add per-volume transforms as single transform in chain by @effigies in https://github.com/nipy/nitransforms/pull/226
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.0.1...24.0.2
+
 24.0.1 (September 17, 2024)
 ===========================
 Bug-fix release in the 24.0.x series.
