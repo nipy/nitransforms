@@ -82,6 +82,20 @@ def test_loadsave_itk(tmp_path, data_path, testdata_path):
     )
 
 
+def test_mapping_chain(data_path):
+    xfm = nitl.load(data_path / "itktflist2.tfm", fmt="itk")
+    xfm = nitl.load(data_path / "itktflist2.tfm", fmt="itk")
+    assert len(xfm) == 9
+
+    # Addiition produces a chain
+    chain = xfm + xfm
+    # Length now means number of transforms, not number of affines in one transform
+    assert len(chain) == 2
+    # Just because a LinearTransformsMapping is iterable does not mean we decompose it
+    chain += xfm
+    assert len(chain) == 3
+
+
 @pytest.mark.parametrize(
     "image_orientation",
     [
