@@ -213,6 +213,8 @@ def _as_chain(x):
     """Convert a value into a transform chain."""
     if isinstance(x, TransformChain):
         return x.transforms
+    if isinstance(x, TransformBase):
+        return [x]
     if isinstance(x, Iterable):
         return list(x)
     return [x]
