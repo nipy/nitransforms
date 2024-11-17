@@ -1,3 +1,17 @@
+24.1.0 (November 17, 2024)
+==========================
+New feature release in the 24.1.x series.
+
+This release has the same code as 24.0.2, but the package has been
+tested with Numpy 2.0 and Python 3.13 and the metadata updated accordingly.
+
+CHANGES
+-------
+* MAINT: Transition to pyproject.toml and tox, support numpy 2, python 3.13
+  by @effigies in https://github.com/nipy/nitransforms/pull/228
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.0.2...24.1.0
+
 24.0.2 (September 21, 2024)
 ===========================
 Bug-fix release in the 24.0.x series.
