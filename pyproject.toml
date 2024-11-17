@@ -38,6 +38,7 @@ test = [
     "pytest >= 6",
     "pytest-cov",
     "pytest-env",
+    "pytest-xdist",
     "codecov",
     "nitransforms[niftiext]",
 ]
