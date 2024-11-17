@@ -1,7 +1,0 @@
-recursive-exclude .circleci/ *
-recursive-exclude .github/ *
-recursive-exclude docker/ *
-recursive-exclude docs/ *
-recursive-exclude joss/ *
-recursive-exclude nitransforms/tests *
-exclude .codecov.yml .coveragerc .gitignore .pep8speaks.yml .travis.yml Dockerfile
