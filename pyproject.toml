@@ -35,7 +35,7 @@ NiBabel = "https://github.com/nipy/nibabel/pull/656"
 [project.optional-dependencies]
 niftiext = ["lxml"]
 test = [
-    "pytest",
+    "pytest >= 6",
     "pytest-cov",
     "pytest-env",
     "codecov",
@@ -63,8 +63,21 @@ __version__ = "{version}"
 fallback_version = "0.0"
 
 [tool.pytest.ini_options]
+minversion = "6"
+testpaths = ["nitransforms"]
+log_cli_level = "INFO"
+xfail_strict = true
 norecursedirs = [".git"]
-addopts = "-svx --doctest-modules"
+addopts = [
+  "-svx",
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--doctest-modules",
+  "--cov=nitransforms",
+  "--cov-report=xml",
+  "--cov-config=pyproject.toml",
+]
 doctest_optionflags = "ALLOW_UNICODE NORMALIZE_WHITESPACE ELLIPSIS"
 env = "PYTHONHASHSEED=0"
 filterwarnings = ["ignore::DeprecationWarning"]
