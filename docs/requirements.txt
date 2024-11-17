@@ -4,5 +4,5 @@ packaging
 pydot>=1.2.3
 pydotplus
 sphinx-argparse
-sphinx
+sphinx~=7.0
 sphinx_rtd_theme
