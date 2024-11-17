@@ -2,6 +2,58 @@
 requires = ["setuptools >= 45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "nitransforms"
+authors = [{name = "The NiPy developers", email = "nipreps@gmail.com"}]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+description = "NiTransforms -- Neuroimaging spatial transforms in Python."
+license = {text = "MIT License"}
+requires-python = ">= 3.9"
+dependencies = [
+    "numpy ~= 1.21",
+    "scipy >= 1.6.0",
+    "nibabel >= 3.0",
+    "h5py",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/nipy/nitransforms"
+Manuscript = "https://doi.org/10.31219/osf.io/8aq7b"
+NiBabel = "https://github.com/nipy/nibabel/pull/656"
+
+[project.optional-dependencies]
+niftiext = ["lxml"]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-env",
+    "codecov",
+    "nitransforms[niftiext]",
+]
+# Aliases
+niftiexts = ["nitransforms[niftiext]"]
+tests = ["nitransforms[test]"]
+all = [
+    "nitransforms[test]",
+]
+
+[project.scripts]
+nb-transform = "nitransforms.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["nitransforms*"]
+
 [tool.setuptools_scm]
 write_to = "nitransforms/_version.py"
 write_to_template = """\
@@ -9,3 +61,11 @@ write_to_template = """\
 __version__ = "{version}"
 """
 fallback_version = "0.0"
+
+[tool.pytest.ini_options]
+norecursedirs = [".git"]
+addopts = "-svx --doctest-modules"
+doctest_optionflags = "ALLOW_UNICODE NORMALIZE_WHITESPACE ELLIPSIS"
+env = "PYTHONHASHSEED=0"
+filterwarnings = ["ignore::DeprecationWarning"]
+junit_family = "xunit2"
