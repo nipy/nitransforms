@@ -20,6 +20,7 @@ from . import linear, manip, nonlinear, surface
 from .linear import Affine, LinearTransformsMapping
 from .nonlinear import DenseFieldTransform
 from .manip import TransformChain
+from .resampling import apply
 
 try:
     from ._version import __version__
@@ -37,6 +38,7 @@ __packagename__ = "nitransforms"
 __copyright__ = "Copyright (c) 2021 The NiPy developers"
 
 __all__ = [
+    "apply",
     "surface",
     "linear",
     "manip",
