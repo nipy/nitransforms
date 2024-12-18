@@ -1,3 +1,15 @@
+24.1.1 (December 18, 2024)
+==========================
+New patch release that adds ``nitransforms.resampling.apply`` as a top-level import, and removes the `pkg_resources` dependency.
+
+CHANGES
+-------
+
+* RF: Add nitransforms.resamping.apply to top module imports in https://github.com/nipy/nitransforms/pull/227
+* FIX: Remove pkg_resources dependency in https://github.com/nipy/nitransforms/pull/230
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.1.0...24.1.1
+
 24.1.0 (November 17, 2024)
 ==========================
 New feature release in the 24.1.x series.
