@@ -383,12 +383,20 @@ class ITKCompositeH5:
         xfm_list = []
         h5group = fileobj["TransformGroup"]
         typo_fallback = "Transform"
+
+        start_idx = 1
+        for i, group in enumerate(h5group):
+            found = h5group[group].get(f'{typo_fallback}Parameters', None)
+            if found is not None:
+                start_idx = i
+                break
+
         try:
-            h5group["1"][f"{typo_fallback}Parameters"]
+            h5group[f'{start_idx}'][f"{typo_fallback}Parameters"]
         except KeyError:
             typo_fallback = "Tranform"
 
-        for xfm in list(h5group.values())[1:]:
+        for xfm in list(h5group.values())[start_idx:]:
             if xfm["TransformType"][0].startswith(b"AffineTransform"):
                 _params = np.asanyarray(xfm[f"{typo_fallback}Parameters"])
                 xfm_list.append(
