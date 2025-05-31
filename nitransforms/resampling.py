@@ -108,7 +108,7 @@ async def _apply_serial(
     semaphore = asyncio.Semaphore(max_concurrent)
 
     for t in range(n_resamplings):
-        xfm_t = transform if n_resamplings == 1 else transform[t]
+        xfm_t = transform if (n_resamplings == 1 or transform.ndim < 4) else transform[t]
 
         if targets is None:
             targets = ImageGrid(spatialimage).index(  # data should be an image
@@ -270,7 +270,7 @@ def apply(
         # Order F ensures individual volumes are contiguous in memory
         # Also matches NIfTI, making final save more efficient
         resampled = np.zeros(
-            (len(ref_ndcoords), len(transform)), dtype=input_dtype, order="F"
+            (len(ref_ndcoords), n_resamplings), dtype=input_dtype, order="F"
         )
 
         resampled = asyncio.run(
