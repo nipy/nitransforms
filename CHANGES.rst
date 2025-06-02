@@ -1,3 +1,18 @@
+24.1.2 (June 02, 2025)
+======================
+New patch release that addresses a crash when applying a 3D transform to a 4D image.
+
+New Contributors
+----------------
+* @coryshain made their first contribution in https://github.com/nipy/nitransforms/pull/236
+
+CHANGES
+-------
+* FIX: Patch for crash when applying 3D transform to 4D image (#236)
+* MNT: Switch from zenodo.json to CITATION.cff, add contributors (#237)
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.1.1...24.1.2
+
 24.1.1 (December 18, 2024)
 ==========================
 New patch release that adds ``nitransforms.resampling.apply`` as a top-level import, and removes the `pkg_resources` dependency.
