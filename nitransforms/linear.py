@@ -7,12 +7,14 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Linear transforms."""
+
 import warnings
 import numpy as np
 from pathlib import Path
 
 from nibabel.affines import from_matvec
 
+from nitransforms import __version__
 from nitransforms.base import (
     ImageGrid,
     TransformBase,
@@ -79,6 +81,23 @@ should be (0, 0, 0, 1), got %s."""
             # Normalize last row
             self._matrix[3, :] = (0, 0, 0, 1)
             self._inverse = np.linalg.inv(self._matrix)
+
+    def __repr__(self):
+        """
+        Change representation to the internal matrix.
+
+        Example
+        -------
+        >>> Affine([
+        ...     [1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]
+        ... ])  # doctest: +NORMALIZE_WHITESPACE
+        array([[1, 0, 0, 4],
+               [0, 1, 0, 0],
+               [0, 0, 1, 0],
+               [0, 0, 0, 1]])
+
+        """
+        return repr(self.matrix)
 
     def __eq__(self, other):
         """
@@ -149,62 +168,6 @@ should be (0, 0, 0, 1), got %s."""
         """Access the internal representation of this affine."""
         return self._matrix.ndim + 1
 
-    def map(self, x, inverse=False):
-        r"""
-        Apply :math:`y = f(x)`.
-
-        Parameters
-        ----------
-        x : N x D numpy.ndarray
-            Input RAS+ coordinates (i.e., physical coordinates).
-        inverse : bool
-            If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
-
-        Returns
-        -------
-        y : N x D numpy.ndarray
-            Transformed (mapped) RAS+ coordinates (i.e., physical coordinates).
-
-        Examples
-        --------
-        >>> xfm = Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
-        >>> xfm.map((0,0,0))
-        array([[1., 2., 3.]])
-
-        >>> xfm.map((0,0,0), inverse=True)
-        array([[-1., -2., -3.]])
-
-        """
-        affine = self._matrix
-        coords = _as_homogeneous(x, dim=affine.shape[0] - 1).T
-        if inverse is True:
-            affine = self._inverse
-        return affine.dot(coords).T[..., :-1]
-
-    def _to_hdf5(self, x5_root):
-        """Serialize this object into the x5 file format."""
-        xform = x5_root.create_dataset("Transform", data=[self._matrix])
-        xform.attrs["Type"] = "affine"
-        x5_root.create_dataset("Inverse", data=[(~self).matrix])
-
-        if self._reference:
-            self.reference._to_hdf5(x5_root.create_group("Reference"))
-
-    def to_filename(self, filename, fmt="X5", moving=None):
-        """Store the transform in the requested output format."""
-        writer = get_linear_factory(fmt, is_array=False)
-
-        if fmt.lower() in ("itk", "ants", "elastix"):
-            writer.from_ras(self.matrix).to_filename(filename)
-        else:
-            # Rest of the formats peek into moving and reference image grids
-            writer.from_ras(
-                self.matrix,
-                reference=self.reference,
-                moving=ImageGrid(moving) if moving is not None else self.reference,
-            ).to_filename(filename)
-        return filename
-
     @classmethod
     def from_filename(cls, filename, fmt=None, reference=None, moving=None):
         """Create an affine from a transform file."""
@@ -260,40 +223,75 @@ should be (0, 0, 0, 1), got %s."""
         vec = vec if vec is not None else np.zeros((3,))
         return cls(from_matvec(mat, vector=vec), reference=reference)
 
-    def __repr__(self):
-        """
-        Change representation to the internal matrix.
+    def map(self, x, inverse=False):
+        r"""
+        Apply :math:`y = f(x)`.
 
-        Example
+        Parameters
+        ----------
+        x : N x D numpy.ndarray
+            Input RAS+ coordinates (i.e., physical coordinates).
+        inverse : bool
+            If ``True``, apply the inverse transform :math:`x = f^{-1}(y)`.
+
+        Returns
         -------
-        >>> Affine([
-        ...     [1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]
-        ... ])  # doctest: +NORMALIZE_WHITESPACE
-        array([[1, 0, 0, 4],
-               [0, 1, 0, 0],
-               [0, 0, 1, 0],
-               [0, 0, 0, 1]])
+        y : N x D numpy.ndarray
+            Transformed (mapped) RAS+ coordinates (i.e., physical coordinates).
+
+        Examples
+        --------
+        >>> xfm = Affine([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]])
+        >>> xfm.map((0,0,0))
+        array([[1., 2., 3.]])
+
+        >>> xfm.map((0,0,0), inverse=True)
+        array([[-1., -2., -3.]])
 
         """
-        return repr(self.matrix)
+        affine = self._matrix
+        coords = _as_homogeneous(x, dim=affine.shape[0] - 1).T
+        if inverse is True:
+            affine = self._inverse
+        return affine.dot(coords).T[..., :-1]
 
-    def to_x5(self):
+    def to_filename(self, filename, fmt="X5", moving=None):
+        """Store the transform in the requested output format."""
+        writer = get_linear_factory(fmt, is_array=False)
+
+        if fmt.lower() in ("itk", "ants", "elastix"):
+            writer.from_ras(self.matrix).to_filename(filename)
+        else:
+            # Rest of the formats peek into moving and reference image grids
+            writer.from_ras(
+                self.matrix,
+                reference=self.reference,
+                moving=ImageGrid(moving) if moving is not None else self.reference,
+            ).to_filename(filename)
+        return filename
+
+    def to_x5(self, store_inverse=False, metadata=None):
         """Return an :class:`~nitransforms.io.x5.X5Transform` representation."""
+        metadata = {"WrittenBy": f"NiTransforms {__version__}"} | (metadata or {})
+
         domain = None
-        if self._reference is not None:
+        if (reference := self.reference) is not None:
             domain = X5Domain(
                 grid=True,
-                size=self.reference.shape,
-                mapping=self.reference.affine,
+                size=getattr(reference or {}, "shape", (0, 0, 0)),
+                mapping=reference.affine,
             )
         kinds = tuple("space" for _ in range(self.ndim)) + ("vector",)
         return X5Transform(
             type="linear",
             subtype="affine",
+            representation="matrix",
+            metadata=metadata,
             transform=self.matrix,
             dimension_kinds=kinds,
             domain=domain,
-            inverse=(~self).matrix,
+            inverse=(~self).matrix if store_inverse else None,
+            array_length=len(self),
         )
 
 
@@ -349,26 +347,6 @@ class LinearTransformsMapping(Affine):
     def __getitem__(self, i):
         """Enable indexed access to the series of matrices."""
         return Affine(self.matrix[i, ...], reference=self._reference)
-
-    def to_x5(self):
-        """Return an :class:`~nitransforms.io.x5.X5Transform` object."""
-        domain = None
-        if self._reference is not None:
-            domain = X5Domain(
-                grid=True,
-                size=self.reference.shape,
-                mapping=self.reference.affine,
-            )
-        kinds = tuple("space" for _ in range(self.ndim - 1)) + ("vector",)
-        return X5Transform(
-            type="linear",
-            subtype="affine",
-            transform=self.matrix,
-            dimension_kinds=kinds,
-            domain=domain,
-            inverse=self._inverse,
-            array_length=len(self),
-        )
 
     def map(self, x, inverse=False):
         r"""

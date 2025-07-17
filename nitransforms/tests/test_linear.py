@@ -4,7 +4,6 @@
 
 import pytest
 import numpy as np
-import h5py
 
 from pathlib import Path
 
@@ -246,15 +245,20 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 
-def test_Affine_to_x5(tmpdir):
+@pytest.mark.parametrize("store_inverse", [True, False])
+def test_Affine_to_x5(tmpdir, store_inverse):
     """Test affine's operations."""
     tmpdir.chdir()
     aff = nitl.Affine()
-    node = aff.to_x5()
+    node = aff.to_x5(
+        metadata={"GeneratedBy": "FreeSurfer 8"}, store_inverse=store_inverse
+    )
     assert node.type == "linear"
+    assert node.subtype == "matrix"
     assert node.domain is None
     assert node.transform.shape == (4, 4)
     assert node.array_length == 1
+    assert (node.metadata or {}).get("GeneratedBy") == "FreeSurfer 8"
 
     img = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="float32"), np.eye(4))
     img_path = Path(tmpdir) / "ref.nii.gz"

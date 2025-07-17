@@ -61,9 +61,7 @@ def to_filename(fname: str, x5_list: List[X5Transform]):
             )
             if node.domain is not None:
                 dgrp = g.create_group("Domain")
-                dgrp.create_dataset(
-                    "Grid", data=np.uint8(1 if node.domain.grid else 0)
-                )
+                dgrp.create_dataset("Grid", data=np.uint8(1 if node.domain.grid else 0))
                 dgrp.create_dataset("Size", data=np.asarray(node.domain.size))
                 dgrp.create_dataset("Mapping", data=node.domain.mapping)
                 if node.domain.coordinates is not None:
@@ -77,4 +75,4 @@ def to_filename(fname: str, x5_list: List[X5Transform]):
                 g.create_dataset(
                     "AdditionalParameters", data=node.additional_parameters
                 )
-    return str(fname)
+    return fname
