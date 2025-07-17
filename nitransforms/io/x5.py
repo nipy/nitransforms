@@ -25,8 +25,6 @@ import h5py
 
 import numpy as np
 
-from .base import TransformFileError
-
 
 @dataclass
 class X5Domain:
@@ -142,18 +140,15 @@ def to_filename(fname: str | Path, x5_list: List[X5Transform]):
 
 def from_filename(fname: str | Path) -> List[X5Transform]:
     """Read a list of :class:`X5Transform` objects from an X5 HDF5 file."""
-    try:
-        with h5py.File(str(fname), "r") as in_file:
-            if in_file.attrs.get("Format") != "X5":
-                raise TransformFileError("Input file is not in X5 format")
+    with h5py.File(str(fname), "r") as in_file:
+        if in_file.attrs.get("Format") != "X5":
+            raise ValueError("Input file is not in X5 format")
 
-            tg = in_file["TransformGroup"]
-            return [
-                _read_x5_group(node)
-                for _, node in sorted(tg.items(), key=lambda kv: int(kv[0]))
-            ]
-    except OSError as exc:  # pragma: no cover - in case h5py not installed
-        raise TransformFileError(str(exc)) from exc
+        tg = in_file["TransformGroup"]
+        return [
+            _read_x5_group(node)
+            for _, node in sorted(tg.items(), key=lambda kv: int(kv[0]))
+        ]
 
 
 def _read_x5_group(node) -> X5Transform:
