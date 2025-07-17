@@ -140,15 +140,21 @@ def to_filename(fname: str | Path, x5_list: List[X5Transform]):
 
 def from_filename(fname: str | Path) -> List[X5Transform]:
     """Read a list of :class:`X5Transform` objects from an X5 HDF5 file."""
-    with h5py.File(str(fname), "r") as in_file:
-        if in_file.attrs.get("Format") != "X5":
-            raise ValueError("Input file is not in X5 format")
+    try:
+        with h5py.File(str(fname), "r") as in_file:
+            if in_file.attrs.get("Format") != "X5":
+                raise TypeError("Input file is not in X5 format")
 
-        tg = in_file["TransformGroup"]
-        return [
-            _read_x5_group(node)
-            for _, node in sorted(tg.items(), key=lambda kv: int(kv[0]))
-        ]
+            tg = in_file["TransformGroup"]
+            return [
+                _read_x5_group(node)
+                for _, node in sorted(tg.items(), key=lambda kv: int(kv[0]))
+            ]
+    except OSError as err:
+        if "file signature not found" in err.args[0]:
+            raise TypeError("Input file is not HDF5.")
+
+        raise  # pragma: no cover
 
 
 def _read_x5_group(node) -> X5Transform:

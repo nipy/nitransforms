@@ -265,6 +265,9 @@ def test_linear_to_x5(tmpdir, store_inverse):
 
     aff.to_filename("export1.x5", x5_inverse=store_inverse)
 
+    # Test round trip
+    assert aff == nitl.Affine.from_filename("export1.x5", fmt="X5")
+
     # Test with Domain
     img = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="float32"), np.eye(4))
     img_path = Path(tmpdir) / "ref.nii.gz"
@@ -274,6 +277,9 @@ def test_linear_to_x5(tmpdir, store_inverse):
     assert node.domain.grid
     assert node.domain.size == aff.reference.shape
     aff.to_filename("export2.x5", x5_inverse=store_inverse)
+
+    # Test round trip
+    assert aff == nitl.Affine.from_filename("export2.x5", fmt="X5")
 
     # Test with Jacobian
     node.jacobian = np.zeros((2, 2, 2), dtype="float32")

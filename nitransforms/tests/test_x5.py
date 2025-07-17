@@ -73,5 +73,5 @@ def test_from_filename_invalid(tmp_path):
     with H5File(fname, "w") as f:
         f.attrs["Format"] = "NOTX5"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         from_filename(fname)

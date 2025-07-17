@@ -9,6 +9,7 @@
 """Linear transforms."""
 
 import warnings
+from collections import namedtuple
 import numpy as np
 from pathlib import Path
 
@@ -187,9 +188,18 @@ should be (0, 0, 0, 1), got %s."""
         if fmt and fmt.upper() == "X5":
             x5_xfm = load_x5(filename)[x5_position]
             Transform = cls if x5_xfm.array_length == 1 else LinearTransformsMapping
-            if x5_xfm.domain:
-                # override reference
-                raise NotImplementedError
+            if (
+                x5_xfm.domain
+                and not x5_xfm.domain.grid
+                and len(x5_xfm.domain.size) == 3
+            ):  # pragma: no cover
+                raise NotImplementedError(
+                    "Only 3D regularly gridded domains are supported"
+                )
+            elif x5_xfm.domain:
+                # Override reference
+                Domain = namedtuple("Domain", "affine shape")
+                reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
 
             return Transform(x5_xfm.transform, reference=reference)
 
