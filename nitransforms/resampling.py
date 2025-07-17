@@ -63,7 +63,7 @@ async def _apply_serial(
     ----------
     data : :obj:`~numpy.ndarray`
         The input data array.
-    spatialimage : :obj:`~nibabel.spatialimages.SpatialImage` or `os.pathlike`
+    spatialimage : :obj:`~nibabel.spatialimages.SpatialImage` or :obj:`os.PathLike`
         The image object containing the data to be resampled in reference
         space
     targets : :obj:`~numpy.ndarray`
@@ -162,10 +162,10 @@ def apply(
     ----------
     transform: :obj:`~nitransforms.base.TransformBase`
         The 3D, 3D+t, or 4D transform through which data will be resampled.
-    spatialimage : :obj:`~nibabel.spatialimages.SpatialImage` or `os.pathlike`
+    spatialimage : :obj:`~nibabel.spatialimages.SpatialImage` or :obj:`os.PathLike`
         The image object containing the data to be resampled in reference
         space
-    reference : :obj:`~nibabel.spatialimages.SpatialImage` or `os.pathlike`
+    reference : :obj:`~nibabel.spatialimages.SpatialImage` or :obj:`os.PathLike`
         The image, surface, or combination thereof containing the coordinates
         of samples that will be sampled.
     order : :obj:`int`, optional
