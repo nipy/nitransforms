@@ -285,6 +285,7 @@ should be (0, 0, 0, 1), got %s."""
                 grid=True,
                 size=getattr(reference or {}, "shape", (0, 0, 0)),
                 mapping=reference.affine,
+                coordinates="cartesian",
             )
         kinds = tuple("space" for _ in range(self.ndim)) + ("vector",)
         return X5Transform(

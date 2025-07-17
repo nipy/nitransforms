@@ -246,9 +246,11 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
 
 
 @pytest.mark.parametrize("store_inverse", [True, False])
-def test_Affine_to_x5(tmpdir, store_inverse):
+def test_linear_to_x5(tmpdir, store_inverse):
     """Test affine's operations."""
     tmpdir.chdir()
+
+    # Test base operations
     aff = nitl.Affine()
     node = aff.to_x5(
         metadata={"GeneratedBy": "FreeSurfer 8"}, store_inverse=store_inverse
@@ -261,14 +263,21 @@ def test_Affine_to_x5(tmpdir, store_inverse):
     assert node.array_length == 1
     assert (node.metadata or {}).get("GeneratedBy") == "FreeSurfer 8"
 
+    io.x5.to_filename("export1.x5", [node])
+
+    # Test with Domain
     img = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="float32"), np.eye(4))
     img_path = Path(tmpdir) / "ref.nii.gz"
     img.to_filename(str(img_path))
-
     aff.reference = img_path
     node = aff.to_x5()
     assert node.domain.grid
     assert node.domain.size == aff.reference.shape
+    io.x5.to_filename("export2.x5", [node])
+
+    # Test with Jacobian
+    node.jacobian = np.zeros((2, 2, 2), dtype="float32")
+    io.x5.to_filename("export3.x5", [node])
 
 
 def test_mapping_to_x5():
