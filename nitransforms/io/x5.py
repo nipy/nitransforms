@@ -25,6 +25,8 @@ import h5py
 
 import numpy as np
 
+from .base import TransformFileError
+
 
 @dataclass
 class X5Domain:
@@ -136,3 +138,50 @@ def to_filename(fname: str | Path, x5_list: List[X5Transform]):
             #         "AdditionalParameters", data=node.additional_parameters
             #     )
     return fname
+
+
+def from_filename(fname: str | Path) -> List[X5Transform]:
+    """Read a list of :class:`X5Transform` objects from an X5 HDF5 file."""
+    try:
+        with h5py.File(str(fname), "r") as in_file:
+            if in_file.attrs.get("Format") != "X5":
+                raise TransformFileError("Input file is not in X5 format")
+
+            tg = in_file["TransformGroup"]
+            return [
+                _read_x5_group(node)
+                for _, node in sorted(tg.items(), key=lambda kv: int(kv[0]))
+            ]
+    except OSError as exc:  # pragma: no cover - in case h5py not installed
+        raise TransformFileError(str(exc)) from exc
+
+
+def _read_x5_group(node) -> X5Transform:
+    x5 = X5Transform(
+        type=node.attrs["Type"],
+        transform=np.asarray(node["Transform"]),
+        subtype=node.attrs.get("SubType"),
+        representation=node.attrs.get("Representation"),
+        metadata=json.loads(node.attrs["Metadata"])
+        if "Metadata" in node.attrs
+        else None,
+        dimension_kinds=[
+            k.decode() if isinstance(k, bytes) else k
+            for k in node["DimensionKinds"][()]
+        ],
+        domain=None,
+        inverse=np.asarray(node["Inverse"]) if "Inverse" in node else None,
+        jacobian=np.asarray(node["Jacobian"]) if "Jacobian" in node else None,
+        array_length=int(node.attrs.get("ArrayLength", 1)),
+    )
+
+    if "Domain" in node:
+        dgrp = node["Domain"]
+        x5.domain = X5Domain(
+            grid=bool(int(np.asarray(dgrp["Grid"]))),
+            size=tuple(np.asarray(dgrp["Size"])),
+            mapping=np.asarray(dgrp["Mapping"]),
+            coordinates=dgrp.attrs.get("Coordinates"),
+        )
+
+    return x5
