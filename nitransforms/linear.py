@@ -14,7 +14,12 @@ from pathlib import Path
 
 from nibabel.affines import from_matvec
 
-from nitransforms import __version__
+# Avoids circular imports
+try:
+    from nitransforms._version import __version__
+except ModuleNotFoundError:
+    __version__ = "0+unknown"
+
 from nitransforms.base import (
     ImageGrid,
     TransformBase,
