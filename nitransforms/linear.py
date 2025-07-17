@@ -27,7 +27,7 @@ from nitransforms.base import (
     EQUALITY_TOL,
 )
 from nitransforms.io import get_linear_factory, TransformFileError
-from nitransforms.io.x5 import X5Transform, X5Domain
+from nitransforms.io.x5 import X5Transform, X5Domain, to_filename as save_x5
 
 
 class Affine(TransformBase):
@@ -260,9 +260,12 @@ should be (0, 0, 0, 1), got %s."""
             affine = self._inverse
         return affine.dot(coords).T[..., :-1]
 
-    def to_filename(self, filename, fmt="X5", moving=None):
+    def to_filename(self, filename, fmt="X5", moving=None, x5_inverse=False):
         """Store the transform in the requested output format."""
-        writer = get_linear_factory(fmt, is_array=False)
+        if fmt.upper() == "X5":
+            return save_x5(filename, [self.to_x5(store_inverse=x5_inverse)])
+
+        writer = get_linear_factory(fmt, is_array=isinstance(self, LinearTransformsMapping))
 
         if fmt.lower() in ("itk", "ants", "elastix"):
             writer.from_ras(self.matrix).to_filename(filename)
@@ -406,21 +409,6 @@ class LinearTransformsMapping(Affine):
         if inverse is True:
             affine = self._inverse
         return np.swapaxes(affine.dot(coords), 1, 2)
-
-    def to_filename(self, filename, fmt="X5", moving=None):
-        """Store the transform in the requested output format."""
-        writer = get_linear_factory(fmt, is_array=True)
-
-        if fmt.lower() in ("itk", "ants", "elastix"):
-            writer.from_ras(self.matrix).to_filename(filename)
-        else:
-            # Rest of the formats peek into moving and reference image grids
-            writer.from_ras(
-                self.matrix,
-                reference=self.reference,
-                moving=ImageGrid(moving) if moving is not None else self.reference,
-            ).to_filename(filename)
-        return filename
 
 
 def load(filename, fmt=None, reference=None, moving=None):
