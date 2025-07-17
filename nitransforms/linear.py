@@ -17,7 +17,7 @@ from nibabel.affines import from_matvec
 # Avoids circular imports
 try:
     from nitransforms._version import __version__
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # pragma: no cover
     __version__ = "0+unknown"
 
 from nitransforms.base import (
