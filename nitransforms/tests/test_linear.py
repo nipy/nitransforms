@@ -6,8 +6,11 @@ import pytest
 import numpy as np
 import h5py
 
+from pathlib import Path
+
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
+import nibabel as nb
 from nitransforms import linear as nitl
 from nitransforms import io
 from .utils import assert_affines_by_filename
@@ -243,16 +246,35 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 
-def test_Affine_to_x5(tmpdir, testdata_path):
+def test_Affine_to_x5(tmpdir):
     """Test affine's operations."""
     tmpdir.chdir()
     aff = nitl.Affine()
-    with h5py.File("xfm.x5", "w") as f:
-        aff._to_hdf5(f.create_group("Affine"))
+    node = aff.to_x5()
+    assert node.type == "linear"
+    assert node.domain is None
+    assert node.transform.shape == (4, 4)
+    assert node.array_length == 1
 
-    aff.reference = testdata_path / "someones_anatomy.nii.gz"
-    with h5py.File("withref-xfm.x5", "w") as f:
-        aff._to_hdf5(f.create_group("Affine"))
+    img = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="float32"), np.eye(4))
+    img_path = Path(tmpdir) / "ref.nii.gz"
+    img.to_filename(str(img_path))
+
+    aff.reference = img_path
+    node = aff.to_x5()
+    assert node.domain.grid
+    assert node.domain.size == aff.reference.shape
+
+
+def test_mapping_to_x5():
+    mats = [
+        np.eye(4),
+        np.array([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]]),
+    ]
+    mapping = nitl.LinearTransformsMapping(mats)
+    node = mapping.to_x5()
+    assert node.array_length == 2
+    assert node.transform.shape == (2, 4, 4)
 
 
 def test_mulmat_operator(testdata_path):

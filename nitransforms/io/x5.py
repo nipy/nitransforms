@@ -1,39 +1,80 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; indent-tabs-mode: nil -*-
-# vi: set ft=python sts=4 ts=4 sw=4 et:
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-#
-#   See COPYING file distributed along with the NiBabel package for the
-#   copyright and license terms.
-#
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Read/write x5 transforms."""
+"""Data structures for the X5 transform format."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Sequence, List
+
+import json
+import h5py
 
 import numpy as np
-from h5py import File as H5File
 
 
-def to_filename(fname, xfm, moving=None):
-    """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-    with H5File(fname, "w") as out_file:
+@dataclass
+class X5Domain:
+    """Domain information of a transform."""
+
+    grid: bool
+    size: Sequence[int]
+    mapping: np.ndarray
+    coordinates: Optional[str] = None
+
+
+@dataclass
+class X5Transform:
+    """Represent one transform entry of an X5 file."""
+
+    type: str
+    transform: np.ndarray
+    dimension_kinds: Sequence[str]
+    array_length: int = 1
+    domain: Optional[X5Domain] = None
+    subtype: Optional[str] = None
+    representation: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    inverse: Optional[np.ndarray] = None
+    jacobian: Optional[np.ndarray] = None
+    additional_parameters: Optional[np.ndarray] = None
+
+
+def to_filename(fname: str, x5_list: List[X5Transform]):
+    """Write a list of :class:`X5Transform` objects to an X5 HDF5 file."""
+    with h5py.File(str(fname), "w") as out_file:
         out_file.attrs["Format"] = "X5"
         out_file.attrs["Version"] = np.uint16(1)
-        x5_root = out_file.create_group("/0")
+        tg = out_file.create_group("TransformGroup")
+        for i, node in enumerate(x5_list):
+            g = tg.create_group(str(i))
+            g.attrs["Type"] = node.type
+            g.attrs["ArrayLength"] = node.array_length
+            if node.subtype is not None:
+                g.attrs["SubType"] = node.subtype
+            if node.representation is not None:
+                g.attrs["Representation"] = node.representation
+            if node.metadata is not None:
+                g.attrs["Metadata"] = json.dumps(node.metadata)
+            g.create_dataset("Transform", data=node.transform)
+            g.create_dataset(
+                "DimensionKinds",
+                data=np.asarray(node.dimension_kinds, dtype="S"),
+            )
+            if node.domain is not None:
+                dgrp = g.create_group("Domain")
+                dgrp.create_dataset(
+                    "Grid", data=np.uint8(1 if node.domain.grid else 0)
+                )
+                dgrp.create_dataset("Size", data=np.asarray(node.domain.size))
+                dgrp.create_dataset("Mapping", data=node.domain.mapping)
+                if node.domain.coordinates is not None:
+                    dgrp.attrs["Coordinates"] = node.domain.coordinates
 
-        # Serialize this object into the x5 file format.
-        transform_group = x5_root.create_group("TransformGroup")
-
-        # Group '0' containing Affine transform
-        transform_0 = transform_group.create_group("0")
-
-        transform_0.attrs["Type"] = "Affine"
-        transform_0.create_dataset("Transform", data=xfm.matrix)
-        transform_0.create_dataset("Inverse", data=~xfm)
-
-        metadata = {"key": "value"}
-        transform_0.attrs["Metadata"] = str(metadata)
-
-        # sub-group 'Domain' contained within group '0'
-        transform_0.create_group("Domain")
-        # domain_group.attrs["Grid"] = self._grid
-        # domain_group.create_dataset("Size", data=_as_homogeneous(self._reference.shape))
-        # domain_group.create_dataset("Mapping", data=self.mapping)
+            if node.inverse is not None:
+                g.create_dataset("Inverse", data=node.inverse)
+            if node.jacobian is not None:
+                g.create_dataset("Jacobian", data=node.jacobian)
+            if node.additional_parameters is not None:
+                g.create_dataset(
+                    "AdditionalParameters", data=node.additional_parameters
+                )
+    return str(fname)

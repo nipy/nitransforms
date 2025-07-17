@@ -20,6 +20,7 @@ from nitransforms.base import (
     EQUALITY_TOL,
 )
 from nitransforms.io import get_linear_factory, TransformFileError
+from nitransforms.io.x5 import X5Transform, X5Domain
 
 
 class Affine(TransformBase):
@@ -276,6 +277,25 @@ should be (0, 0, 0, 1), got %s."""
         """
         return repr(self.matrix)
 
+    def to_x5(self):
+        """Return an :class:`~nitransforms.io.x5.X5Transform` representation."""
+        domain = None
+        if self._reference is not None:
+            domain = X5Domain(
+                grid=True,
+                size=self.reference.shape,
+                mapping=self.reference.affine,
+            )
+        kinds = tuple("space" for _ in range(self.ndim)) + ("vector",)
+        return X5Transform(
+            type="linear",
+            subtype="affine",
+            transform=self.matrix,
+            dimension_kinds=kinds,
+            domain=domain,
+            inverse=(~self).matrix,
+        )
+
 
 class LinearTransformsMapping(Affine):
     """Represents a series of linear transforms."""
@@ -329,6 +349,26 @@ class LinearTransformsMapping(Affine):
     def __getitem__(self, i):
         """Enable indexed access to the series of matrices."""
         return Affine(self.matrix[i, ...], reference=self._reference)
+
+    def to_x5(self):
+        """Return an :class:`~nitransforms.io.x5.X5Transform` object."""
+        domain = None
+        if self._reference is not None:
+            domain = X5Domain(
+                grid=True,
+                size=self.reference.shape,
+                mapping=self.reference.affine,
+            )
+        kinds = tuple("space" for _ in range(self.ndim - 1)) + ("vector",)
+        return X5Transform(
+            type="linear",
+            subtype="affine",
+            transform=self.matrix,
+            dimension_kinds=kinds,
+            domain=domain,
+            inverse=self._inverse,
+            array_length=len(self),
+        )
 
     def map(self, x, inverse=False):
         r"""
