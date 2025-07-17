@@ -254,7 +254,8 @@ def test_Affine_to_x5(tmpdir, store_inverse):
         metadata={"GeneratedBy": "FreeSurfer 8"}, store_inverse=store_inverse
     )
     assert node.type == "linear"
-    assert node.subtype == "matrix"
+    assert node.subtype == "affine"
+    assert node.representation == "matrix"
     assert node.domain is None
     assert node.transform.shape == (4, 4)
     assert node.array_length == 1
