@@ -88,14 +88,14 @@ def to_filename(fname: str | Path, x5_list: List[X5Transform]):
 
     Parameters
     ----------
-    fname : :obj:`os.pathlike`
+    fname : :obj:`os.PathLike`
         The file name (preferably with the ".x5" extension) in which transforms will be stored.
     x5_list : :obj:`list`
         The list of transforms to be stored in the output dataset.
 
     Returns
     -------
-    fname : :obj:`os.pathlike`
+    fname : :obj:`os.PathLike`
         File containing the transform(s).
 
     """
