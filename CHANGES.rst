@@ -1,3 +1,21 @@
+25.0.0 (TBD)
+============
+A new major release with critical updates.
+The new release includes a critical hotfix for 4D resamplings.
+The second major improvement is the inclusion of a first implementation of the X5 format (BIDS).
+The X5 implementation is currently restricted to reading/writing of linear transforms.
+
+CHANGES
+-------
+* FIX: Broken 4D resampling by @oesteban in https://github.com/nipy/nitransforms/pull/247
+* ENH: Loading of X5 (linear) transforms by @oesteban in https://github.com/nipy/nitransforms/pull/243
+* ENH: Implement X5 representation and output to filesystem by @oesteban in https://github.com/nipy/nitransforms/pull/241
+* DOC: Fix references to ``os.PathLike`` by @oesteban in https://github.com/nipy/nitransforms/pull/242
+* MNT: Increase coverage by testing edge cases and adding docstrings by @oesteban in https://github.com/nipy/nitransforms/pull/248
+* MNT: Refactor io/lta to reduce one partial line by @oesteban in https://github.com/nipy/nitransforms/pull/246
+* MNT: Move flake8 config into ``pyproject.toml`` by @oesteban in https://github.com/nipy/nitransforms/pull/245
+* MNT: Configure coverage to omit tests by @oesteban in https://github.com/nipy/nitransforms/pull/244
+
 24.1.2 (June 02, 2025)
 ======================
 New patch release that addresses a crash when applying a 3D transform to a 4D image.
