@@ -1,4 +1,5 @@
 """Read/write linear transforms."""
+
 import numpy as np
 from nibabel.volumeutils import Recoder
 from nibabel.affines import voxel_sizes, from_matvec
@@ -29,12 +30,12 @@ class VolumeGeometry(StringBasedStruct):
     template_dtype = np.dtype(
         [
             ("valid", "i4"),  # Valid values: 0, 1
-            ("volume", "i4", (3, )),  # width, height, depth
-            ("voxelsize", "f4", (3, )),  # xsize, ysize, zsize
+            ("volume", "i4", (3,)),  # width, height, depth
+            ("voxelsize", "f4", (3,)),  # xsize, ysize, zsize
             ("xras", "f8", (3, 1)),  # x_r, x_a, x_s
             ("yras", "f8", (3, 1)),  # y_r, y_a, y_s
             ("zras", "f8", (3, 1)),  # z_r, z_a, z_s
-            ("cras", "f8", (3, )),  # c_r, c_a, c_s
+            ("cras", "f8", (3,)),  # c_r, c_a, c_s
             ("filename", "U1024"),
         ]
     )  # Not conformant (may be >1024 bytes)
@@ -109,14 +110,19 @@ class VolumeGeometry(StringBasedStruct):
             label, valstring = lines.pop(0).split(" =")
             assert label.strip() == key
 
-            val = ""
-            if valstring.strip():
-                parsed = np.genfromtxt(
+            parsed = (
+                np.genfromtxt(
                     [valstring.encode()], autostrip=True, dtype=cls.dtype[key]
                 )
-                if parsed.size:
-                    val = parsed.reshape(sa[key].shape)
-            sa[key] = val
+                if valstring.strip()
+                else None
+            )
+
+            if parsed is not None and parsed.size:
+                sa[key] = parsed.reshape(sa[key].shape)
+            else:  # pragma: no coverage
+                """Do not set sa[key]"""
+
         return volgeom
 
 
@@ -218,11 +224,15 @@ class FSLinearTransform(LinearTransformStruct):
     def to_string(self, partial=False):
         """Convert this transform to text."""
         sa = self.structarr
-        lines = [
-            "# LTA file created by NiTransforms",
-            "type      = {}".format(sa["type"]),
-            "nxforms   = 1",
-        ] if not partial else []
+        lines = (
+            [
+                "# LTA file created by NiTransforms",
+                "type      = {}".format(sa["type"]),
+                "nxforms   = 1",
+            ]
+            if not partial
+            else []
+        )
 
         # Standard preamble
         lines += [
@@ -232,10 +242,7 @@ class FSLinearTransform(LinearTransformStruct):
         ]
 
         # Format parameters matrix
-        lines += [
-            " ".join(f"{v:18.15e}" for v in sa["m_L"][i])
-            for i in range(4)
-        ]
+        lines += [" ".join(f"{v:18.15e}" for v in sa["m_L"][i]) for i in range(4)]
 
         lines += [
             "src volume info",
@@ -324,10 +331,7 @@ class FSLinearTransformArray(BaseLinearTransformList):
     def to_ras(self, moving=None, reference=None):
         """Set type to RAS2RAS and return the new matrix."""
         self.structarr["type"] = 1
-        return [
-            xfm.to_ras(moving=moving, reference=reference)
-            for xfm in self.xforms
-        ]
+        return [xfm.to_ras(moving=moving, reference=reference) for xfm in self.xforms]
 
     def to_string(self):
         """Convert this LTA into text format."""
@@ -396,9 +400,11 @@ class FSLinearTransformArray(BaseLinearTransformList):
         sa["type"] = 1
         sa["nxforms"] = ras.shape[0]
         for i in range(sa["nxforms"]):
-            lt._xforms.append(cls._inner_type.from_ras(
-                ras[i, ...], moving=moving, reference=reference
-            ))
+            lt._xforms.append(
+                cls._inner_type.from_ras(
+                    ras[i, ...], moving=moving, reference=reference
+                )
+            )
 
         sa["subject"] = "unset"
         sa["fscale"] = 0.0
@@ -407,8 +413,10 @@ class FSLinearTransformArray(BaseLinearTransformList):
 
 def _drop_comments(string):
     """Drop comments."""
-    return "\n".join([
-        line.split("#")[0].strip()
-        for line in string.splitlines()
-        if line.split("#")[0].strip()
-    ])
+    return "\n".join(
+        [
+            line.split("#")[0].strip()
+            for line in string.splitlines()
+            if line.split("#")[0].strip()
+        ]
+    )
