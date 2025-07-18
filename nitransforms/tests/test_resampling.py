@@ -363,3 +363,25 @@ def test_LinearTransformsMapping_apply(
             reference=testdata_path / "sbref.nii.gz",
             serialize_nvols=2 if serialize_4d else np.inf,
         )
+
+
+def test_apply_serialized_4d_multiple_targets():
+    """Regression test for per-volume transforms with serialized resampling."""
+    nvols = 9
+    shape = (10, 5, 5)
+    base = np.zeros(shape, dtype=np.float32)
+    base[9, 2, 2] = 1
+    img = nb.Nifti1Image(np.stack([base] * nvols, axis=-1), np.eye(4))
+
+    transforms = []
+    for i in range(nvols):
+        mat = np.eye(4)
+        mat[0, 3] = i
+        transforms.append(nitl.Affine(mat))
+
+    xfm = nitl.LinearTransformsMapping(transforms, reference=img)
+    moved = apply(xfm, img, order=0)
+
+    data = np.asanyarray(moved.dataobj)
+    idxs = [tuple(np.argwhere(data[..., i])[0]) for i in range(nvols)]
+    assert idxs == [(9 - i, 2, 2) for i in range(nvols)]
