@@ -1,7 +1,7 @@
 # NiTransforms
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03459/status.svg)](https://doi.org/10.21105/joss.03459)
 [![ISBI2020](https://img.shields.io/badge/doi-10.31219%2Fosf.io%2F8aq7b-blue.svg)](https://doi.org/10.31219/osf.io/8aq7b)
-[![Deps & CI](https://github.com/nipy/nitransforms/actions/workflows/travis.yml/badge.svg)](https://github.com/nipy/nitransforms/actions/workflows/travis.yml)
+[![Deps & CI](https://github.com/nipy/nitransforms/actions/workflows/tox.yml/badge.svg)](https://github.com/nipy/nitransforms/actions/workflows/tox.yml)
 [![CircleCI](https://circleci.com/gh/nipy/nitransforms.svg?style=svg)](https://circleci.com/gh/nipy/nitransforms)
 [![codecov](https://codecov.io/gh/nipy/nitransforms/branch/master/graph/badge.svg)](https://codecov.io/gh/nipy/nitransforms)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/nipy/nitransforms/master?filepath=docs%2Fnotebooks%2F)

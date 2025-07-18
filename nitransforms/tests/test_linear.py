@@ -1,41 +1,28 @@
 # emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """Tests of linear transforms."""
-import os
+
 import pytest
 import numpy as np
-from subprocess import check_call
-import shutil
-import h5py
 
-import nibabel as nb
+from pathlib import Path
+
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
+import nibabel as nb
 from nitransforms import linear as nitl
 from nitransforms import io
 from .utils import assert_affines_by_filename
 
-RMSE_TOL = 0.1
-APPLY_LINEAR_CMD = {
-    "fsl": """\
-flirt -setbackground 0 -interp nearestneighbour -in {moving} -ref {reference} \
--applyxfm -init {transform} -out {resampled}\
-""".format,
-    "itk": """\
-antsApplyTransforms -d 3 -r {reference} -i {moving} \
--o {resampled} -n NearestNeighbor -t {transform} --float\
-""".format,
-    "afni": """\
-3dAllineate -base {reference} -input {moving} \
--prefix {resampled} -1Dmatrix_apply {transform} -final NN\
-""".format,
-    "fs": """\
-mri_vol2vol --mov {moving} --targ {reference} --lta {transform} \
---o {resampled} --nearest""".format,
-}
 
-
-@pytest.mark.parametrize("matrix", [[0.0], np.ones((3, 3, 3)), np.ones((3, 4)), ])
+@pytest.mark.parametrize(
+    "matrix",
+    [
+        [0.0],
+        np.ones((3, 3, 3)),
+        np.ones((3, 4)),
+    ],
+)
 def test_linear_typeerrors1(matrix):
     """Exercise errors in Affine creation."""
     with pytest.raises(TypeError):
@@ -95,6 +82,20 @@ def test_loadsave_itk(tmp_path, data_path, testdata_path):
     assert single_xfm == nitl.Affine.from_filename(
         data_path / "affine-LAS.itk.tfm", fmt="itk"
     )
+
+
+def test_mapping_chain(data_path):
+    xfm = nitl.load(data_path / "itktflist2.tfm", fmt="itk")
+    xfm = nitl.load(data_path / "itktflist2.tfm", fmt="itk")
+    assert len(xfm) == 9
+
+    # Addiition produces a chain
+    chain = xfm + xfm
+    # Length now means number of transforms, not number of affines in one transform
+    assert len(chain) == 2
+    # Just because a LinearTransformsMapping is iterable does not mean we decompose it
+    chain += xfm
+    assert len(chain) == 3
 
 
 @pytest.mark.parametrize(
@@ -157,7 +158,9 @@ def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
 
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(
+                fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file
+            ).matrix,
         )
     else:
         assert xfm == nitl.load(fname, fmt=supplied_fmt, reference=ref_file)
@@ -167,7 +170,9 @@ def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(
+                fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file
+            ).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
@@ -181,7 +186,9 @@ def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(
+                fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file
+            ).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
@@ -191,7 +198,9 @@ def test_loadsave(tmp_path, data_path, testdata_path, autofmt, fmt):
     if fmt == "fsl":
         assert np.allclose(
             xfm.matrix,
-            nitl.load(fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file).matrix,
+            nitl.load(
+                fname, fmt=supplied_fmt, reference=ref_file, moving=ref_file
+            ).matrix,
             rtol=1e-2,  # FSL incurs into large errors due to rounding
         )
     else:
@@ -211,12 +220,15 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
         T = np.linalg.inv(T)
 
     xfm = (
-        nitl.Affine(T) if (sw_tool, image_orientation) != ("afni", "oblique") else
+        nitl.Affine(T)
+        if (sw_tool, image_orientation) != ("afni", "oblique")
         # AFNI is special when moving or reference are oblique - let io do the magic
-        nitl.Affine(io.afni.AFNILinearTransform.from_ras(T).to_ras(
-            reference=img,
-            moving=img,
-        ))
+        else nitl.Affine(
+            io.afni.AFNILinearTransform.from_ras(T).to_ras(
+                reference=img,
+                moving=img,
+            )
+        )
     )
     xfm.reference = img
 
@@ -226,143 +238,71 @@ def test_linear_save(tmpdir, data_path, get_testdata, image_orientation, sw_tool
     elif sw_tool == "fs":
         ext = ".lta"
 
-    xfm_fname1 = "M.%s%s" % (sw_tool, ext)
+    xfm_fname1 = f"M.{sw_tool}{ext}"
     xfm.to_filename(xfm_fname1, fmt=sw_tool)
 
     xfm_fname2 = str(data_path / "affine-%s.%s%s") % (image_orientation, sw_tool, ext)
     assert_affines_by_filename(xfm_fname1, xfm_fname2)
 
 
-@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", 'oblique', ])
-@pytest.mark.parametrize("sw_tool", ["itk", "fsl", "afni", "fs"])
-def test_apply_linear_transform(tmpdir, get_testdata, get_testmask, image_orientation, sw_tool):
-    """Check implementation of exporting affines to formats."""
-    tmpdir.chdir()
-
-    img = get_testdata[image_orientation]
-    msk = get_testmask[image_orientation]
-
-    # Generate test transform
-    T = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
-    xfm = nitl.Affine(T)
-    xfm.reference = img
-
-    ext = ""
-    if sw_tool == "itk":
-        ext = ".tfm"
-    elif sw_tool == "fs":
-        ext = ".lta"
-
-    img.to_filename("img.nii.gz")
-    msk.to_filename("mask.nii.gz")
-
-    # Write out transform file (software-dependent)
-    xfm_fname = "M.%s%s" % (sw_tool, ext)
-    # Change reference dataset for AFNI & oblique
-    if (sw_tool, image_orientation) == ("afni", "oblique"):
-        io.afni.AFNILinearTransform.from_ras(
-            T,
-            moving=img,
-            reference=img,
-        ).to_filename(xfm_fname)
-    else:
-        xfm.to_filename(xfm_fname, fmt=sw_tool)
-
-    cmd = APPLY_LINEAR_CMD[sw_tool](
-        transform=os.path.abspath(xfm_fname),
-        reference=os.path.abspath("mask.nii.gz"),
-        moving=os.path.abspath("mask.nii.gz"),
-        resampled=os.path.abspath("resampled_brainmask.nii.gz"),
-    )
-
-    # skip test if command is not available on host
-    exe = cmd.split(" ", 1)[0]
-    if not shutil.which(exe):
-        pytest.skip("Command {} not found on host".format(exe))
-
-    # resample mask
-    exit_code = check_call([cmd], shell=True)
-    assert exit_code == 0
-    sw_moved_mask = nb.load("resampled_brainmask.nii.gz")
-
-    nt_moved_mask = xfm.apply(msk, order=0)
-    nt_moved_mask.set_data_dtype(msk.get_data_dtype())
-    nt_moved_mask.to_filename("ntmask.nii.gz")
-    diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
-
-    assert np.sqrt((diff ** 2).mean()) < RMSE_TOL
-    brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
-
-    cmd = APPLY_LINEAR_CMD[sw_tool](
-        transform=os.path.abspath(xfm_fname),
-        reference=os.path.abspath("img.nii.gz"),
-        moving=os.path.abspath("img.nii.gz"),
-        resampled=os.path.abspath("resampled.nii.gz"),
-    )
-
-    exit_code = check_call([cmd], shell=True)
-    assert exit_code == 0
-    sw_moved = nb.load("resampled.nii.gz")
-    sw_moved.set_data_dtype(img.get_data_dtype())
-
-    nt_moved = xfm.apply(img, order=0)
-    diff = (
-        np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
-        - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
-    )
-
-    # A certain tolerance is necessary because of resampling at borders
-    assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL
-
-    nt_moved = xfm.apply("img.nii.gz", order=0)
-    diff = (
-        np.asanyarray(sw_moved.dataobj, dtype=sw_moved.get_data_dtype())
-        - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
-    )
-    # A certain tolerance is necessary because of resampling at borders
-    assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL
-
-
-def test_Affine_to_x5(tmpdir, testdata_path):
+@pytest.mark.parametrize("store_inverse", [True, False])
+def test_linear_to_x5(tmpdir, store_inverse):
     """Test affine's operations."""
     tmpdir.chdir()
+
+    # Test base operations
     aff = nitl.Affine()
-    with h5py.File("xfm.x5", "w") as f:
-        aff._to_hdf5(f.create_group("Affine"))
-
-    aff.reference = testdata_path / "someones_anatomy.nii.gz"
-    with h5py.File("withref-xfm.x5", "w") as f:
-        aff._to_hdf5(f.create_group("Affine"))
-
-
-def test_LinearTransformsMapping_apply(tmp_path, data_path, testdata_path):
-    """Apply transform mappings."""
-    hmc = nitl.load(
-        data_path / "hmc-itk.tfm", fmt="itk", reference=testdata_path / "sbref.nii.gz"
+    node = aff.to_x5(
+        metadata={"GeneratedBy": "FreeSurfer 8"}, store_inverse=store_inverse
     )
-    assert isinstance(hmc, nitl.LinearTransformsMapping)
+    assert node.type == "linear"
+    assert node.subtype == "affine"
+    assert node.representation == "matrix"
+    assert node.domain is None
+    assert node.transform.shape == (4, 4)
+    assert node.array_length == 1
+    assert (node.metadata or {}).get("GeneratedBy") == "FreeSurfer 8"
 
-    # Test-case: realign functional data on to sbref
-    nii = hmc.apply(
-        testdata_path / "func.nii.gz", order=1, reference=testdata_path / "sbref.nii.gz"
+    aff.to_filename("export1.x5", x5_inverse=store_inverse)
+
+    # Test round trip
+    assert aff == nitl.Affine.from_filename("export1.x5", fmt="X5")
+
+    # Test with Domain
+    img = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="float32"), np.eye(4))
+    img_path = Path(tmpdir) / "ref.nii.gz"
+    img.to_filename(str(img_path))
+    aff.reference = img_path
+    node = aff.to_x5()
+    assert node.domain.grid
+    assert node.domain.size == aff.reference.shape
+    aff.to_filename("export2.x5", x5_inverse=store_inverse)
+
+    # Test round trip
+    assert aff == nitl.Affine.from_filename("export2.x5", fmt="X5")
+
+    # Test with Jacobian
+    node.jacobian = np.zeros((2, 2, 2), dtype="float32")
+    io.x5.to_filename("export3.x5", [node])
+
+
+@pytest.mark.parametrize("store_inverse", [True, False])
+def test_mapping_to_x5(tmp_path, store_inverse):
+    mats = [
+        np.eye(4),
+        np.array([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]]),
+    ]
+    mapping = nitl.LinearTransformsMapping(mats)
+    node = mapping.to_x5(
+        metadata={"GeneratedBy": "FreeSurfer 8"}, store_inverse=store_inverse
     )
-    assert nii.dataobj.shape[-1] == len(hmc)
+    assert node.array_length == 2
+    assert node.transform.shape == (2, 4, 4)
 
-    # Test-case: write out a fieldmap moved with head
-    hmcinv = nitl.LinearTransformsMapping(
-        np.linalg.inv(hmc.matrix), reference=testdata_path / "func.nii.gz"
-    )
-    nii = hmcinv.apply(testdata_path / "fmap.nii.gz", order=1)
-    assert nii.dataobj.shape[-1] == len(hmc)
+    mapping.to_filename(tmp_path / "export1.x5", x5_inverse=store_inverse)
 
-    # Ensure a ValueError is issued when trying to do weird stuff
-    hmc = nitl.LinearTransformsMapping(hmc.matrix[:1, ...])
-    with pytest.raises(ValueError):
-        hmc.apply(
-            testdata_path / "func.nii.gz",
-            order=1,
-            reference=testdata_path / "sbref.nii.gz",
-        )
+    # Test round trip
+    assert mapping == nitl.Affine.from_filename(tmp_path / "export1.x5", fmt="X5")
 
 
 def test_mulmat_operator(testdata_path):

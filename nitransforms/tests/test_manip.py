@@ -1,19 +1,12 @@
 # emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """Tests of nonlinear transforms."""
-import os
-import shutil
-from subprocess import check_call
+
 import pytest
 
 import numpy as np
-import nibabel as nb
-from ..manip import load as _load, TransformChain
+from ..manip import TransformChain
 from ..linear import Affine
-from .test_nonlinear import (
-    RMSE_TOL,
-    APPLY_NONLINEAR_CMD,
-)
 
 FMT = {"lta": "fs", "tfm": "itk"}
 

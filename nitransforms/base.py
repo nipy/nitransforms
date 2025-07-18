@@ -7,6 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
+
 from pathlib import Path
 import numpy as np
 import h5py
@@ -15,7 +16,7 @@ from nibabel.loadsave import load as _nbload
 from nibabel import funcs as _nbfuncs
 from nibabel.nifti1 import intent_codes as INTENT_CODES
 from nibabel.cifti2 import Cifti2Image
-from scipy import ndimage as ndi
+import nibabel as nb
 
 EQUALITY_TOL = 1e-5
 
@@ -87,6 +88,76 @@ class SampledSpatialData:
     def shape(self):
         """Access the space's size of each dimension."""
         return self._shape
+
+
+class SurfaceMesh(SampledSpatialData):
+    """Class to represent surface meshes."""
+
+    __slots__ = ["_triangles"]
+
+    def __init__(self, dataset):
+        """Create a sampling reference."""
+        self._shape = None
+
+        if isinstance(dataset, SurfaceMesh):
+            self._coords = dataset._coords
+            self._triangles = dataset._triangles
+            self._ndim = dataset._ndim
+            self._npoints = dataset._npoints
+            self._shape = dataset._shape
+            return
+
+        if isinstance(dataset, (str, Path)):
+            dataset = _nbload(str(dataset))
+
+        if hasattr(dataset, "numDA"):  # Looks like a Gifti file
+            _das = dataset.get_arrays_from_intent(INTENT_CODES["pointset"])
+            if not _das:
+                raise TypeError(
+                    "Input Gifti file does not contain reference coordinates."
+                )
+            self._coords = np.vstack([da.data for da in _das])
+            _tris = dataset.get_arrays_from_intent(INTENT_CODES["triangle"])
+            self._triangles = np.vstack([da.data for da in _tris])
+            self._npoints, self._ndim = self._coords.shape
+            self._shape = self._coords.shape
+            return
+
+        if isinstance(dataset, Cifti2Image):
+            raise NotImplementedError
+
+        raise ValueError("Dataset could not be interpreted as an irregular sample.")
+
+    def check_sphere(self, tolerance=1.001):
+        """Check sphericity of surface.
+        Based on https://github.com/Washington-University/workbench/blob/\
+7ba3345d161d567a4b628ceb02ab4471fc96cb20/src/Files/SurfaceResamplingHelper.cxx#L503
+        """
+        dists = np.linalg.norm(self._coords, axis=1)
+        return (dists.min() * tolerance) > dists.max()
+
+    def set_radius(self, radius=100):
+        if not self.check_sphere():
+            raise ValueError("You should only set the radius on spherical surfaces.")
+        dists = np.linalg.norm(self._coords, axis=1)
+        self._coords = self._coords * (radius / dists).reshape((-1, 1))
+
+    @classmethod
+    def from_arrays(cls, coordinates, triangles):
+        darrays = [
+            nb.gifti.GiftiDataArray(
+                coordinates.astype(np.float32),
+                intent=nb.nifti1.intent_codes["NIFTI_INTENT_POINTSET"],
+                datatype=nb.nifti1.data_type_codes["NIFTI_TYPE_FLOAT32"],
+            ),
+            nb.gifti.GiftiDataArray(
+                triangles.astype(np.int32),
+                intent=nb.nifti1.intent_codes["NIFTI_INTENT_TRIANGLE"],
+                datatype=nb.nifti1.data_type_codes["NIFTI_TYPE_INT32"],
+            ),
+        ]
+        gii = nb.gifti.GiftiImage(darrays=darrays)
+        return cls(gii)
 
 
 class ImageGrid(SampledSpatialData):
@@ -178,7 +249,10 @@ class ImageGrid(SampledSpatialData):
 class TransformBase:
     """Abstract image class to represent transforms."""
 
-    __slots__ = ("_reference",)
+    __slots__ = (
+        "_reference",
+        "_ndim",
+    )
 
     def __init__(self, reference=None):
         """Instantiate a transform."""
@@ -206,6 +280,22 @@ class TransformBase:
 
         return TransformChain(transforms=[self, b])
 
+    def __len__(self):
+        """
+        Enable ``len()``.
+
+        By default, all transforms are of length one.
+        This must be overriden by transforms arrays and chains.
+
+        Example
+        -------
+        >>> T1 = TransformBase()
+        >>> len(T1)
+        1
+
+        """
+        return 1
+
     @property
     def reference(self):
         """Access a reference space where data will be resampled onto."""
@@ -220,97 +310,7 @@ class TransformBase:
     @property
     def ndim(self):
         """Access the dimensions of the reference space."""
-        return self.reference.ndim
-
-    def apply(
-        self,
-        spatialimage,
-        reference=None,
-        order=3,
-        mode="constant",
-        cval=0.0,
-        prefilter=True,
-        output_dtype=None,
-    ):
-        """
-        Apply a transformation to an image, resampling on the reference spatial object.
-
-        Parameters
-        ----------
-        spatialimage : `spatialimage`
-            The image object containing the data to be resampled in reference
-            space
-        reference : spatial object, optional
-            The image, surface, or combination thereof containing the coordinates
-            of samples that will be sampled.
-        order : int, optional
-            The order of the spline interpolation, default is 3.
-            The order has to be in the range 0-5.
-        mode : {'constant', 'reflect', 'nearest', 'mirror', 'wrap'}, optional
-            Determines how the input image is extended when the resamplings overflows
-            a border. Default is 'constant'.
-        cval : float, optional
-            Constant value for ``mode='constant'``. Default is 0.0.
-        prefilter: bool, optional
-            Determines if the image's data array is prefiltered with
-            a spline filter before interpolation. The default is ``True``,
-            which will create a temporary *float64* array of filtered values
-            if *order > 1*. If setting this to ``False``, the output will be
-            slightly blurred if *order > 1*, unless the input is prefiltered,
-            i.e. it is the result of calling the spline filter on the original
-            input.
-
-        Returns
-        -------
-        resampled : `spatialimage` or ndarray
-            The data imaged after resampling to reference space.
-
-        """
-        if reference is not None and isinstance(reference, (str, Path)):
-            reference = _nbload(str(reference))
-
-        _ref = (
-            self.reference if reference is None else SpatialReference.factory(reference)
-        )
-
-        if _ref is None:
-            raise TransformError("Cannot apply transform without reference")
-
-        if isinstance(spatialimage, (str, Path)):
-            spatialimage = _nbload(str(spatialimage))
-
-        data = np.asanyarray(
-            spatialimage.dataobj,
-            dtype=spatialimage.get_data_dtype()
-        )
-        output_dtype = output_dtype or data.dtype
-        targets = ImageGrid(spatialimage).index(  # data should be an image
-            _as_homogeneous(self.map(_ref.ndcoords.T), dim=_ref.ndim)
-        )
-
-        resampled = ndi.map_coordinates(
-            data,
-            targets.T,
-            output=output_dtype,
-            order=order,
-            mode=mode,
-            cval=cval,
-            prefilter=prefilter,
-        )
-
-        if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
-            hdr = None
-            if _ref.header is not None:
-                hdr = _ref.header.copy()
-                hdr.set_data_dtype(output_dtype)
-            moved = spatialimage.__class__(
-                resampled.reshape(_ref.shape).astype(output_dtype),
-                _ref.affine,
-                hdr,
-            )
-            return moved
-
-        return resampled
+        raise TypeError("TransformBase has no dimensions")
 
     def map(self, x, inverse=False):
         r"""
@@ -347,6 +347,17 @@ class TransformBase:
         """Serialize this object into the x5 file format."""
         raise NotImplementedError
 
+    def apply(self, *args, **kwargs):
+        """Apply the transform to a dataset.
+
+        Deprecated. Please use ``nitransforms.resampling.apply`` instead.
+        """
+        _msg = "This method is deprecated. Please use `nitransforms.resampling.apply` instead."
+        warnings.warn(_msg, DeprecationWarning, stacklevel=2)
+        from .resampling import apply
+
+        return apply(self, *args, **kwargs)
+
 
 def _as_homogeneous(xyz, dtype="float32", dim=3):
     """
@@ -377,4 +388,8 @@ def _as_homogeneous(xyz, dtype="float32", dim=3):
 
 def _apply_affine(x, affine, dim):
     """Get the image array's indexes corresponding to coordinates."""
-    return affine.dot(_as_homogeneous(x, dim=dim).T)[:dim, ...].T
+    return np.tensordot(
+        affine,
+        _as_homogeneous(x, dim=dim).T,
+        axes=1,
+    )[:dim, ...]

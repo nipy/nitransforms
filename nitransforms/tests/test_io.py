@@ -28,6 +28,8 @@ from nitransforms.io.lta import (
 )
 from nitransforms.io.base import LinearParameters, TransformIOError, TransformFileError
 from nitransforms.conftest import _datadir, _testdir
+from nitransforms.resampling import apply
+
 
 LPS = np.diag([-1, -1, 1, 1])
 ITK_MAT = LPS.dot(np.ones((4, 4)).dot(LPS))
@@ -180,7 +182,7 @@ def test_LT_conversions(data_path, fname):
         "oblique",
     ],
 )
-@pytest.mark.parametrize("sw", ["afni", "fsl", "fs", "itk"])
+@pytest.mark.parametrize("sw", ["afni", "fsl", "fs", "itk", "afni-array"])
 def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     tmpdir.chdir()
 
@@ -190,6 +192,8 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     ext = ""
     if sw == "afni":
         factory = afni.AFNILinearTransform
+    elif sw == "afni-array":
+        factory = afni.AFNILinearTransformArray
     elif sw == "fsl":
         factory = fsl.FSLLinearTransform
     elif sw == "itk":
@@ -204,7 +208,7 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
     with pytest.raises(TransformFileError):
         factory.from_string("")
 
-    fname = "affine-%s.%s%s" % (image_orientation, sw, ext)
+    fname = f"affine-{image_orientation}.{sw}{ext}"
 
     # Test the transform loaders are implemented
     xfm = factory.from_filename(data_path / fname)
@@ -222,6 +226,9 @@ def test_Linear_common(tmpdir, data_path, sw, image_orientation, get_testdata):
 
     # Test from_ras
     RAS = from_matvec(euler2mat(x=0.9, y=0.001, z=0.001), [4.0, 2.0, -1.0])
+    if sw == "afni-array":
+        RAS = np.array([RAS, RAS])
+
     xfm = factory.from_ras(RAS, reference=reference, moving=moving)
     assert np.allclose(xfm.to_ras(reference=reference, moving=moving), RAS)
 
@@ -262,7 +269,7 @@ def test_LinearList_common(tmpdir, data_path, sw, image_orientation, get_testdat
 
     tflist1 = factory(mats)
 
-    fname = "affine-%s.%s%s" % (image_orientation, sw, ext)
+    fname = f"affine-{image_orientation}.{sw}{ext}"
 
     with pytest.raises(FileNotFoundError):
         factory.from_filename(fname)
@@ -305,7 +312,7 @@ def test_ITKLinearTransform(tmpdir, testdata_path):
 
     # Test to_filename(textfiles)
     itkxfm.to_filename("textfile.tfm")
-    with open("textfile.tfm", "r") as f:
+    with open("textfile.tfm") as f:
         itkxfm2 = itk.ITKLinearTransform.from_fileobj(f)
     assert np.allclose(itkxfm["parameters"], itkxfm2["parameters"])
 
@@ -492,10 +499,13 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     assert np.allclose(card_aff, nb.load("deob_3drefit.nii.gz").affine)
 
     # Check that nitransforms can emulate 3drefit -deoblique
-    nt3drefit = Affine(
-        afni._cardinal_rotation(img.affine, False),
-        reference="deob_3drefit.nii.gz",
-    ).apply("orig.nii.gz")
+    nt3drefit = apply(
+        Affine(
+            afni._cardinal_rotation(img.affine, False),
+            reference="deob_3drefit.nii.gz",
+        ),
+        "orig.nii.gz",
+    )
 
     diff = (
         np.asanyarray(img.dataobj, dtype="uint8")
@@ -504,10 +514,13 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     assert np.sqrt((diff[10:-10, 10:-10, 10:-10] ** 2).mean()) < 0.1
 
     # Check that nitransforms can revert 3drefit -deoblique
-    nt_undo3drefit = Affine(
-        afni._cardinal_rotation(img.affine, True),
-        reference="orig.nii.gz",
-    ).apply("deob_3drefit.nii.gz")
+    nt_undo3drefit = apply(
+        Affine(
+            afni._cardinal_rotation(img.affine, True),
+            reference="orig.nii.gz",
+        ),
+        "deob_3drefit.nii.gz",
+    )
 
     diff = (
         np.asanyarray(img.dataobj, dtype="uint8")
@@ -526,16 +539,21 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     assert np.allclose(deobaff, deobnii.affine)
 
     # Check resampling in deobliqued grid
-    ntdeobnii = Affine(np.eye(4), reference=deobnii.__class__(
-        np.zeros(deobshape, dtype="uint8"),
-        deobaff,
-        deobnii.header
-    )).apply(img, order=0)
+    ntdeobnii = apply(
+        Affine(np.eye(4), reference=deobnii.__class__(
+            np.zeros(deobshape, dtype="uint8"),
+            deobaff,
+            deobnii.header
+        )),
+        img,
+        order=0,
+    )
 
     # Generate an internal box to exclude border effects
     box = np.zeros(img.shape, dtype="uint8")
     box[10:-10, 10:-10, 10:-10] = 1
-    ntdeobmask = Affine(np.eye(4), reference=ntdeobnii).apply(
+    ntdeobmask = apply(
+        Affine(np.eye(4), reference=ntdeobnii),
         nb.Nifti1Image(box, img.affine, img.header),
         order=0,
     )

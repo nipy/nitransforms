@@ -14,7 +14,7 @@ A development repo for `nipy/nibabel#656 <https://github.com/nipy/nibabel/pull/6
 .. image:: https://circleci.com/gh/nipy/nitransforms.svg?style=svg
     :target: https://circleci.com/gh/nipy/nitransforms
 
-.. image:: https://github.com/nipy/nitransforms/actions/workflows/travis.yml/badge.svg
+.. image:: https://github.com/nipy/nitransforms/actions/workflows/tox.yml/badge.svg
     :target: https://github.com/nipy/nitransforms/actions
 
 .. image:: https://img.shields.io/badge/doi-10.31219%2Fosf.io%2F8aq7b-blue.svg

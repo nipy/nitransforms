@@ -67,6 +67,11 @@ class TransformChain(TransformBase):
         return len(self.transforms)
 
     @property
+    def ndim(self):
+        """Get the number of dimensions."""
+        return max(x.ndim for x in self._transforms)
+
+    @property
     def transforms(self):
         """Get the internal list of transforms."""
         return self._transforms
@@ -206,6 +211,8 @@ def _as_chain(x):
     """Convert a value into a transform chain."""
     if isinstance(x, TransformChain):
         return x.transforms
+    if isinstance(x, TransformBase):
+        return [x]
     if isinstance(x, Iterable):
         return list(x)
     return [x]

@@ -7,22 +7,33 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Linear transforms."""
+
 import warnings
+from collections import namedtuple
 import numpy as np
 from pathlib import Path
-from scipy import ndimage as ndi
 
-from nibabel.loadsave import load as _nbload
 from nibabel.affines import from_matvec
+
+# Avoids circular imports
+try:
+    from nitransforms._version import __version__
+except ModuleNotFoundError:  # pragma: no cover
+    __version__ = "0+unknown"
 
 from nitransforms.base import (
     ImageGrid,
     TransformBase,
-    SpatialReference,
     _as_homogeneous,
     EQUALITY_TOL,
 )
 from nitransforms.io import get_linear_factory, TransformFileError
+from nitransforms.io.x5 import (
+    X5Transform,
+    X5Domain,
+    to_filename as save_x5,
+    from_filename as load_x5,
+)
 
 
 class Affine(TransformBase):
@@ -82,6 +93,23 @@ should be (0, 0, 0, 1), got %s."""
             self._matrix[3, :] = (0, 0, 0, 1)
             self._inverse = np.linalg.inv(self._matrix)
 
+    def __repr__(self):
+        """
+        Change representation to the internal matrix.
+
+        Example
+        -------
+        >>> Affine([
+        ...     [1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]
+        ... ])  # doctest: +NORMALIZE_WHITESPACE
+        array([[1, 0, 0, 4],
+               [0, 1, 0, 0],
+               [0, 0, 1, 0],
+               [0, 0, 0, 1]])
+
+        """
+        return repr(self.matrix)
+
     def __eq__(self, other):
         """
         Overload equals operator.
@@ -112,6 +140,10 @@ should be (0, 0, 0, 1), got %s."""
         """
         return self.__class__(self._inverse)
 
+    def __len__(self):
+        """Enable using len()."""
+        return 1 if self._matrix.ndim == 2 else len(self._matrix)
+
     def __matmul__(self, b):
         """
         Compose two Affines.
@@ -139,6 +171,87 @@ should be (0, 0, 0, 1), got %s."""
     def matrix(self):
         """Access the internal representation of this affine."""
         return self._matrix
+
+    @property
+    def ndim(self):
+        """Access the internal representation of this affine."""
+        return self._matrix.ndim + 1
+
+    @classmethod
+    def from_filename(
+        cls, filename, fmt=None, reference=None, moving=None, x5_position=0
+    ):
+        """Create an affine from a transform file."""
+
+        if fmt and fmt.upper() == "X5":
+            x5_xfm = load_x5(filename)[x5_position]
+            Transform = cls if x5_xfm.array_length == 1 else LinearTransformsMapping
+            if (
+                x5_xfm.domain
+                and not x5_xfm.domain.grid
+                and len(x5_xfm.domain.size) == 3
+            ):  # pragma: no cover
+                raise NotImplementedError(
+                    "Only 3D regularly gridded domains are supported"
+                )
+            elif x5_xfm.domain:
+                # Override reference
+                Domain = namedtuple("Domain", "affine shape")
+                reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
+
+            return Transform(x5_xfm.transform, reference=reference)
+
+        fmtlist = [fmt] if fmt is not None else ("itk", "lta", "afni", "fsl")
+
+        if fmt is not None and not Path(filename).exists():
+            if fmt != "fsl":
+                raise FileNotFoundError(
+                    f"[Errno 2] No such file or directory: '{filename}'"
+                )
+            elif not Path(f"{filename}.000").exists():
+                raise FileNotFoundError(
+                    f"[Errno 2] No such file or directory: '{filename}[.000]'"
+                )
+
+        is_array = cls != Affine
+        errors = []
+        for potential_fmt in fmtlist:
+            if potential_fmt == "itk" and Path(filename).suffix == ".mat":
+                is_array = False
+                cls = Affine
+
+            try:
+                struct = get_linear_factory(
+                    potential_fmt, is_array=is_array
+                ).from_filename(filename)
+            except (TransformFileError, FileNotFoundError) as err:
+                errors.append((potential_fmt, err))
+                continue
+
+            matrix = struct.to_ras(reference=reference, moving=moving)
+            return cls(matrix, reference=reference)
+
+        raise TransformFileError(
+            f"Could not open <{filename}> (formats tried: {', '.join(fmtlist)})."
+        )
+
+    @classmethod
+    def from_matvec(cls, mat=None, vec=None, reference=None):
+        """
+        Create an affine from a matrix and translation pair.
+
+        Example
+        -------
+        >>> Affine.from_matvec(vec=(4, 0, 0))  # doctest: +NORMALIZE_WHITESPACE
+        array([[1., 0., 0., 4.],
+               [0., 1., 0., 0.],
+               [0., 0., 1., 0.],
+               [0., 0., 0., 1.]])
+
+        """
+        mat = mat if mat is not None else np.eye(3)
+        vec = vec if vec is not None else np.zeros((3,))
+        return cls(from_matvec(mat, vector=vec), reference=reference)
 
     def map(self, x, inverse=False):
         r"""
@@ -172,18 +285,14 @@ should be (0, 0, 0, 1), got %s."""
             affine = self._inverse
         return affine.dot(coords).T[..., :-1]
 
-    def _to_hdf5(self, x5_root):
-        """Serialize this object into the x5 file format."""
-        xform = x5_root.create_dataset("Transform", data=[self._matrix])
-        xform.attrs["Type"] = "affine"
-        x5_root.create_dataset("Inverse", data=[(~self).matrix])
-
-        if self._reference:
-            self.reference._to_hdf5(x5_root.create_group("Reference"))
-
-    def to_filename(self, filename, fmt="X5", moving=None):
+    def to_filename(self, filename, fmt="X5", moving=None, x5_inverse=False):
         """Store the transform in the requested output format."""
-        writer = get_linear_factory(fmt, is_array=False)
+        if fmt.upper() == "X5":
+            return save_x5(filename, [self.to_x5(store_inverse=x5_inverse)])
+
+        writer = get_linear_factory(
+            fmt, is_array=isinstance(self, LinearTransformsMapping)
+        )
 
         if fmt.lower() in ("itk", "ants", "elastix"):
             writer.from_ras(self.matrix).to_filename(filename)
@@ -196,78 +305,30 @@ should be (0, 0, 0, 1), got %s."""
             ).to_filename(filename)
         return filename
 
-    @classmethod
-    def from_filename(cls, filename, fmt=None, reference=None, moving=None):
-        """Create an affine from a transform file."""
-        fmtlist = [fmt] if fmt is not None else ("itk", "lta", "afni", "fsl")
+    def to_x5(self, store_inverse=False, metadata=None):
+        """Return an :class:`~nitransforms.io.x5.X5Transform` representation."""
+        metadata = {"WrittenBy": f"NiTransforms {__version__}"} | (metadata or {})
 
-        if fmt is not None and not Path(filename).exists():
-            if fmt != "fsl":
-                raise FileNotFoundError(
-                    f"[Errno 2] No such file or directory: '{filename}'"
-                )
-            elif not Path(f"{filename}.000").exists():
-                raise FileNotFoundError(
-                    f"[Errno 2] No such file or directory: '{filename}[.000]'"
-                )
-
-        is_array = cls != Affine
-        errors = []
-        for potential_fmt in fmtlist:
-            if (potential_fmt == "itk" and Path(filename).suffix == ".mat"):
-                is_array = False
-                cls = Affine
-
-            try:
-                struct = get_linear_factory(
-                    potential_fmt,
-                    is_array=is_array
-                ).from_filename(filename)
-            except (TransformFileError, FileNotFoundError) as err:
-                errors.append((potential_fmt, err))
-                continue
-
-            matrix = struct.to_ras(reference=reference, moving=moving)
-            return cls(matrix, reference=reference)
-
-        raise TransformFileError(
-            f"Could not open <{filename}> (formats tried: {', '.join(fmtlist)})."
+        domain = None
+        if (reference := self.reference) is not None:
+            domain = X5Domain(
+                grid=True,
+                size=getattr(reference or {}, "shape", (0, 0, 0)),
+                mapping=reference.affine,
+                coordinates="cartesian",
+            )
+        kinds = tuple("space" for _ in range(self.ndim)) + ("vector",)
+        return X5Transform(
+            type="linear",
+            subtype="affine",
+            representation="matrix",
+            metadata=metadata,
+            transform=self.matrix,
+            dimension_kinds=kinds,
+            domain=domain,
+            inverse=(~self).matrix if store_inverse else None,
+            array_length=len(self),
         )
-
-    @classmethod
-    def from_matvec(cls, mat=None, vec=None, reference=None):
-        """
-        Create an affine from a matrix and translation pair.
-
-        Example
-        -------
-        >>> Affine.from_matvec(vec=(4, 0, 0))  # doctest: +NORMALIZE_WHITESPACE
-        array([[1., 0., 0., 4.],
-               [0., 1., 0., 0.],
-               [0., 0., 1., 0.],
-               [0., 0., 0., 1.]])
-
-        """
-        mat = mat if mat is not None else np.eye(3)
-        vec = vec if vec is not None else np.zeros((3,))
-        return cls(from_matvec(mat, vector=vec), reference=reference)
-
-    def __repr__(self):
-        """
-        Change representation to the internal matrix.
-
-        Example
-        -------
-        >>> Affine([
-        ...     [1, 0, 0, 4], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]
-        ... ])  # doctest: +NORMALIZE_WHITESPACE
-        array([[1, 0, 0, 4],
-               [0, 1, 0, 0],
-               [0, 0, 1, 0],
-               [0, 0, 0, 1]])
-
-        """
-        return repr(self.matrix)
 
 
 class LinearTransformsMapping(Affine):
@@ -317,10 +378,6 @@ class LinearTransformsMapping(Affine):
     def __getitem__(self, i):
         """Enable indexed access to the series of matrices."""
         return Affine(self.matrix[i, ...], reference=self._reference)
-
-    def __len__(self):
-        """Enable using len()."""
-        return len(self._matrix)
 
     def map(self, x, inverse=False):
         r"""
@@ -374,126 +431,6 @@ class LinearTransformsMapping(Affine):
         if inverse is True:
             affine = self._inverse
         return np.swapaxes(affine.dot(coords), 1, 2)
-
-    def to_filename(self, filename, fmt="X5", moving=None):
-        """Store the transform in the requested output format."""
-        writer = get_linear_factory(fmt, is_array=True)
-
-        if fmt.lower() in ("itk", "ants", "elastix"):
-            writer.from_ras(self.matrix).to_filename(filename)
-        else:
-            # Rest of the formats peek into moving and reference image grids
-            writer.from_ras(
-                self.matrix,
-                reference=self.reference,
-                moving=ImageGrid(moving) if moving is not None else self.reference,
-            ).to_filename(filename)
-        return filename
-
-    def apply(
-        self,
-        spatialimage,
-        reference=None,
-        order=3,
-        mode="constant",
-        cval=0.0,
-        prefilter=True,
-        output_dtype=None,
-    ):
-        """
-        Apply a transformation to an image, resampling on the reference spatial object.
-
-        Parameters
-        ----------
-        spatialimage : `spatialimage`
-            The image object containing the data to be resampled in reference
-            space
-        reference : spatial object, optional
-            The image, surface, or combination thereof containing the coordinates
-            of samples that will be sampled.
-        order : int, optional
-            The order of the spline interpolation, default is 3.
-            The order has to be in the range 0-5.
-        mode : {"constant", "reflect", "nearest", "mirror", "wrap"}, optional
-            Determines how the input image is extended when the resamplings overflows
-            a border. Default is "constant".
-        cval : float, optional
-            Constant value for ``mode="constant"``. Default is 0.0.
-        prefilter: bool, optional
-            Determines if the image's data array is prefiltered with
-            a spline filter before interpolation. The default is ``True``,
-            which will create a temporary *float64* array of filtered values
-            if *order > 1*. If setting this to ``False``, the output will be
-            slightly blurred if *order > 1*, unless the input is prefiltered,
-            i.e. it is the result of calling the spline filter on the original
-            input.
-
-        Returns
-        -------
-        resampled : `spatialimage` or ndarray
-            The data imaged after resampling to reference space.
-
-        """
-        if reference is not None and isinstance(reference, (str, Path)):
-            reference = _nbload(str(reference))
-
-        _ref = (
-            self.reference if reference is None else SpatialReference.factory(reference)
-        )
-
-        if isinstance(spatialimage, (str, Path)):
-            spatialimage = _nbload(str(spatialimage))
-
-        data = np.squeeze(np.asanyarray(spatialimage.dataobj))
-        output_dtype = output_dtype or data.dtype
-
-        ycoords = self.map(_ref.ndcoords.T)
-        targets = ImageGrid(spatialimage).index(  # data should be an image
-            _as_homogeneous(np.vstack(ycoords), dim=_ref.ndim)
-        )
-
-        if data.ndim == 4:
-            if len(self) != data.shape[-1]:
-                raise ValueError(
-                    "Attempting to apply %d transforms on a file with "
-                    "%d timepoints" % (len(self), data.shape[-1])
-                )
-            targets = targets.reshape((len(self), -1, targets.shape[-1]))
-            resampled = np.stack(
-                [
-                    ndi.map_coordinates(
-                        data[..., t],
-                        targets[t, ..., : _ref.ndim].T,
-                        output=output_dtype,
-                        order=order,
-                        mode=mode,
-                        cval=cval,
-                        prefilter=prefilter,
-                    )
-                    for t in range(data.shape[-1])
-                ],
-                axis=0,
-            )
-        elif data.ndim in (2, 3):
-            resampled = ndi.map_coordinates(
-                data,
-                targets[..., : _ref.ndim].T,
-                output=output_dtype,
-                order=order,
-                mode=mode,
-                cval=cval,
-                prefilter=prefilter,
-            )
-
-        if isinstance(_ref, ImageGrid):  # If reference is grid, reshape
-            newdata = resampled.reshape((len(self), *_ref.shape))
-            moved = spatialimage.__class__(
-                np.moveaxis(newdata, 0, -1), _ref.affine, spatialimage.header
-            )
-            moved.header.set_data_dtype(output_dtype)
-            return moved
-
-        return resampled
 
 
 def load(filename, fmt=None, reference=None, moving=None):
