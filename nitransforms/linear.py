@@ -377,11 +377,6 @@ class LinearTransformsMapping(Affine):
         )
         self._inverse = np.linalg.inv(self._matrix)
 
-    def __iter__(self):
-        """Enable iterating over the series of transforms."""
-        for _m in self.matrix:
-            yield Affine(_m, reference=self._reference)
-
     def __getitem__(self, i):
         """Enable indexed access to the series of matrices."""
         return Affine(self.matrix[i, ...], reference=self._reference)
