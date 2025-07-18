@@ -110,11 +110,13 @@ async def _apply_serial(
     for t in range(n_resamplings):
         xfm_t = transform if (n_resamplings == 1 or transform.ndim < 4) else transform[t]
 
-        targets_t = targets
-        if targets_t is None:
-            targets_t = ImageGrid(spatialimage).index(  # data should be an image
+        targets_t = (
+            ImageGrid(spatialimage).index(
                 _as_homogeneous(xfm_t.map(ref_ndcoords), dim=ref_ndim)
             )
+            if targets is None
+            else targets
+        )
 
         data_t = (
             data
