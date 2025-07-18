@@ -98,3 +98,12 @@ exclude_lines = [
     "raise NotImplementedError",
     "warnings\\.warn",
 ]
+
+[tool.flake8]
+max-line-length = 99
+doctests = false
+ignore = [
+    "E266",
+    "E231",
+    "W503",
+]
