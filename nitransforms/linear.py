@@ -9,6 +9,7 @@
 """Linear transforms."""
 
 import warnings
+from collections import namedtuple
 import numpy as np
 from pathlib import Path
 
@@ -27,7 +28,12 @@ from nitransforms.base import (
     EQUALITY_TOL,
 )
 from nitransforms.io import get_linear_factory, TransformFileError
-from nitransforms.io.x5 import X5Transform, X5Domain, to_filename as save_x5
+from nitransforms.io.x5 import (
+    X5Transform,
+    X5Domain,
+    to_filename as save_x5,
+    from_filename as load_x5,
+)
 
 
 class Affine(TransformBase):
@@ -174,8 +180,29 @@ should be (0, 0, 0, 1), got %s."""
         return self._matrix.ndim + 1
 
     @classmethod
-    def from_filename(cls, filename, fmt=None, reference=None, moving=None):
+    def from_filename(
+        cls, filename, fmt=None, reference=None, moving=None, x5_position=0
+    ):
         """Create an affine from a transform file."""
+
+        if fmt and fmt.upper() == "X5":
+            x5_xfm = load_x5(filename)[x5_position]
+            Transform = cls if x5_xfm.array_length == 1 else LinearTransformsMapping
+            if (
+                x5_xfm.domain
+                and not x5_xfm.domain.grid
+                and len(x5_xfm.domain.size) == 3
+            ):  # pragma: no cover
+                raise NotImplementedError(
+                    "Only 3D regularly gridded domains are supported"
+                )
+            elif x5_xfm.domain:
+                # Override reference
+                Domain = namedtuple("Domain", "affine shape")
+                reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
+
+            return Transform(x5_xfm.transform, reference=reference)
+
         fmtlist = [fmt] if fmt is not None else ("itk", "lta", "afni", "fsl")
 
         if fmt is not None and not Path(filename).exists():
@@ -265,7 +292,9 @@ should be (0, 0, 0, 1), got %s."""
         if fmt.upper() == "X5":
             return save_x5(filename, [self.to_x5(store_inverse=x5_inverse)])
 
-        writer = get_linear_factory(fmt, is_array=isinstance(self, LinearTransformsMapping))
+        writer = get_linear_factory(
+            fmt, is_array=isinstance(self, LinearTransformsMapping)
+        )
 
         if fmt.lower() in ("itk", "ants", "elastix"):
             writer.from_ras(self.matrix).to_filename(filename)
