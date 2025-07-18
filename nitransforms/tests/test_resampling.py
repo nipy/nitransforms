@@ -365,7 +365,8 @@ def test_LinearTransformsMapping_apply(
         )
 
 
-def test_apply_serialized_4d_multiple_targets():
+@pytest.mark.parametrize("serialize_4d", [True, False])
+def test_apply_4d(serialize_4d):
     """Regression test for per-volume transforms with serialized resampling."""
     nvols = 9
     shape = (10, 5, 5)
@@ -379,9 +380,11 @@ def test_apply_serialized_4d_multiple_targets():
         mat[0, 3] = i
         transforms.append(nitl.Affine(mat))
 
-    xfm = nitl.LinearTransformsMapping(transforms, reference=img)
-    moved = apply(xfm, img, order=0)
+    extraparams = {} if serialize_4d else {"serialize_nvols": nvols + 1}
 
+    xfm = nitl.LinearTransformsMapping(transforms, reference=img)
+
+    moved = apply(xfm, img, order=0, **extraparams)
     data = np.asanyarray(moved.dataobj)
     idxs = [tuple(np.argwhere(data[..., i])[0]) for i in range(nvols)]
     assert idxs == [(9 - i, 2, 2) for i in range(nvols)]
