@@ -286,15 +286,23 @@ def test_linear_to_x5(tmpdir, store_inverse):
     io.x5.to_filename("export3.x5", [node])
 
 
-def test_mapping_to_x5():
+@pytest.mark.parametrize("store_inverse", [True, False])
+def test_mapping_to_x5(tmp_path, store_inverse):
     mats = [
         np.eye(4),
         np.array([[1, 0, 0, 1], [0, 1, 0, 2], [0, 0, 1, 3], [0, 0, 0, 1]]),
     ]
     mapping = nitl.LinearTransformsMapping(mats)
-    node = mapping.to_x5()
+    node = mapping.to_x5(
+        metadata={"GeneratedBy": "FreeSurfer 8"}, store_inverse=store_inverse
+    )
     assert node.array_length == 2
     assert node.transform.shape == (2, 4, 4)
+
+    mapping.to_filename(tmp_path / "export1.x5", x5_inverse=store_inverse)
+
+    # Test round trip
+    assert mapping == nitl.Affine.from_filename(tmp_path / "export1.x5", fmt="X5")
 
 
 def test_mulmat_operator(testdata_path):
