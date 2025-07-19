@@ -6,8 +6,6 @@ import nibabel as nb
 import pytest
 import tempfile
 
-_data = None
-_brainmask = None
 _testdir = Path(os.getenv("TEST_DATA_HOME", "~/.nitransforms/testdata")).expanduser()
 _outdir = os.getenv("TEST_OUTPUT_DIR", None)
 
@@ -56,10 +54,6 @@ def output_path():
 @pytest.fixture
 def get_testdata():
     """Generate data in the requested orientation."""
-    global _data
-
-    if _data is not None:
-        return _data
 
     return _reorient(_testdir / "someones_anatomy.nii.gz")
 
@@ -67,11 +61,6 @@ def get_testdata():
 @pytest.fixture
 def get_testmask():
     """Generate data in the requested orientation."""
-    global _brainmask
-
-    if _brainmask is not None:
-        return _brainmask
-
     return _reorient(_testdir / "someones_anatomy_brainmask.nii.gz")
 
 

@@ -1,6 +1,9 @@
 """Tests of the base module."""
+
 import numpy as np
 import nibabel as nb
+from nibabel.arrayproxy import get_obj_dtype
+
 import pytest
 import h5py
 
@@ -97,7 +100,7 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     fname = testdata_path / "someones_anatomy.nii.gz"
 
     img = nb.load(fname)
-    imgdata = np.asanyarray(img.dataobj, dtype=img.get_data_dtype())
+    imgdata = np.asanyarray(img.dataobj, dtype=get_obj_dtype(img.dataobj))
 
     # Test identity transform - setting reference
     xfm = TransformBase()
@@ -111,7 +114,10 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
     xfm = nitl.Affine()
     xfm.reference = fname
     moved = apply(xfm, fname, order=0)
-    assert np.all(imgdata == np.asanyarray(moved.dataobj, dtype=moved.get_data_dtype()))
+
+    assert np.all(
+        imgdata == np.asanyarray(moved.dataobj, dtype=get_obj_dtype(moved.dataobj))
+    )
 
     # Test ndim returned by affine
     assert nitl.Affine().ndim == 3
@@ -165,7 +171,10 @@ def test_concatenation(testdata_path):
 
 def test_SurfaceMesh(testdata_path):
     surf_path = testdata_path / "sub-200148_hemi-R_pial.surf.gii"
-    shape_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
+    shape_path = (
+        testdata_path
+        / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
+    )
     img_path = testdata_path / "bold.nii.gz"
 
     mesh = SurfaceMesh(nb.load(surf_path))
@@ -189,3 +198,18 @@ def test_SurfaceMesh(testdata_path):
 
     with pytest.raises(TypeError):
         SurfaceMesh(nb.load(shape_path))
+
+
+def test_apply_deprecation(monkeypatch):
+    """Make sure a deprecation warning is issued."""
+    from nitransforms import resampling
+
+    def _retval(*args, **kwargs):
+        return 1
+
+    monkeypatch.setattr(resampling, "apply", _retval)
+
+    with pytest.deprecated_call():
+        retval = TransformBase().apply()
+
+    assert retval == 1

@@ -20,23 +20,18 @@ from . import linear, manip, nonlinear, surface
 from .linear import Affine, LinearTransformsMapping
 from .nonlinear import DenseFieldTransform
 from .manip import TransformChain
+from .resampling import apply
 
 try:
     from ._version import __version__
 except ModuleNotFoundError:
-    from pkg_resources import get_distribution, DistributionNotFound
-
-    try:
-        __version__ = get_distribution("nitransforms").version
-    except DistributionNotFound:
-        __version__ = "unknown"
-    del get_distribution
-    del DistributionNotFound
+    __version__ = "0+unknown"
 
 __packagename__ = "nitransforms"
 __copyright__ = "Copyright (c) 2021 The NiPy developers"
 
 __all__ = [
+    "apply",
     "surface",
     "linear",
     "manip",

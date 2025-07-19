@@ -1,3 +1,142 @@
+25.0.0 (TBD)
+============
+A new major release with critical updates.
+The new release includes a critical hotfix for 4D resamplings.
+The second major improvement is the inclusion of a first implementation of the X5 format (BIDS).
+The X5 implementation is currently restricted to reading/writing of linear transforms.
+
+CHANGES
+-------
+* FIX: Broken 4D resampling by @oesteban in https://github.com/nipy/nitransforms/pull/247
+* ENH: Loading of X5 (linear) transforms by @oesteban in https://github.com/nipy/nitransforms/pull/243
+* ENH: Implement X5 representation and output to filesystem by @oesteban in https://github.com/nipy/nitransforms/pull/241
+* DOC: Fix references to ``os.PathLike`` by @oesteban in https://github.com/nipy/nitransforms/pull/242
+* MNT: Increase coverage by testing edge cases and adding docstrings by @oesteban in https://github.com/nipy/nitransforms/pull/248
+* MNT: Refactor io/lta to reduce one partial line by @oesteban in https://github.com/nipy/nitransforms/pull/246
+* MNT: Move flake8 config into ``pyproject.toml`` by @oesteban in https://github.com/nipy/nitransforms/pull/245
+* MNT: Configure coverage to omit tests by @oesteban in https://github.com/nipy/nitransforms/pull/244
+
+24.1.2 (June 02, 2025)
+======================
+New patch release that addresses a crash when applying a 3D transform to a 4D image.
+
+New Contributors
+----------------
+* @coryshain made their first contribution in https://github.com/nipy/nitransforms/pull/236
+
+CHANGES
+-------
+* FIX: Patch for crash when applying 3D transform to 4D image (#236)
+* MNT: Switch from zenodo.json to CITATION.cff, add contributors (#237)
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.1.1...24.1.2
+
+24.1.1 (December 18, 2024)
+==========================
+New patch release that adds ``nitransforms.resampling.apply`` as a top-level import, and removes the `pkg_resources` dependency.
+
+CHANGES
+-------
+
+* RF: Add nitransforms.resamping.apply to top module imports in https://github.com/nipy/nitransforms/pull/227
+* FIX: Remove pkg_resources dependency in https://github.com/nipy/nitransforms/pull/230
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.1.0...24.1.1
+
+24.1.0 (November 17, 2024)
+==========================
+New feature release in the 24.1.x series.
+
+This release has the same code as 24.0.2, but the package has been
+tested with Numpy 2.0 and Python 3.13 and the metadata updated accordingly.
+
+CHANGES
+-------
+* MAINT: Transition to pyproject.toml and tox, support numpy 2, python 3.13
+  by @effigies in https://github.com/nipy/nitransforms/pull/228
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.0.2...24.1.0
+
+24.0.2 (September 21, 2024)
+===========================
+Bug-fix release in the 24.0.x series.
+
+CHANGES
+-------
+
+* FIX: Add per-volume transforms as single transform in chain by @effigies in https://github.com/nipy/nitransforms/pull/226
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.0.1...24.0.2
+
+24.0.1 (September 17, 2024)
+===========================
+Bug-fix release in the 24.0.x series.
+
+New Contributors
+----------------
+* @shnizzedy made their first contribution in https://github.com/nipy/nitransforms/pull/222
+
+CHANGES
+-------
+
+* FIX: Use standard library ``pathlib`` by @shnizzedy in https://github.com/nipy/nitransforms/pull/222
+* MAINT: Support pre-``__or__`` types by @effigies in https://github.com/nipy/nitransforms/pull/223
+* MAINT: Bump the actions-infrastructure group with 3 updates by @dependabot in https://github.com/nipy/nitransforms/pull/224
+* MAINT: Bump codecov/codecov-action from 3 to 4 by @dependabot in https://github.com/nipy/nitransforms/pull/225
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.0.0...24.0.1
+
+24.0.0 (August 18, 2024)
+========================
+A new series incorporating several major changes, including bugfixes and taking on several
+housekeeping/maintenance actions.
+One relevant change is the outsourcing of the ``apply()`` member out of
+transformation data structures by @jmarabotto.
+The method ``apply()`` is now a standalone method that operates on one transform
+and images/surfaces/etc. provided as arguments.
+A later major development is the adoption of a foundation for surface transforms by @feilong
+and @Shotgunosine.
+
+New Contributors
+----------------
+
+* @mvdoc made their first contribution in https://github.com/nipy/nitransforms/pull/194
+* @jmarabotto made their first contribution in https://github.com/nipy/nitransforms/pull/197
+* @bpinsard made their first contribution in https://github.com/nipy/nitransforms/pull/182
+* @jbanusco made their first contribution in https://github.com/nipy/nitransforms/pull/188
+* @feilong made their first contribution in https://github.com/nipy/nitransforms/pull/203
+
+CHANGES
+-------
+
+* FIX: Inefficient iterative reloading of reference and moving images by @oesteban in https://github.com/nipy/nitransforms/pull/186
+* FIX: Postpone coordinate mapping on linear array transforms by @oesteban in https://github.com/nipy/nitransforms/pull/187
+* FIX: Remove unsafe cast during ``TransformBase.apply()`` by @effigies in https://github.com/nipy/nitransforms/pull/189
+* FIX: ``_is_oblique()`` by @mvdoc in https://github.com/nipy/nitransforms/pull/194
+* FIX: Update implementation of ``ndim`` property of transforms by @jmarabotto in https://github.com/nipy/nitransforms/pull/197
+* FIX: Output displacement fields by @bpinsard in https://github.com/nipy/nitransforms/pull/182
+* FIX: Composition of deformation fields by @jbanusco in https://github.com/nipy/nitransforms/pull/188
+* FIX: Indexing disallowed in lists introduced by bugfix by @oesteban in https://github.com/nipy/nitransforms/pull/204
+* FIX: Do not transpose (see :obj:`~scipy.ndimage.map_coordinates`) by @oesteban in https://github.com/nipy/nitransforms/pull/207
+* FIX: Forgotten test using ``xfm.apply()`` by @oesteban in https://github.com/nipy/nitransforms/pull/208
+* FIX: Load ITK fields from H5 correctly by @effigies in https://github.com/nipy/nitransforms/pull/211
+* FIX: Wrong warning argument name ``level`` in ``warnings.warn`` by @oesteban in https://github.com/nipy/nitransforms/pull/216
+* ENH: Define ``ndim`` property on nonlinear transforms by @oesteban in https://github.com/nipy/nitransforms/pull/201
+* ENH: Outsource ``apply()`` from transform objects by @jmarabotto in https://github.com/nipy/nitransforms/pull/195
+* ENH: Restore ``apply()`` method, warning of deprecation and calling function by @effigies in https://github.com/nipy/nitransforms/pull/209
+* ENH: ``SurfaceTransform`` class by @feilong in https://github.com/nipy/nitransforms/pull/203
+* ENH: reenable-parallelization-apply-214 (builds on PR #215, solves Issue #214) by @jmarabotto in https://github.com/nipy/nitransforms/pull/217
+* ENH: Parallelize serialized 3D+t transforms by @oesteban in https://github.com/nipy/nitransforms/pull/220
+* ENH: Implement a memory limitation mechanism in loading data by @oesteban in https://github.com/nipy/nitransforms/pull/221
+* ENH: Serialize+parallelize 4D ``apply()`` into 3D+t and add 'low memory' loading by @oesteban in https://github.com/nipy/nitransforms/pull/215
+* MAINT: Loosen dependencies by @mgxd in https://github.com/nipy/nitransforms/pull/164
+* MAINT: Drop Python 3.7 support, test through 3.11 by @effigies in https://github.com/nipy/nitransforms/pull/181
+* MAINT: Update CircleCI's infrastructure (machine image and Python version in Docker image) by @oesteban in https://github.com/nipy/nitransforms/pull/206
+* MAINT: Fix tests for Python 3.12, numpy 2.0, and pytest-xdist by @effigies in https://github.com/nipy/nitransforms/pull/210
+* MAINT: Update ANTs' pinnings by @oesteban in https://github.com/nipy/nitransforms/pull/219
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/23.0.1...24.0.0
+
 23.0.1 (July 10, 2023)
 ======================
 Hotfix release addressing two issues.
