@@ -193,6 +193,8 @@ class TransformChain(TransformBase):
     def from_filename(cls, filename, fmt="X5", reference=None, moving=None):
         """Load a transform file."""
         from .io import itk
+        from .io.x5 import from_filename as load_x5
+        from . import linear as nitl
 
         retval = []
         if str(filename).endswith(".h5"):
@@ -203,6 +205,24 @@ class TransformChain(TransformBase):
                     retval.insert(0, Affine(xfmobj.to_ras(), reference=reference))
                 else:
                     retval.insert(0, DenseFieldTransform(xfmobj))
+
+            return TransformChain(retval)
+
+        if fmt.upper() == "X5" or str(filename).endswith(".x5"):
+            for i, x5_xfm in enumerate(load_x5(filename)):
+                if x5_xfm.type != "linear":
+                    raise NotImplementedError(
+                        "Only linear X5 transforms are currently supported"
+                    )
+
+                xfm = nitl.Affine.from_filename(
+                    filename,
+                    fmt="X5",
+                    reference=reference,
+                    moving=moving,
+                    x5_position=i,
+                )
+                retval.append(xfm)
 
             return TransformChain(retval)
 

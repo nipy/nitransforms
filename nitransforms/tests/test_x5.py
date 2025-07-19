@@ -3,6 +3,8 @@ import pytest
 from h5py import File as H5File
 
 from ..io.x5 import X5Transform, X5Domain, to_filename, from_filename
+from nitransforms import linear as nitl
+from nitransforms import manip as nitm
 
 
 def test_x5_transform_defaults():
@@ -75,3 +77,15 @@ def test_from_filename_invalid(tmp_path):
 
     with pytest.raises(TypeError):
         from_filename(fname)
+
+
+def test_transformchain_from_x5(tmp_path):
+    aff1 = nitl.Affine.from_matvec(vec=(1, 2, 3))
+    aff2 = nitl.Affine.from_matvec(vec=(-1, -2, -3))
+    fname = tmp_path / "chain.x5"
+    to_filename(fname, [aff1.to_x5(), aff2.to_x5()])
+
+    chain = nitm.TransformChain.from_filename(fname, fmt="X5")
+    assert len(chain.transforms) == 2
+    assert chain.transforms[0] == aff1
+    assert chain.transforms[1] == aff2
