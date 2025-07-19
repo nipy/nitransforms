@@ -4,14 +4,12 @@ A new major release with critical updates.
 The new release includes a critical hotfix for 4D resamplings.
 The second major improvement is the inclusion of a first implementation of the X5 format (BIDS).
 The X5 implementation is currently restricted to reading/writing of linear transforms.
-It now supports nonlinear transforms as well.
 
 CHANGES
 -------
 * FIX: Broken 4D resampling by @oesteban in https://github.com/nipy/nitransforms/pull/247
 * ENH: Loading of X5 (linear) transforms by @oesteban in https://github.com/nipy/nitransforms/pull/243
 * ENH: Implement X5 representation and output to filesystem by @oesteban in https://github.com/nipy/nitransforms/pull/241
-* ENH: Support reading and writing of nonlinear transforms in X5
 * DOC: Fix references to ``os.PathLike`` by @oesteban in https://github.com/nipy/nitransforms/pull/242
 * MNT: Increase coverage by testing edge cases and adding docstrings by @oesteban in https://github.com/nipy/nitransforms/pull/248
 * MNT: Refactor io/lta to reduce one partial line by @oesteban in https://github.com/nipy/nitransforms/pull/246
