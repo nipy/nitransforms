@@ -1,3 +1,11 @@
+24.1.3 (July 19, 2025)
+======================
+Hotfix release addressing the issues when resampling 4D data.
+
+CHANGES
+-------
+* FIX: Broken 4D resampling by @oesteban in https://github.com/nipy/nitransforms/pull/247
+
 24.1.2 (June 02, 2025)
 ======================
 New patch release that addresses a crash when applying a 3D transform to a 4D image.
