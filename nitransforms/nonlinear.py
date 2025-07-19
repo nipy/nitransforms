@@ -9,6 +9,7 @@
 """Nonlinear transforms."""
 import warnings
 from functools import partial
+from collections import namedtuple
 import numpy as np
 
 from nitransforms import io
@@ -227,17 +228,54 @@ class DenseFieldTransform(TransformBase):
             warnings.warn("Fields are equal, but references do not match.")
         return _eq
 
+    def to_x5(self, metadata=None):
+        """Return an :class:`~nitransforms.io.x5.X5Transform` representation."""
+        from ._version import __version__
+        from .io.x5 import X5Domain, X5Transform
+
+        metadata = {"WrittenBy": f"NiTransforms {__version__}"} | (metadata or {})
+
+        domain = None
+        if (reference := self.reference) is not None:
+            domain = X5Domain(
+                grid=True,
+                size=getattr(reference, "shape", (0, 0, 0)),
+                mapping=reference.affine,
+                coordinates="cartesian",
+            )
+
+        kinds = tuple("space" for _ in range(self.ndim)) + ("vector",)
+
+        return X5Transform(
+            type="nonlinear",
+            subtype="densefield",
+            representation="displacements",
+            metadata=metadata,
+            transform=self._deltas,
+            dimension_kinds=kinds,
+            domain=domain,
+        )
+
     @classmethod
     def from_filename(cls, filename, fmt="X5"):
         _factory = {
             "afni": io.afni.AFNIDisplacementsField,
             "itk": io.itk.ITKDisplacementsField,
             "fsl": io.fsl.FSLDisplacementsField,
+            "X5": None,
         }
-        if fmt not in _factory:
+        fmt = fmt.upper()
+        if fmt not in {k.upper() for k in _factory}:
             raise NotImplementedError(f"Unsupported format <{fmt}>")
 
-        return cls(_factory[fmt].from_filename(filename))
+        if fmt == "X5":
+            from .io.x5 import from_filename as load_x5
+            x5_xfm = load_x5(filename)[0]
+            Domain = namedtuple("Domain", "affine shape")
+            reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
+            return cls(x5_xfm.transform, is_deltas=True, reference=reference)
+
+        return cls(_factory[fmt.lower()].from_filename(filename))
 
 
 load = DenseFieldTransform.from_filename
@@ -291,6 +329,39 @@ class BSplineFieldTransform(TransformBase):
 
         return DenseFieldTransform(
             field.astype(dtype).reshape(*_ref.shape, -1), reference=_ref
+        )
+
+    def to_x5(self, metadata=None):
+        """Return an :class:`~nitransforms.io.x5.X5Transform` representation."""
+        from ._version import __version__
+        from .io.x5 import X5Transform, X5Domain
+
+        metadata = {"WrittenBy": f"NiTransforms {__version__}"} | (metadata or {})
+
+        domain = None
+        if (reference := self.reference) is not None:
+            domain = X5Domain(
+                grid=True,
+                size=getattr(reference, "shape", (0, 0, 0)),
+                mapping=reference.affine,
+                coordinates="cartesian",
+            )
+
+        meta = metadata | {
+            "KnotsAffine": self._knots.affine.tolist(),
+            "KnotsShape": self._knots.shape,
+        }
+
+        kinds = tuple("space" for _ in range(self.ndim)) + ("vector",)
+
+        return X5Transform(
+            type="nonlinear",
+            subtype="bspline",
+            representation="coefficients",
+            metadata=meta,
+            transform=self._coeffs,
+            dimension_kinds=kinds,
+            domain=domain,
         )
 
     def map(self, x, inverse=False):
