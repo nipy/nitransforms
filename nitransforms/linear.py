@@ -186,22 +186,9 @@ should be (0, 0, 0, 1), got %s."""
         """Create an affine from a transform file."""
 
         if fmt and fmt.upper() == "X5":
-            x5_xfm = load_x5(filename)[x5_position]
-            Transform = cls if x5_xfm.array_length == 1 else LinearTransformsMapping
-            if (
-                x5_xfm.domain
-                and not x5_xfm.domain.grid
-                and len(x5_xfm.domain.size) == 3
-            ):  # pragma: no cover
-                raise NotImplementedError(
-                    "Only 3D regularly gridded domains are supported"
-                )
-            elif x5_xfm.domain:
-                # Override reference
-                Domain = namedtuple("Domain", "affine shape")
-                reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
-
-            return Transform(x5_xfm.transform, reference=reference)
+            return from_x5(
+                load_x5(filename), reference=reference, x5_position=x5_position
+            )
 
         fmtlist = [fmt] if fmt is not None else ("itk", "lta", "afni", "fsl")
 
@@ -458,3 +445,20 @@ def load(filename, fmt=None, reference=None, moving=None):
         xfm = xfm[0]
 
     return xfm
+
+
+def from_x5(x5_list, reference=None, x5_position=0):
+    """Create an affine from a list of :class:`~nitransforms.io.x5.X5Transform` objects."""
+
+    x5_xfm = x5_list[x5_position]
+    Transform = Affine if x5_xfm.array_length == 1 else LinearTransformsMapping
+    if (
+        x5_xfm.domain and not x5_xfm.domain.grid and len(x5_xfm.domain.size) == 3
+    ):  # pragma: no cover
+        raise NotImplementedError("Only 3D regularly gridded domains are supported")
+    elif x5_xfm.domain:
+        # Override reference
+        Domain = namedtuple("Domain", "affine shape")
+        reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
+
+    return Transform(x5_xfm.transform, reference=reference)

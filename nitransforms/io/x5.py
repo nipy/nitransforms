@@ -26,7 +26,7 @@ import h5py
 import numpy as np
 
 
-@dataclass
+@dataclass(eq=True)
 class X5Domain:
     """Domain information of a transform representing reference/moving spaces."""
 

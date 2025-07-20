@@ -278,7 +278,7 @@ class DenseFieldTransform(TransformBase):
         )
 
     @classmethod
-    def from_filename(cls, filename, fmt="X5"):
+    def from_filename(cls, filename, fmt="X5", x5_position=0):
         _factory = {
             "afni": io.afni.AFNIDisplacementsField,
             "itk": io.itk.ITKDisplacementsField,
@@ -290,15 +290,7 @@ class DenseFieldTransform(TransformBase):
             raise NotImplementedError(f"Unsupported format <{fmt}>")
 
         if fmt == "X5":
-            x5_xfm = load_x5(filename)[0]
-            Domain = namedtuple("Domain", "affine shape")
-            reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
-            field = nb.Nifti1Image(x5_xfm.transform, reference.affine)
-            return cls(
-                field,
-                is_deltas=x5_xfm.representation == "displacements",
-                reference=reference,
-            )
+            return from_x5(load_x5(filename), x5_position=x5_position)
 
         return cls(_factory[fmt.lower()].from_filename(filename))
 
@@ -336,7 +328,7 @@ class BSplineFieldTransform(TransformBase):
         return self._coeffs.ndim - 1
 
     @classmethod
-    def from_filename(cls, filename, fmt="X5"):
+    def from_filename(cls, filename, fmt="X5", x5_position=0):
         _factory = {
             "X5": None,
         }
@@ -344,13 +336,7 @@ class BSplineFieldTransform(TransformBase):
         if fmt not in {k.upper() for k in _factory}:
             raise NotImplementedError(f"Unsupported format <{fmt}>")
 
-        x5_xfm = load_x5(filename)[0]
-        Domain = namedtuple("Domain", "affine shape")
-        reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
-
-        coefficients = nb.Nifti1Image(x5_xfm.transform, x5_xfm.additional_parameters)
-        return cls(coefficients, reference=reference)
-
+        return from_x5(load_x5(filename), x5_position=x5_position)
         # return cls(_factory[fmt.lower()].from_filename(filename))
 
     def to_field(self, reference=None, dtype="float32"):
@@ -438,6 +424,31 @@ class BSplineFieldTransform(TransformBase):
             coeffs=self._coeffs,
         )
         return np.array([vfunc(_x).tolist() for _x in np.atleast_2d(x)])
+
+
+def from_x5(x5_list, x5_position=0):
+    """Create a transform from a list of :class:`~nitransforms.io.x5.X5Transform` objects."""
+
+    x5_xfm = x5_list[x5_position]
+
+    Transform = (
+        BSplineFieldTransform if x5_xfm.subtype == "bspline" else DenseFieldTransform
+    )
+    Domain = namedtuple("Domain", "affine shape")
+    reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
+    xfm_params = (
+        nb.Nifti1Image(x5_xfm.transform, x5_xfm.additional_parameters)
+        if x5_xfm.subtype == "bspline"
+        else x5_xfm.transform
+    )
+
+    xfm_kwargs = (
+        {}
+        if x5_xfm.subtype == "bspline"
+        else {"is_deltas": x5_xfm.representation == "displacements"}
+    )
+
+    return Transform(xfm_params, reference=reference, **xfm_kwargs)
 
 
 def _map_xyz(x, reference, knots, coeffs):
