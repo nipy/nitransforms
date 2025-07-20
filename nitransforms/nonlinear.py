@@ -85,7 +85,9 @@ class DenseFieldTransform(TransformBase):
             )
 
         if is_deltas:
-            self._deltas = self._field
+            self._deltas = (
+                self._field.copy()
+            )  # IMPORTANT: you don't want to update deltas
             # Convert from displacements (deltas) to deformations fields
             # (just add its origin to each delta vector)
             self._field += self.reference.ndcoords.T.reshape(self._field.shape)
