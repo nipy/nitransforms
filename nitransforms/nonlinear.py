@@ -245,9 +245,13 @@ class DenseFieldTransform(TransformBase):
         >>> xfm2 = DenseFieldTransform(test_dir / "someones_displacement_field.nii.gz")
         >>> xfm1 == xfm2
         True
+        >>> xfm1 == TransformBase()
+        False
+        >>> xfm1 == BSplineFieldTransform(test_dir / "someones_bspline_coefficients.nii.gz")
+        False
 
         """
-        if not hasattr(other, "_field"):
+        if not hasattr(other, "_field") or self._field.shape != other._field.shape:
             return False
 
         _eq = np.allclose(self._field, other._field)
@@ -335,13 +339,26 @@ class BSplineFieldTransform(TransformBase):
         >>> xfm2 = BSplineFieldTransform(test_dir / "someones_bspline_coefficients.nii.gz")
         >>> xfm1 == xfm2
         True
+        >>> xfm2._coeffs[:, :, :] = 0  # Let's zero all coefficients
+        >>> xfm1 == xfm2
+        False
+        >>> xfm2 = BSplineFieldTransform(
+        ...     test_dir / "someones_bspline_coefficients.nii.gz",
+        ...     order=4,
+        ... )
+        >>> xfm1 == xfm2
+        False
+        >>> xfm1 == TransformBase()
+        False
+        >>> xfm1 == DenseFieldTransform(test_dir / "someones_displacement_field.nii.gz")
+        False
 
         """
-        if not hasattr(other, "_coeffs"):
+        if not hasattr(other, "_coeffs") or self._coeffs.shape != other._coeffs.shape:
             return False
 
-        _eq = np.allclose(self._coeffs, other._coeffs)
-        _eq = _eq and self._order == other._order
+        _eq = self._order == other._order
+        _eq = _eq and np.allclose(self._coeffs, other._coeffs)
 
         if _eq and self._reference != other._reference:
             warnings.warn("Coefficients are equal, but references do not match.")

@@ -7,9 +7,11 @@ import pytest
 import numpy as np
 import nibabel as nb
 import h5py
+from ..base import TransformError
 from ..manip import TransformChain
 from ..linear import Affine
 from ..nonlinear import DenseFieldTransform
+from ..io import x5
 
 FMT = {"lta": "fs", "tfm": "itk"}
 
@@ -45,9 +47,19 @@ def test_collapse_affines(tmp_path, data_path, ext0, ext1, ext2):
 def test_transformchain_x5_roundtrip(tmp_path):
     """Round-trip TransformChain with X5 storage."""
 
+    # Test empty transform file
+    x5.to_filename(tmp_path / "empty.x5", [])
+    with pytest.raises(TransformError):
+        TransformChain.from_filename(tmp_path / "empty.x5")
+
     mat = np.eye(4)
     mat[0, 3] = 1
     aff = Affine(mat)
+
+    # Test loading X5 with no transforms chains
+    x5.to_filename(tmp_path / "nochain.x5", [aff.to_x5()])
+    with pytest.raises(TransformError):
+        TransformChain.from_filename(tmp_path / "nochain.x5")
 
     field = nb.Nifti1Image(np.zeros((5, 5, 5, 3), dtype="float32"), np.eye(4))
     fdata = field.get_fdata()
@@ -55,8 +67,8 @@ def test_transformchain_x5_roundtrip(tmp_path):
     field = nb.Nifti1Image(fdata, np.eye(4))
     dfield = DenseFieldTransform(field, is_deltas=True)
 
+    # Create a chain
     chain = TransformChain([aff, aff, aff, dfield])
-
     fname = tmp_path / "chain.x5"
     chain.to_filename(fname)
 

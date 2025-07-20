@@ -120,6 +120,10 @@ should be (0, 0, 0, 1), got %s."""
         >>> xfm2 = Affine(xfm1.matrix)
         >>> xfm1 == xfm2
         True
+        >>> xfm1 == Affine()
+        False
+        >>> xfm1 == TransformBase()
+        False
 
         """
         if not hasattr(other, "matrix"):

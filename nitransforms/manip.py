@@ -19,13 +19,13 @@ from nitransforms.base import (
 )
 from nitransforms.io import itk, x5 as x5io
 from nitransforms.io.x5 import from_filename as load_x5
-from nitransforms.linear import (
+from nitransforms.linear import (  # noqa: F401
     Affine,
-    from_x5 as linear_from_x5,  # noqa: F401
+    from_x5 as linear_from_x5,
 )
-from nitransforms.nonlinear import (
+from nitransforms.nonlinear import (  # noqa: F401
     DenseFieldTransform,
-    from_x5 as nonlinear_from_x5,  # noqa: F401
+    from_x5 as nonlinear_from_x5,
 )
 
 
@@ -224,8 +224,9 @@ class TransformChain(TransformBase):
                     raise TransformError("X5 file contains no TransformChain")
 
                 chain_path = chain_grp[str(x5_chain)][()]
-                if isinstance(chain_path, bytes):
-                    chain_path = chain_path.decode()
+                chain_path = (
+                    chain_path.decode() if isinstance(chain_path, bytes) else chain_path
+                )
 
             return TransformChain([xfm_list[int(idx)] for idx in chain_path.split("/")])
 
