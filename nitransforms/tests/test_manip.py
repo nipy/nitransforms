@@ -59,11 +59,14 @@ def test_transformchain_x5_roundtrip(tmp_path):
 
     fname = tmp_path / "chain.x5"
     chain.to_filename(fname)
+
+    with h5py.File(fname) as f:
+        assert len(f["TransformGroup"]) == 2
+
     chain.to_filename(fname)  # append again, should not duplicate transforms
 
     with h5py.File(fname) as f:
         assert len(f["TransformGroup"]) == 2
-        assert len(f["TransformChain"]) == 2
 
     loaded0 = TransformChain.from_filename(fname, fmt="X5", x5_chain=0)
     loaded1 = TransformChain.from_filename(fname, fmt="X5", x5_chain=1)

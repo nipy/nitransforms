@@ -247,6 +247,9 @@ class DenseFieldTransform(TransformBase):
         True
 
         """
+        if not hasattr(other, "_field"):
+            return False
+
         _eq = np.allclose(self._field, other._field)
         if _eq and self._reference != other._reference:
             warnings.warn("Fields are equal, but references do not match.")
@@ -321,6 +324,28 @@ class BSplineFieldTransform(TransformBase):
                     "Number of components of the coefficients does "
                     "not match the number of dimensions"
                 )
+
+    def __eq__(self, other):
+        """
+        Overload equals operator.
+
+        Examples
+        --------
+        >>> xfm1 = BSplineFieldTransform(test_dir / "someones_bspline_coefficients.nii.gz")
+        >>> xfm2 = BSplineFieldTransform(test_dir / "someones_bspline_coefficients.nii.gz")
+        >>> xfm1 == xfm2
+        True
+
+        """
+        if not hasattr(other, "_coeffs"):
+            return False
+
+        _eq = np.allclose(self._coeffs, other._coeffs)
+        _eq = _eq and self._order == other._order
+
+        if _eq and self._reference != other._reference:
+            warnings.warn("Coefficients are equal, but references do not match.")
+        return _eq
 
     @property
     def ndim(self):

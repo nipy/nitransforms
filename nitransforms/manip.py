@@ -208,9 +208,15 @@ class TransformChain(TransformBase):
 
         retval = []
         if fmt and fmt.upper() == "X5":
-            xfm_list = load_x5(filename)
+            # Get list of X5 nodes and generate transforms
+            xfm_list = [
+                globals()[f"{node.type}_from_x5"]([node]) for node in load_x5(filename)
+            ]
             if not xfm_list:
                 raise TransformError("Empty transform group")
+
+            if x5_chain is None:
+                return xfm_list
 
             with h5py.File(str(filename), "r") as f:
                 chain_grp = f.get("TransformChain")
@@ -221,12 +227,7 @@ class TransformChain(TransformBase):
                 if isinstance(chain_path, bytes):
                     chain_path = chain_path.decode()
 
-            for idx in chain_path.split("/"):
-                node = x5io._read_x5_group(xfm_list[int(idx)])
-                from_x5 = globals()[f"{node.type}_from_x5"]
-                retval.append(from_x5([node]))
-
-            return TransformChain(retval)
+            return TransformChain([xfm_list[int(idx)] for idx in chain_path.split("/")])
 
         if str(filename).endswith(".h5"):
             reference = None
@@ -247,9 +248,14 @@ class TransformChain(TransformBase):
         if fmt.upper() != "X5":
             raise NotImplementedError("Only X5 format is supported for chains")
 
-        existing = load_x5(filename) if os.path.exists(filename) else []
+        existing = (
+            self.from_filename(filename, x5_chain=None)
+            if os.path.exists(filename)
+            else []
+        )
+
         xfm_chain = []
-        new_nodes = []
+        new_xfms = []
         next_xfm_index = len(existing)
         for xfm in self.transforms:
             for eidx, existing_xfm in enumerate(existing):
@@ -258,7 +264,7 @@ class TransformChain(TransformBase):
                     break
             else:
                 xfm_chain.append(next_xfm_index)
-                new_nodes.append((next_xfm_index, xfm))
+                new_xfms.append((next_xfm_index, xfm))
                 existing.append(xfm)
                 next_xfm_index += 1
 
@@ -269,9 +275,9 @@ class TransformChain(TransformBase):
                 f.attrs["Version"] = np.uint16(1)
 
             tg = f.require_group("TransformGroup")
-            for idx, node in new_nodes:
+            for idx, node in new_xfms:
                 g = tg.create_group(str(idx))
-                x5io._write_x5_group(g, node)
+                x5io._write_x5_group(g, node.to_x5())
 
             cg = f.require_group("TransformChain")
             cg.create_dataset(str(len(cg)), data="/".join(str(i) for i in xfm_chain))

@@ -122,6 +122,9 @@ should be (0, 0, 0, 1), got %s."""
         True
 
         """
+        if not hasattr(other, "matrix"):
+            return False
+
         _eq = np.allclose(self.matrix, other.matrix, rtol=EQUALITY_TOL)
         if _eq and self._reference != other._reference:
             warnings.warn("Affines are equal, but references do not match.")

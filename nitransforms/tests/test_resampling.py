@@ -284,7 +284,7 @@ def test_apply_transformchain(tmp_path, testdata_path):
         / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"
     )
 
-    xfm = nitm.load(xfm_fname)
+    xfm = nitm.load(xfm_fname, fmt="itk")
 
     assert len(xfm) == 2
 
