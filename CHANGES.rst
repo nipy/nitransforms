@@ -1,3 +1,11 @@
+24.1.4 (July 20, 2025)
+======================
+Hotfix release addressing an issue in dense displacements fields.
+
+CHANGES
+-------
+* FIX: Backport https://github.com/nipy/nitransforms/pull/251 into 24.1.x series by @oesteban in https://github.com/nipy/nitransforms/pull/252
+
 24.1.3 (July 19, 2025)
 ======================
 Hotfix release addressing the issues when resampling 4D data.
