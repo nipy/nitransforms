@@ -7,15 +7,26 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Common interface for transforms."""
+
+import os
 from collections.abc import Iterable
 import numpy as np
 
-from .base import (
+import h5py
+from nitransforms.base import (
     TransformBase,
     TransformError,
 )
-from .linear import Affine
-from .nonlinear import DenseFieldTransform
+from nitransforms.io import itk, x5 as x5io
+from nitransforms.io.x5 import from_filename as load_x5
+from nitransforms.linear import (  # noqa: F401
+    Affine,
+    from_x5 as linear_from_x5,
+)
+from nitransforms.nonlinear import (  # noqa: F401
+    DenseFieldTransform,
+    from_x5 as nonlinear_from_x5,
+)
 
 
 class TransformChain(TransformBase):
@@ -183,18 +194,42 @@ class TransformChain(TransformBase):
             The indices of the values to extract.
 
         """
-        affines = self.transforms if indices is None else np.take(self.transforms, indices)
+        affines = (
+            self.transforms if indices is None else np.take(self.transforms, indices)
+        )
         retval = affines[0]
         for xfm in affines[1:]:
             retval = xfm @ retval
         return retval
 
     @classmethod
-    def from_filename(cls, filename, fmt="X5", reference=None, moving=None):
+    def from_filename(cls, filename, fmt="X5", reference=None, moving=None, x5_chain=0):
         """Load a transform file."""
-        from .io import itk
 
         retval = []
+        if fmt and fmt.upper() == "X5":
+            # Get list of X5 nodes and generate transforms
+            xfm_list = [
+                globals()[f"{node.type}_from_x5"]([node]) for node in load_x5(filename)
+            ]
+            if not xfm_list:
+                raise TransformError("Empty transform group")
+
+            if x5_chain is None:
+                return xfm_list
+
+            with h5py.File(str(filename), "r") as f:
+                chain_grp = f.get("TransformChain")
+                if chain_grp is None:
+                    raise TransformError("X5 file contains no TransformChain")
+
+                chain_path = chain_grp[str(x5_chain)][()]
+                chain_path = (
+                    chain_path.decode() if isinstance(chain_path, bytes) else chain_path
+                )
+
+            return TransformChain([xfm_list[int(idx)] for idx in chain_path.split("/")])
+
         if str(filename).endswith(".h5"):
             reference = None
             xforms = itk.ITKCompositeH5.from_filename(filename)
@@ -207,6 +242,48 @@ class TransformChain(TransformBase):
             return TransformChain(retval)
 
         raise NotImplementedError
+
+    def to_filename(self, filename, fmt="X5"):
+        """Store the transform chain in X5 format."""
+
+        if fmt.upper() != "X5":
+            raise NotImplementedError("Only X5 format is supported for chains")
+
+        existing = (
+            self.from_filename(filename, x5_chain=None)
+            if os.path.exists(filename)
+            else []
+        )
+
+        xfm_chain = []
+        new_xfms = []
+        next_xfm_index = len(existing)
+        for xfm in self.transforms:
+            for eidx, existing_xfm in enumerate(existing):
+                if xfm == existing_xfm:
+                    xfm_chain.append(eidx)
+                    break
+            else:
+                xfm_chain.append(next_xfm_index)
+                new_xfms.append((next_xfm_index, xfm))
+                existing.append(xfm)
+                next_xfm_index += 1
+
+        mode = "r+" if os.path.exists(filename) else "w"
+        with h5py.File(str(filename), mode) as f:
+            if "Format" not in f.attrs:
+                f.attrs["Format"] = "X5"
+                f.attrs["Version"] = np.uint16(1)
+
+            tg = f.require_group("TransformGroup")
+            for idx, node in new_xfms:
+                g = tg.create_group(str(idx))
+                x5io._write_x5_group(g, node.to_x5())
+
+            cg = f.require_group("TransformChain")
+            cg.create_dataset(str(len(cg)), data="/".join(str(i) for i in xfm_chain))
+
+        return filename
 
 
 def _as_chain(x):
