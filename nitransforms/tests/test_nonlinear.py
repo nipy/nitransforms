@@ -122,17 +122,18 @@ def test_bspline(tmp_path, testdata_path):
     )
 
 
-def test_densefield_x5_roundtrip(tmp_path):
+@pytest.mark.parametrize("is_deltas", [True, False])
+def test_densefield_x5_roundtrip(tmp_path, is_deltas):
     """Ensure dense field transforms roundtrip via X5."""
     ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
     disp = nb.Nifti1Image(np.random.rand(2, 2, 2, 3).astype("float32"), np.eye(4))
 
-    xfm = DenseFieldTransform(disp, reference=ref)
+    xfm = DenseFieldTransform(disp, is_deltas=is_deltas, reference=ref)
 
     node = xfm.to_x5(metadata={"GeneratedBy": "pytest"})
     assert node.type == "nonlinear"
     assert node.subtype == "densefield"
-    assert node.representation == "displacements"
+    assert node.representation == "displacements" if is_deltas else "deformations"
     assert node.domain.size == ref.shape
     assert node.metadata["GeneratedBy"] == "pytest"
 
@@ -140,11 +141,10 @@ def test_densefield_x5_roundtrip(tmp_path):
     io.x5.to_filename(fname, [node])
 
     xfm2 = DenseFieldTransform.from_filename(fname, fmt="X5")
-    diff = xfm2._deltas - xfm._deltas
-    coords = xfm.reference.ndcoords.T.reshape(xfm._deltas.shape)
-    assert np.allclose(diff, coords)
+
     assert xfm2.reference.shape == ref.shape
     assert np.allclose(xfm2.reference.affine, ref.affine)
+    assert xfm == xfm2
 
 
 def test_bspline_to_x5(tmp_path):
@@ -161,6 +161,8 @@ def test_bspline_to_x5(tmp_path):
 
     fname = tmp_path / "bspline.x5"
     io.x5.to_filename(fname, [node])
-    node2 = io.x5.from_filename(fname)[0]
-    assert np.allclose(node2.transform, node.transform)
-    assert node2.metadata["tool"] == "pytest"
+
+    xfm2 = BSplineFieldTransform.from_filename(fname, fmt="X5")
+    assert np.allclose(xfm._coeffs, xfm2._coeffs)
+    assert xfm2.reference.shape == ref.shape
+    assert np.allclose(xfm2.reference.affine, ref.affine)
