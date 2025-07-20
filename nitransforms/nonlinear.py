@@ -7,6 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Nonlinear transforms."""
+
 import warnings
 from functools import partial
 from collections import namedtuple
@@ -22,6 +23,12 @@ from nitransforms.base import (
     _as_homogeneous,
 )
 from scipy.ndimage import map_coordinates
+
+# Avoids circular imports
+try:
+    from nitransforms._version import __version__
+except ModuleNotFoundError:  # pragma: no cover
+    __version__ = "0+unknown"
 
 
 class DenseFieldTransform(TransformBase):
@@ -230,14 +237,11 @@ class DenseFieldTransform(TransformBase):
 
     def to_x5(self, metadata=None):
         """Return an :class:`~nitransforms.io.x5.X5Transform` representation."""
-        from ._version import __version__
-        from .io.x5 import X5Domain, X5Transform
-
         metadata = {"WrittenBy": f"NiTransforms {__version__}"} | (metadata or {})
 
         domain = None
         if (reference := self.reference) is not None:
-            domain = X5Domain(
+            domain = io.x5.X5Domain(
                 grid=True,
                 size=getattr(reference, "shape", (0, 0, 0)),
                 mapping=reference.affine,
@@ -246,7 +250,7 @@ class DenseFieldTransform(TransformBase):
 
         kinds = tuple("space" for _ in range(self.ndim)) + ("vector",)
 
-        return X5Transform(
+        return io.x5.X5Transform(
             type="nonlinear",
             subtype="densefield",
             representation="displacements",
@@ -270,6 +274,7 @@ class DenseFieldTransform(TransformBase):
 
         if fmt == "X5":
             from .io.x5 import from_filename as load_x5
+
             x5_xfm = load_x5(filename)[0]
             Domain = namedtuple("Domain", "affine shape")
             reference = Domain(x5_xfm.domain.mapping, x5_xfm.domain.size)
@@ -333,14 +338,11 @@ class BSplineFieldTransform(TransformBase):
 
     def to_x5(self, metadata=None):
         """Return an :class:`~nitransforms.io.x5.X5Transform` representation."""
-        from ._version import __version__
-        from .io.x5 import X5Transform, X5Domain
-
         metadata = {"WrittenBy": f"NiTransforms {__version__}"} | (metadata or {})
 
         domain = None
         if (reference := self.reference) is not None:
-            domain = X5Domain(
+            domain = io.x5.X5Domain(
                 grid=True,
                 size=getattr(reference, "shape", (0, 0, 0)),
                 mapping=reference.affine,
@@ -354,7 +356,7 @@ class BSplineFieldTransform(TransformBase):
 
         kinds = tuple("space" for _ in range(self.ndim)) + ("vector",)
 
-        return X5Transform(
+        return io.x5.X5Transform(
             type="nonlinear",
             subtype="bspline",
             representation="coefficients",
