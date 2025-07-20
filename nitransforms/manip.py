@@ -195,6 +195,7 @@ class TransformChain(TransformBase):
         from .io import itk
         from .io.x5 import from_filename as load_x5
         from . import linear as nitl
+        from . import nonlinear as nitn
 
         retval = []
         if str(filename).endswith(".h5"):
@@ -210,18 +211,20 @@ class TransformChain(TransformBase):
 
         if fmt.upper() == "X5" or str(filename).endswith(".x5"):
             for i, x5_xfm in enumerate(load_x5(filename)):
-                if x5_xfm.type != "linear":
-                    raise NotImplementedError(
-                        "Only linear X5 transforms are currently supported"
+                if x5_xfm.type == "linear":
+                    xfm = nitl.Affine.from_filename(
+                        filename,
+                        fmt="X5",
+                        reference=reference,
+                        moving=moving,
+                        x5_position=i,
                     )
-
-                xfm = nitl.Affine.from_filename(
-                    filename,
-                    fmt="X5",
-                    reference=reference,
-                    moving=moving,
-                    x5_position=i,
-                )
+                elif x5_xfm.type == "nonlinear":
+                    xfm = nitn.DenseFieldTransform.from_x5(x5_xfm)
+                else:
+                    raise NotImplementedError(
+                        f"Unsupported X5 transform type {x5_xfm.type}"
+                    )
                 retval.append(xfm)
 
             return TransformChain(retval)

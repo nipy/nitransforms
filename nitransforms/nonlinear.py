@@ -10,6 +10,7 @@
 import warnings
 from functools import partial
 import numpy as np
+import nibabel as nb
 
 from nitransforms import io
 from nitransforms.io.base import _ensure_image
@@ -238,6 +239,26 @@ class DenseFieldTransform(TransformBase):
             raise NotImplementedError(f"Unsupported format <{fmt}>")
 
         return cls(_factory[fmt].from_filename(filename))
+
+    @classmethod
+    def from_x5(cls, x5struct):
+        """Instantiate a dense field transform from an :class:`X5Transform`."""
+        if x5struct.type != "nonlinear":
+            raise TypeError("X5 structure is not a nonlinear transform")
+        if not x5struct.domain or not x5struct.domain.grid:
+            raise NotImplementedError(
+                "Only regularly gridded nonlinear X5 transforms are supported"
+            )
+
+        hdr = nb.Nifti1Header()
+        hdr.set_intent("vector")
+        img = nb.Nifti1Image(x5struct.transform.astype("float32"), x5struct.domain.mapping, hdr)
+
+        is_deltas = True
+        if x5struct.representation and "def" in x5struct.representation.lower():
+            is_deltas = False
+
+        return cls(img, is_deltas=is_deltas)
 
 
 load = DenseFieldTransform.from_filename

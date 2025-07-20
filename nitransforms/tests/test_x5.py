@@ -5,6 +5,7 @@ from h5py import File as H5File
 from ..io.x5 import X5Transform, X5Domain, to_filename, from_filename
 from nitransforms import linear as nitl
 from nitransforms import manip as nitm
+from nitransforms import nonlinear as nitn
 
 
 def test_x5_transform_defaults():
@@ -89,3 +90,24 @@ def test_transformchain_from_x5(tmp_path):
     assert len(chain.transforms) == 2
     assert chain.transforms[0] == aff1
     assert chain.transforms[1] == aff2
+
+
+def test_transformchain_from_x5_nonlinear(tmp_path):
+    field = np.zeros((2, 2, 2, 3), dtype=float)
+    domain = X5Domain(grid=True, size=(2, 2, 2), mapping=np.eye(4))
+    nonlinear_node = X5Transform(
+        type="nonlinear",
+        transform=field,
+        representation="dense_field",
+        dimension_kinds=("space", "space", "space", "vector"),
+        domain=domain,
+    )
+    aff = nitl.Affine.from_matvec(vec=(0, 0, 0))
+    fname = tmp_path / "nonlinear_chain.x5"
+    to_filename(fname, [aff.to_x5(), nonlinear_node])
+
+    chain = nitm.TransformChain.from_filename(fname, fmt="X5")
+    assert len(chain.transforms) == 2
+    assert chain.transforms[0] == aff
+    assert isinstance(chain.transforms[1], nitn.DenseFieldTransform)
+    assert chain.transforms[1].reference.shape == (2, 2, 2)

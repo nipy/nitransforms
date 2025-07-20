@@ -9,7 +9,6 @@ CHANGES
 -------
 * FIX: Broken 4D resampling by @oesteban in https://github.com/nipy/nitransforms/pull/247
 * ENH: Loading of X5 (linear) transforms by @oesteban in https://github.com/nipy/nitransforms/pull/243
-* ENH: Add X5 support to transform chains by @oesteban
 * ENH: Implement X5 representation and output to filesystem by @oesteban in https://github.com/nipy/nitransforms/pull/241
 * DOC: Fix references to ``os.PathLike`` by @oesteban in https://github.com/nipy/nitransforms/pull/242
 * MNT: Increase coverage by testing edge cases and adding docstrings by @oesteban in https://github.com/nipy/nitransforms/pull/248
