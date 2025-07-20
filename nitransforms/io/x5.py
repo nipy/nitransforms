@@ -105,35 +105,7 @@ def to_filename(fname: str | Path, x5_list: List[X5Transform]):
         tg = out_file.create_group("TransformGroup")
         for i, node in enumerate(x5_list):
             g = tg.create_group(str(i))
-            g.attrs["Type"] = node.type
-            g.attrs["ArrayLength"] = node.array_length
-            if node.subtype is not None:
-                g.attrs["SubType"] = node.subtype
-            if node.representation is not None:
-                g.attrs["Representation"] = node.representation
-            if node.metadata is not None:
-                g.attrs["Metadata"] = json.dumps(node.metadata)
-            g.create_dataset("Transform", data=node.transform)
-            g.create_dataset(
-                "DimensionKinds",
-                data=np.asarray(node.dimension_kinds, dtype="S"),
-            )
-            if node.domain is not None:
-                dgrp = g.create_group("Domain")
-                dgrp.create_dataset("Grid", data=np.uint8(1 if node.domain.grid else 0))
-                dgrp.create_dataset("Size", data=np.asarray(node.domain.size))
-                dgrp.create_dataset("Mapping", data=node.domain.mapping)
-                if node.domain.coordinates is not None:
-                    dgrp.attrs["Coordinates"] = node.domain.coordinates
-
-            if node.inverse is not None:
-                g.create_dataset("Inverse", data=node.inverse)
-            if node.jacobian is not None:
-                g.create_dataset("Jacobian", data=node.jacobian)
-            if node.additional_parameters is not None:
-                g.create_dataset(
-                    "AdditionalParameters", data=node.additional_parameters
-                )
+            _write_x5_group(g, node)
     return fname
 
 
@@ -188,3 +160,30 @@ def _read_x5_group(node) -> X5Transform:
         )
 
     return x5
+
+
+def _write_x5_group(g, node: X5Transform):
+    """Write one :class:`X5Transform` element into an opened HDF5 group."""
+    g.attrs["Type"] = node.type
+    g.attrs["ArrayLength"] = node.array_length
+    if node.subtype is not None:
+        g.attrs["SubType"] = node.subtype
+    if node.representation is not None:
+        g.attrs["Representation"] = node.representation
+    if node.metadata is not None:
+        g.attrs["Metadata"] = json.dumps(node.metadata)
+    g.create_dataset("Transform", data=node.transform)
+    g.create_dataset("DimensionKinds", data=np.asarray(node.dimension_kinds, dtype="S"))
+    if node.domain is not None:
+        dgrp = g.create_group("Domain")
+        dgrp.create_dataset("Grid", data=np.uint8(1 if node.domain.grid else 0))
+        dgrp.create_dataset("Size", data=np.asarray(node.domain.size))
+        dgrp.create_dataset("Mapping", data=node.domain.mapping)
+        if node.domain.coordinates is not None:
+            dgrp.attrs["Coordinates"] = node.domain.coordinates
+    if node.inverse is not None:
+        g.create_dataset("Inverse", data=node.inverse)
+    if node.jacobian is not None:
+        g.create_dataset("Jacobian", data=node.jacobian)
+    if node.additional_parameters is not None:
+        g.create_dataset("AdditionalParameters", data=node.additional_parameters)

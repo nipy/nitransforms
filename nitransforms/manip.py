@@ -14,7 +14,7 @@ from .base import (
     TransformBase,
     TransformError,
 )
-from .linear import Affine
+from .linear import Affine, LinearTransformsMapping
 from .nonlinear import DenseFieldTransform
 
 
@@ -190,12 +190,15 @@ class TransformChain(TransformBase):
         return retval
 
     @classmethod
-    def from_filename(cls, filename, fmt="X5", reference=None, moving=None):
+    def from_filename(cls, filename, fmt="X5", reference=None, moving=None, x5_chain=0):
         """Load a transform file."""
-        from .io import itk
+        from .io import itk, x5 as x5io
+        import h5py
+        import nibabel as nb
+        from collections import namedtuple
 
         retval = []
-        if str(filename).endswith(".h5"):
+        if str(filename).endswith(".h5") and (fmt is None or fmt.upper() != "X5"):
             reference = None
             xforms = itk.ITKCompositeH5.from_filename(filename)
             for xfmobj in xforms:
@@ -206,7 +209,119 @@ class TransformChain(TransformBase):
 
             return TransformChain(retval)
 
+        if fmt and fmt.upper() == "X5":
+            with h5py.File(str(filename), "r") as f:
+                if f.attrs.get("Format") != "X5":
+                    raise TypeError("Input file is not in X5 format")
+
+                tg = [
+                    x5io._read_x5_group(node)
+                    for _, node in sorted(f["TransformGroup"].items(), key=lambda kv: int(kv[0]))
+                ]
+                chain_grp = f.get("TransformChain")
+                if chain_grp is None:
+                    raise TransformError("X5 file contains no TransformChain")
+
+                chain_path = chain_grp[str(x5_chain)][()]
+                if isinstance(chain_path, bytes):
+                    chain_path = chain_path.decode()
+            indices = [int(idx) for idx in chain_path.split("/") if idx]
+
+            Domain = namedtuple("Domain", "affine shape")
+            for idx in indices:
+                node = tg[idx]
+                if node.type == "linear":
+                    Transform = Affine if node.array_length == 1 else LinearTransformsMapping
+                    reference = None
+                    if node.domain is not None:
+                        reference = Domain(node.domain.mapping, node.domain.size)
+                    retval.append(Transform(node.transform, reference=reference))
+                elif node.type == "nonlinear":
+                    reference = Domain(node.domain.mapping, node.domain.size)
+                    field = nb.Nifti1Image(node.transform, reference.affine)
+                    retval.append(
+                        DenseFieldTransform(
+                            field,
+                            is_deltas=node.representation == "displacements",
+                            reference=reference,
+                        )
+                    )
+                else:  # pragma: no cover - unsupported type
+                    raise NotImplementedError(f"Unsupported transform type {node.type}")
+
+            return TransformChain(retval)
+
         raise NotImplementedError
+
+    def to_filename(self, filename, fmt="X5"):
+        """Store the transform chain in X5 format."""
+        from .io import x5 as x5io
+        import os
+        import h5py
+
+        if fmt.upper() != "X5":
+            raise NotImplementedError("Only X5 format is supported for chains")
+
+        if os.path.exists(filename):
+            with h5py.File(str(filename), "r") as f:
+                existing = [
+                    x5io._read_x5_group(node)
+                    for _, node in sorted(f["TransformGroup"].items(), key=lambda kv: int(kv[0]))
+                ]
+        else:
+            existing = []
+
+        # convert to objects for equality check
+        from collections import namedtuple
+        import nibabel as nb
+
+        def _as_transform(x5node):
+            Domain = namedtuple("Domain", "affine shape")
+            if x5node.type == "linear":
+                Transform = Affine if x5node.array_length == 1 else LinearTransformsMapping
+                ref = None
+                if x5node.domain is not None:
+                    ref = Domain(x5node.domain.mapping, x5node.domain.size)
+                return Transform(x5node.transform, reference=ref)
+            reference = Domain(x5node.domain.mapping, x5node.domain.size)
+            field = nb.Nifti1Image(x5node.transform, reference.affine)
+            return DenseFieldTransform(
+                field,
+                is_deltas=x5node.representation == "displacements",
+                reference=reference,
+            )
+
+        existing_objs = [_as_transform(n) for n in existing]
+        path_indices = []
+        new_nodes = []
+        for xfm in self.transforms:
+            # find existing
+            idx = None
+            for i, obj in enumerate(existing_objs):
+                if type(xfm) is type(obj) and xfm == obj:
+                    idx = i
+                    break
+            if idx is None:
+                idx = len(existing_objs)
+                new_nodes.append((idx, xfm.to_x5()))
+                existing_objs.append(xfm)
+            path_indices.append(idx)
+
+        mode = "r+" if os.path.exists(filename) else "w"
+        with h5py.File(str(filename), mode) as f:
+            if "Format" not in f.attrs:
+                f.attrs["Format"] = "X5"
+                f.attrs["Version"] = np.uint16(1)
+
+            tg = f.require_group("TransformGroup")
+            for idx, node in new_nodes:
+                g = tg.create_group(str(idx))
+                x5io._write_x5_group(g, node)
+
+            cg = f.require_group("TransformChain")
+            cg.create_dataset(str(len(cg)), data="/".join(str(i) for i in path_indices))
+
+        return filename
 
 
 def _as_chain(x):
