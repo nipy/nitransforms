@@ -73,11 +73,11 @@ class X5Transform:
     For parametric models it is generally possible to obtain it analytically, so this dataset
     could not be as useful in that case.
     """
-    # additional_parameters: Optional[np.ndarray] = None
-    # AdditionalParameters is empty in the draft spec - ignore for now.
-    # Only documentation ATM is for SubType:
-    # The SubType setting enables setting the additional parameters on a dataset called
-    # "AdditionalParameters" that hangs directly from this transform node.
+    additional_parameters: Optional[np.ndarray] = None
+    """
+    An OPTIONAL field to store additional parameters, depending on the SubType of the
+    transform.
+    """
     array_length: int = 1
     """Undocumented field in the draft to enable a single transform group for 4D transforms."""
 
@@ -130,11 +130,10 @@ def to_filename(fname: str | Path, x5_list: List[X5Transform]):
                 g.create_dataset("Inverse", data=node.inverse)
             if node.jacobian is not None:
                 g.create_dataset("Jacobian", data=node.jacobian)
-            # Disabled until we need SubType and AdditionalParameters
-            # if node.additional_parameters is not None:
-            #     g.create_dataset(
-            #         "AdditionalParameters", data=node.additional_parameters
-            #     )
+            if node.additional_parameters is not None:
+                g.create_dataset(
+                    "AdditionalParameters", data=node.additional_parameters
+                )
     return fname
 
 
@@ -174,6 +173,9 @@ def _read_x5_group(node) -> X5Transform:
         inverse=np.asarray(node["Inverse"]) if "Inverse" in node else None,
         jacobian=np.asarray(node["Jacobian"]) if "Jacobian" in node else None,
         array_length=int(node.attrs.get("ArrayLength", 1)),
+        additional_parameters=np.asarray(node["AdditionalParameters"])
+        if "AdditionalParameters" in node
+        else None,
     )
 
     if "Domain" in node:
