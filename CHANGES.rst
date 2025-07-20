@@ -7,7 +7,6 @@ The X5 implementation is currently restricted to reading/writing of linear trans
 
 CHANGES
 -------
-* FIX: Broken 4D resampling by @oesteban in https://github.com/nipy/nitransforms/pull/247
 * ENH: Loading of X5 (linear) transforms by @oesteban in https://github.com/nipy/nitransforms/pull/243
 * ENH: Implement X5 representation and output to filesystem by @oesteban in https://github.com/nipy/nitransforms/pull/241
 * DOC: Fix references to ``os.PathLike`` by @oesteban in https://github.com/nipy/nitransforms/pull/242
@@ -15,6 +14,22 @@ CHANGES
 * MNT: Refactor io/lta to reduce one partial line by @oesteban in https://github.com/nipy/nitransforms/pull/246
 * MNT: Move flake8 config into ``pyproject.toml`` by @oesteban in https://github.com/nipy/nitransforms/pull/245
 * MNT: Configure coverage to omit tests by @oesteban in https://github.com/nipy/nitransforms/pull/244
+
+24.1.4 (July 20, 2025)
+======================
+Hotfix release addressing an issue in dense displacements fields.
+
+CHANGES
+-------
+* FIX: Backport https://github.com/nipy/nitransforms/pull/251 into 24.1.x series by @oesteban in https://github.com/nipy/nitransforms/pull/252
+
+24.1.3 (July 19, 2025)
+======================
+Hotfix release addressing the issues when resampling 4D data.
+
+CHANGES
+-------
+* FIX: Broken 4D resampling by @oesteban in https://github.com/nipy/nitransforms/pull/247
 
 24.1.2 (June 02, 2025)
 ======================
