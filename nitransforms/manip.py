@@ -198,7 +198,47 @@ class TransformChain(TransformBase):
         from collections import namedtuple
 
         retval = []
-        if str(filename).endswith(".h5") and (fmt is None or fmt.upper() != "X5"):
+        if fmt and fmt.upper() == "X5":
+            with h5py.File(str(filename), "r") as f:
+                if f.attrs.get("Format") == "X5":
+                    tg = [
+                        x5io._read_x5_group(node)
+                        for _, node in sorted(f["TransformGroup"].items(), key=lambda kv: int(kv[0]))
+                    ]
+                    chain_grp = f.get("TransformChain")
+                    if chain_grp is None:
+                        raise TransformError("X5 file contains no TransformChain")
+
+                    chain_path = chain_grp[str(x5_chain)][()]
+                    if isinstance(chain_path, bytes):
+                        chain_path = chain_path.decode()
+                    indices = [int(idx) for idx in chain_path.split("/") if idx]
+
+                    Domain = namedtuple("Domain", "affine shape")
+                    for idx in indices:
+                        node = tg[idx]
+                        if node.type == "linear":
+                            Transform = Affine if node.array_length == 1 else LinearTransformsMapping
+                            reference = None
+                            if node.domain is not None:
+                                reference = Domain(node.domain.mapping, node.domain.size)
+                            retval.append(Transform(node.transform, reference=reference))
+                        elif node.type == "nonlinear":
+                            reference = Domain(node.domain.mapping, node.domain.size)
+                            field = nb.Nifti1Image(node.transform, reference.affine)
+                            retval.append(
+                                DenseFieldTransform(
+                                    field,
+                                    is_deltas=node.representation == "displacements",
+                                    reference=reference,
+                                )
+                            )
+                        else:  # pragma: no cover - unsupported type
+                            raise NotImplementedError(f"Unsupported transform type {node.type}")
+
+                    return TransformChain(retval)
+
+        if str(filename).endswith(".h5"):
             reference = None
             xforms = itk.ITKCompositeH5.from_filename(filename)
             for xfmobj in xforms:
@@ -206,48 +246,6 @@ class TransformChain(TransformBase):
                     retval.insert(0, Affine(xfmobj.to_ras(), reference=reference))
                 else:
                     retval.insert(0, DenseFieldTransform(xfmobj))
-
-            return TransformChain(retval)
-
-        if fmt and fmt.upper() == "X5":
-            with h5py.File(str(filename), "r") as f:
-                if f.attrs.get("Format") != "X5":
-                    raise TypeError("Input file is not in X5 format")
-
-                tg = [
-                    x5io._read_x5_group(node)
-                    for _, node in sorted(f["TransformGroup"].items(), key=lambda kv: int(kv[0]))
-                ]
-                chain_grp = f.get("TransformChain")
-                if chain_grp is None:
-                    raise TransformError("X5 file contains no TransformChain")
-
-                chain_path = chain_grp[str(x5_chain)][()]
-                if isinstance(chain_path, bytes):
-                    chain_path = chain_path.decode()
-            indices = [int(idx) for idx in chain_path.split("/") if idx]
-
-            Domain = namedtuple("Domain", "affine shape")
-            for idx in indices:
-                node = tg[idx]
-                if node.type == "linear":
-                    Transform = Affine if node.array_length == 1 else LinearTransformsMapping
-                    reference = None
-                    if node.domain is not None:
-                        reference = Domain(node.domain.mapping, node.domain.size)
-                    retval.append(Transform(node.transform, reference=reference))
-                elif node.type == "nonlinear":
-                    reference = Domain(node.domain.mapping, node.domain.size)
-                    field = nb.Nifti1Image(node.transform, reference.affine)
-                    retval.append(
-                        DenseFieldTransform(
-                            field,
-                            is_deltas=node.representation == "displacements",
-                            reference=reference,
-                        )
-                    )
-                else:  # pragma: no cover - unsupported type
-                    raise NotImplementedError(f"Unsupported transform type {node.type}")
 
             return TransformChain(retval)
 
