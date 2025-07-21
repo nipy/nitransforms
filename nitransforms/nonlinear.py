@@ -499,18 +499,23 @@ def _map_xyz(x, reference, knots, coeffs):
     # Calculate the index coordinates of the point in the B-Spline grid
     ijk = (knots.inverse @ _as_homogeneous(x).squeeze())[:ndim]
 
-    # Determine the window within distance 2.0 (where the B-Spline is nonzero)
+    # Determine the window within distance 2.0 (where the B-Spline is nonzero).
     # Probably this will change if the order of the B-Spline is different
     w_start, w_end = np.ceil(ijk - 2).astype(int), np.floor(ijk + 2).astype(int)
-    # Generate a grid of indexes corresponding to the window
-    nonzero_knots = tuple(
-        [np.arange(start, end + 1) for start, end in zip(w_start, w_end)]
-    )
+
+    # Generate a grid of indexes corresponding to the window, clipped to the
+    # coefficient grid boundaries
+    nonzero_knots = []
+    for start, end, size in zip(w_start, w_end, knots.shape):
+        start = max(start, 0)
+        end = min(end, size - 1)
+        nonzero_knots.append(np.arange(start, end + 1))
     nonzero_knots = tuple(np.meshgrid(*nonzero_knots, indexing="ij"))
     window = np.array(nonzero_knots).reshape((ndim, -1))
 
-    # Calculate the distance of the location w.r.t. to all voxels in window
-    distance = window.T - ijk
+    # Calculate the absolute distance of the location w.r.t. all voxels in
+    # the window. Distances are expressed in knot-grid voxel units
+    distance = np.abs(window.T - ijk)
     # Since this is a grid, distance only takes a few float values
     unique_d, indices = np.unique(distance.reshape(-1), return_inverse=True)
     # Calculate the B-Spline weight corresponding to the distance.
