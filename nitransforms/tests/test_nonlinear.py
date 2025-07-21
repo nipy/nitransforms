@@ -166,3 +166,27 @@ def test_bspline_to_x5(tmp_path):
     assert np.allclose(xfm._coeffs, xfm2._coeffs)
     assert xfm2.reference.shape == ref.shape
     assert np.allclose(xfm2.reference.affine, ref.affine)
+
+
+@pytest.mark.parametrize("is_deltas", [True, False])
+def test_densefield_oob_resampling(is_deltas):
+    """Ensure mapping outside the field returns input coordinates."""
+    ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
+
+    if is_deltas:
+        field = nb.Nifti1Image(np.ones((2, 2, 2, 3), dtype="float32"), np.eye(4))
+    else:
+        grid = np.stack(
+            np.meshgrid(*[np.arange(2) for _ in range(3)], indexing="ij"),
+            axis=-1,
+        ).astype("float32")
+        field = nb.Nifti1Image(grid + 1.0, np.eye(4))
+
+    xfm = DenseFieldTransform(field, is_deltas=is_deltas, reference=ref)
+
+    points = np.array([[-1.0, -1.0, -1.0], [0.5, 0.5, 0.5], [3.0, 3.0, 3.0]])
+    mapped = xfm.map(points)
+
+    assert np.allclose(mapped[0], points[0])
+    assert np.allclose(mapped[2], points[2])
+    assert np.allclose(mapped[1], points[1] + 1)
