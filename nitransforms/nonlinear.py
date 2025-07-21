@@ -453,10 +453,10 @@ class BSplineFieldTransform(TransformBase):
         >>> xfm = BSplineFieldTransform(test_dir / "someones_bspline_coefficients.nii.gz")
         >>> xfm.reference = test_dir / "someones_anatomy.nii.gz"
         >>> xfm.map([-6.5, -36., -19.5]).tolist()  # doctest: +ELLIPSIS
-        [[-6.5, -31.476097418406..., -19.5]]
+        [[-6.5, -36.475114..., -19.5]]
 
         >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()  # doctest: +ELLIPSIS
-        [[-6.5, -31.4760974184..., -19.5], [-1.0, -3.807267537712..., -11.25]]
+        [[-6.5, -36.475114..., -19.5], [-1.0, -42.03878957..., -11.25]]
 
         """
         vfunc = partial(
