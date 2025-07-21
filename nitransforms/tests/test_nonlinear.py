@@ -243,4 +243,3 @@ def test_bspline_map_manual():
     pts = np.array([[1.2, 1.5, 2.0], [3.3, 1.7, 2.4]])
     expected = np.vstack([manual_map(p) for p in pts])
     assert np.allclose(bspline.map(pts), expected, atol=1e-6)
-

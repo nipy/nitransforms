@@ -7,6 +7,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Interpolate with 3D tensor-product B-Spline basis."""
+
 import numpy as np
 import nibabel as nb
 from scipy.sparse import csr_matrix, kron
