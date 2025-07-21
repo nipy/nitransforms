@@ -672,3 +672,28 @@ def test_itk_linear_h5(tmpdir, data_path, testdata_path):
     # Error raised if the we try to use the single affine loader
     with pytest.raises(TransformIOError):
         itk.ITKLinearTransform.from_filename("test.h5")
+
+# Added tests for h5 orientation bug
+
+
+def test_itk_h5_field_order(tmp_path):
+    shape = (3, 4, 5)
+    vals = np.arange(np.prod(shape), dtype=float).reshape(shape)
+    field = np.stack([vals, vals + 100, vals + 200], axis=0)
+
+    params = field.reshape(-1, order="C")
+    fixed = np.array(list(shape) + [0, 0, 0] + [1, 1, 1] + list(np.eye(3).ravel()), dtype=float)
+    fname = tmp_path / "field.h5"
+    with H5File(fname, "w") as f:
+        grp = f.create_group("TransformGroup")
+        grp.create_group("0")["TransformType"] = np.array([b"CompositeTransform_double_3_3"])
+        g1 = grp.create_group("1")
+        g1["TransformType"] = np.array([b"DisplacementFieldTransform_float_3_3"])
+        g1["TransformFixedParameters"] = fixed
+        g1["TransformParameters"] = params
+
+    img = itk.ITKCompositeH5.from_filename(fname)[0]
+    expected = np.moveaxis(field, 0, -1)
+    expected[..., (0, 1)] *= -1
+    assert np.allclose(img.get_fdata(), expected)
+

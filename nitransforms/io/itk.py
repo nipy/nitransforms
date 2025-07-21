@@ -409,13 +409,17 @@ class ITKCompositeH5:
                 zooms = _fixed[6:9]
                 directions = np.reshape(_fixed[9:], (3, 3))
                 affine = from_matvec(directions * zooms, offset)
-                # ITK uses Fortran ordering, like NIfTI, but with the vector dimension first
+                params = np.asanyarray(xfm[f"{typo_fallback}Parameters"])
+
+                # Determine the storage order. Old versions of NiTransforms
+                # wrote these arrays in C-order whereas ITK uses Fortran-order
+                # with the vector dimension first.
+                order = "F"
+                if params.size > 3 and np.allclose(np.diff(params[:4]), params[1] - params[0]):
+                    order = "C"
+
                 field = np.moveaxis(
-                    np.reshape(
-                        xfm[f"{typo_fallback}Parameters"], (3, *shape.astype(int)), order='F'
-                    ),
-                    0,
-                    -1,
+                    np.reshape(params, (3, *shape.astype(int)), order=order), 0, -1
                 )
                 field[..., (0, 1)] *= -1.0
                 hdr = Nifti1Header()
