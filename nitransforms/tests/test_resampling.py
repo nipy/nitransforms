@@ -286,6 +286,7 @@ def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     assert np.sqrt((diff**2).mean()) < RMSE_TOL_LINEAR
 
 
+@pytest.mark.slow
 def test_apply_transformchain(tmp_path, testdata_path):
     """Check a translation-only field on one or more axes, different image orientations."""
     os.chdir(str(tmp_path))
