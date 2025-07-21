@@ -108,7 +108,8 @@ def test_TransformBase(monkeypatch, testdata_path, tmpdir):
         _ = xfm.ndim
 
     # Test to_filename
-    xfm.to_filename("data.x5")
+    with pytest.raises(NotImplementedError):
+        xfm.to_filename("data.x5")
 
     # Test identity transform
     xfm = nitl.Affine()

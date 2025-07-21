@@ -10,7 +10,6 @@
 
 from pathlib import Path
 import numpy as np
-import h5py
 import warnings
 from nibabel.loadsave import load as _nbload
 from nibabel import funcs as _nbfuncs
@@ -333,15 +332,9 @@ class TransformBase:
         """
         return x
 
-    def to_filename(self, filename, fmt="X5"):
+    def to_filename(self, filename, fmt="X5", moving=None, x5_inverse=False):
         """Store the transform in BIDS-Transforms HDF5 file format (.x5)."""
-        with h5py.File(filename, "w") as out_file:
-            out_file.attrs["Format"] = "X5"
-            out_file.attrs["Version"] = np.uint16(1)
-            root = out_file.create_group("/0")
-            self._to_hdf5(root)
-
-        return filename
+        raise NotImplementedError
 
     def _to_hdf5(self, x5_root):
         """Serialize this object into the x5 file format."""
