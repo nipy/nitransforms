@@ -35,7 +35,7 @@ NiBabel = "https://github.com/nipy/nibabel/pull/656"
 [project.optional-dependencies]
 niftiext = ["lxml >= 4.6.4"]
 test = [
-    "pytest >= 6",
+    "pytest >= 6.2.5",
     "pytest-cov >= 2.11",
     "pytest-env",
     "pytest-xdist >= 2.5",
