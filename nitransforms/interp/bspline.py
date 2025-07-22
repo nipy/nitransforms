@@ -7,24 +7,28 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Interpolate with 3D tensor-product B-Spline basis."""
+
 import numpy as np
 import nibabel as nb
 from scipy.sparse import csr_matrix, kron
 
 
 def _cubic_bspline(d, order=3):
-    """Evaluate the cubic bspline at distance d from the center."""
+    """Evaluate the cubic B-spline at distance ``d`` from the center."""
+
     if order != 3:
         raise NotImplementedError
 
-    return np.piecewise(
-        d,
-        [d < 1.0, d >= 1.0],
-        [
-            lambda d: (4.0 - 6.0 * d ** 2 + 3.0 * d ** 3) / 6.0,
-            lambda d: (2.0 - d) ** 3 / 6.0,
-        ],
-    )
+    d = np.abs(d)
+    out = np.zeros_like(d, dtype="float32")
+
+    mask1 = d < 1.0
+    mask2 = (d >= 1.0) & (d < 2.0)
+
+    out[mask1] = (4.0 - 6.0 * d[mask1] ** 2 + 3.0 * d[mask1] ** 3) / 6.0
+    out[mask2] = (2.0 - d[mask2]) ** 3 / 6.0
+
+    return out
 
 
 def grid_bspline_weights(target_grid, ctrl_grid):

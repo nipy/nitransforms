@@ -190,3 +190,56 @@ def test_densefield_oob_resampling(is_deltas):
     assert np.allclose(mapped[0], points[0])
     assert np.allclose(mapped[2], points[2])
     assert np.allclose(mapped[1], points[1] + 1)
+
+
+def test_bspline_map_gridpoints():
+    """BSpline mapping matches dense field on grid points."""
+    ref = nb.Nifti1Image(np.zeros((5, 5, 5), dtype="uint8"), np.eye(4))
+    coeff = nb.Nifti1Image(
+        np.random.RandomState(0).rand(9, 9, 9, 3).astype("float32"), np.eye(4)
+    )
+
+    bspline = BSplineFieldTransform(coeff, reference=ref)
+    dense = bspline.to_field()
+
+    # Use a couple of voxel centers from the reference grid
+    ijk = np.array([[1, 1, 1], [2, 3, 0]])
+    pts = nb.affines.apply_affine(ref.affine, ijk)
+
+    assert np.allclose(bspline.map(pts), dense.map(pts), atol=1e-6)
+
+
+def test_bspline_map_manual():
+    """BSpline interpolation agrees with manual computation."""
+    ref = nb.Nifti1Image(np.zeros((5, 5, 5), dtype="uint8"), np.eye(4))
+    rng = np.random.RandomState(0)
+    coeff = nb.Nifti1Image(rng.rand(9, 9, 9, 3).astype("float32"), np.eye(4))
+
+    bspline = BSplineFieldTransform(coeff, reference=ref)
+
+    from nitransforms.base import _as_homogeneous
+    from nitransforms.interp.bspline import _cubic_bspline
+
+    def manual_map(x):
+        ijk = (bspline._knots.inverse @ _as_homogeneous(x).squeeze())[:3]
+        w_start = np.floor(ijk).astype(int) - 1
+        w_end = w_start + 3
+        w_start = np.maximum(w_start, 0)
+        w_end = np.minimum(w_end, np.array(bspline._coeffs.shape[:3]) - 1)
+
+        window = []
+        for i in range(w_start[0], w_end[0] + 1):
+            for j in range(w_start[1], w_end[1] + 1):
+                for k in range(w_start[2], w_end[2] + 1):
+                    window.append([i, j, k])
+        window = np.array(window)
+
+        dist = np.abs(window - ijk)
+        weights = _cubic_bspline(dist).prod(1)
+        coeffs = bspline._coeffs[window[:, 0], window[:, 1], window[:, 2]]
+
+        return x + coeffs.T @ weights
+
+    pts = np.array([[1.2, 1.5, 2.0], [3.3, 1.7, 2.4]])
+    expected = np.vstack([manual_map(p) for p in pts])
+    assert np.allclose(bspline.map(pts), expected, atol=1e-6)
