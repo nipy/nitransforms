@@ -672,3 +672,109 @@ def test_itk_linear_h5(tmpdir, data_path, testdata_path):
     # Error raised if the we try to use the single affine loader
     with pytest.raises(TransformIOError):
         itk.ITKLinearTransform.from_filename("test.h5")
+
+# Added tests for h5 orientation bug
+
+
+@pytest.mark.xfail(
+    reason="GH-137/GH-171: displacement field dimension order is wrong",
+    strict=False,
+)
+def test_itk_h5_field_order(tmp_path):
+    """Displacement fields stored in row-major order should fail to round-trip."""
+    shape = (3, 4, 5)
+    vals = np.arange(np.prod(shape), dtype=float).reshape(shape)
+    field = np.stack([vals, vals + 100, vals + 200], axis=0)
+
+    params = field.reshape(-1, order="C")
+    fixed = np.array(list(shape) + [0, 0, 0] + [1, 1, 1] + list(np.eye(3).ravel()), dtype=float)
+    fname = tmp_path / "field.h5"
+    with H5File(fname, "w") as f:
+        grp = f.create_group("TransformGroup")
+        grp.create_group("0")["TransformType"] = np.array([b"CompositeTransform_double_3_3"])
+        g1 = grp.create_group("1")
+        g1["TransformType"] = np.array([b"DisplacementFieldTransform_float_3_3"])
+        g1["TransformFixedParameters"] = fixed
+        g1["TransformParameters"] = params
+
+    img = itk.ITKCompositeH5.from_filename(fname)[0]
+    expected = np.moveaxis(field, 0, -1)
+    expected[..., (0, 1)] *= -1
+    assert np.allclose(img.get_fdata(), expected)
+
+
+def _load_composite_testdata(data_path):
+    """Return the composite HDF5 and displacement field from regressions."""
+    h5file = data_path / "regressions" / "ants_t1_to_mniComposite.h5"
+    # Generated using
+    # CompositeTransformUtil --disassemble ants_t1_to_mniComposite.h5 \
+    #     ants_t1_to_mniComposite
+    warpfile = data_path / "regressions" / (
+        "01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz"
+    )
+    if not (h5file.exists() and warpfile.exists()):
+        pytest.skip("Composite transform test data not available")
+    return h5file, warpfile
+
+
+@pytest.mark.xfail(
+    reason="GH-137/GH-171: displacement field dimension order is wrong",
+    strict=False,
+)
+def test_itk_h5_displacement_mismatch(data_path):
+    """Composite displacements should match the standalone field"""
+    h5file, warpfile = _load_composite_testdata(data_path)
+    xforms = itk.ITKCompositeH5.from_filename(h5file)
+    field_h5 = xforms[1]
+    field_img = itk.ITKDisplacementsField.from_filename(warpfile)
+
+    np.testing.assert_array_equal(
+        np.asanyarray(field_h5.dataobj), np.asanyarray(field_img.dataobj)
+    )
+
+
+def test_itk_h5_transpose_fix(data_path):
+    """Check the displacement field orientation explicitly.
+
+    ITK stores displacement fields with the vector dimension leading in
+    Fortran (column-major) order [1]_. Transposing the parameters from the HDF5
+    composite file accordingly should match the standalone displacement image.
+
+    References
+    ----------
+    .. [1] ITK Software Guide. https://itk.org/ItkSoftwareGuide.pdf
+    """
+    h5file, warpfile = _load_composite_testdata(data_path)
+
+    with H5File(h5file, "r") as f:
+        group = f["TransformGroup"]["2"]
+        size = group["TransformFixedParameters"][:3].astype(int)
+        params = group["TransformParameters"][:].reshape(*size, 3)
+
+    img = nb.load(warpfile)
+    ref = np.squeeze(np.asanyarray(img.dataobj))
+
+    np.testing.assert_array_equal(params.transpose(2, 1, 0, 3), ref)
+
+
+def test_itk_h5_field_order_fortran(tmp_path):
+    """Verify Fortran-order displacement fields load correctly"""
+    shape = (3, 4, 5)
+    vals = np.arange(np.prod(shape), dtype=float).reshape(shape)
+    field = np.stack([vals, vals + 100, vals + 200], axis=0)
+
+    params = field.reshape(-1, order="F")
+    fixed = np.array(list(shape) + [0, 0, 0] + [1, 1, 1] + list(np.eye(3).ravel()), dtype=float)
+    fname = tmp_path / "field_f.h5"
+    with H5File(fname, "w") as f:
+        grp = f.create_group("TransformGroup")
+        grp.create_group("0")["TransformType"] = np.array([b"CompositeTransform_double_3_3"])
+        g1 = grp.create_group("1")
+        g1["TransformType"] = np.array([b"DisplacementFieldTransform_float_3_3"])
+        g1["TransformFixedParameters"] = fixed
+        g1["TransformParameters"] = params
+
+    img = itk.ITKCompositeH5.from_filename(fname)[0]
+    expected = np.moveaxis(field, 0, -1)
+    expected[..., (0, 1)] *= -1
+    assert np.allclose(img.get_fdata(), expected)
