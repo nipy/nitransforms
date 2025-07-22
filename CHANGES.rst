@@ -1,19 +1,27 @@
-25.0.0 (TBD)
-============
-A new major release with critical updates.
-The new release includes a critical hotfix for 4D resamplings.
-The second major improvement is the inclusion of a first implementation of the X5 format (BIDS).
-The X5 implementation is currently restricted to reading/writing of linear transforms.
+25.0.0 (July 22, 2025)
+======================
+A new major release introducing critical fixes and important new functionality.
+Most notably, it includes a hotfix for 4D resampling (also backported to 24.1.4) and adds **experimental support for the X5 format** (*BIDS*).
+The X5 support enables I/O for linear and nonlinear transforms and includes partial support for transformation chains—marking a first step
+toward full *BIDS* interoperability.
+This release also drops support for *Python* 3.9 and earlier, aligning with modern *Python* standards and paving the way for future improvements.
 
 CHANGES
 -------
+* FIX: BSpline mapping of individual points by @oesteban in https://github.com/nipy/nitransforms/pull/256
+* FIX: Remove implementation of an abstract class by @oesteban in https://github.com/nipy/nitransforms/pull/255
+* FIX: Add test for `DenseFieldTransform` handling of OOB points by @oesteban in https://github.com/nipy/nitransforms/pull/254
+* ENH: X5 read/write support of ``TransformChain`` by @oesteban in https://github.com/nipy/nitransforms/pull/253
 * ENH: Loading of X5 (linear) transforms by @oesteban in https://github.com/nipy/nitransforms/pull/243
 * ENH: Implement X5 representation and output to filesystem by @oesteban in https://github.com/nipy/nitransforms/pull/241
 * DOC: Fix references to ``os.PathLike`` by @oesteban in https://github.com/nipy/nitransforms/pull/242
+* MNT: Drop Python 3.9 by @oesteban in https://github.com/nipy/nitransforms/pull/259
 * MNT: Increase coverage by testing edge cases and adding docstrings by @oesteban in https://github.com/nipy/nitransforms/pull/248
 * MNT: Refactor io/lta to reduce one partial line by @oesteban in https://github.com/nipy/nitransforms/pull/246
 * MNT: Move flake8 config into ``pyproject.toml`` by @oesteban in https://github.com/nipy/nitransforms/pull/245
 * MNT: Configure coverage to omit tests by @oesteban in https://github.com/nipy/nitransforms/pull/244
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/24.1.4...25.0.0
 
 24.1.4 (July 20, 2025)
 ======================
