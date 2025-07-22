@@ -700,6 +700,48 @@ def test_itk_h5_field_order(tmp_path):
     assert np.allclose(img.get_fdata(), expected)
 
 
+def _load_composite_testdata(data_path):
+    """Return the composite HDF5 and displacement field from regressions."""
+    h5file = data_path / "regressions" / "ants_t1_to_mniComposite.h5"
+    warpfile = data_path / "regressions" / (
+        "01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz"
+    )
+    if not (h5file.exists() and warpfile.exists()):
+        pytest.skip("Composite transform test data not available")
+    return h5file, warpfile
+
+
+@pytest.mark.xfail(
+    reason="GH-137/GH-171: displacement field dimension order is wrong",
+    strict=False,
+)
+def test_itk_h5_displacement_mismatch(data_path):
+    """Composite displacements should match the standalone field"""
+    h5file, warpfile = _load_composite_testdata(data_path)
+    xforms = itk.ITKCompositeH5.from_filename(h5file)
+    field_h5 = xforms[1]
+    field_img = itk.ITKDisplacementsField.from_filename(warpfile)
+
+    np.testing.assert_array_equal(
+        np.asanyarray(field_h5.dataobj), np.asanyarray(field_img.dataobj)
+    )
+
+
+def test_itk_h5_transpose_fix(data_path):
+    """Manually transposing the HDF5 parameters should match the image."""
+    h5file, warpfile = _load_composite_testdata(data_path)
+
+    with H5File(h5file, "r") as f:
+        group = f["TransformGroup"]["2"]
+        size = group["TransformFixedParameters"][:3].astype(int)
+        params = group["TransformParameters"][:].reshape(*size, 3)
+
+    img = nb.load(warpfile)
+    ref = np.squeeze(np.asanyarray(img.dataobj))
+
+    np.testing.assert_array_equal(params.transpose(2, 1, 0, 3), ref)
+
+
 def test_itk_h5_field_order_fortran(tmp_path):
     """Verify Fortran-order displacement fields load correctly"""
     shape = (3, 4, 5)
