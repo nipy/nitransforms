@@ -23,7 +23,7 @@ dependencies = [
     "numpy >= 2.1",
     "scipy >= 1.8",
     "nibabel >= 5.2",
-    "h5py >= 3.9",
+    "h5py >= 3.11",
 ]
 dynamic = ["version"]
 
