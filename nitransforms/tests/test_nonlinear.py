@@ -5,6 +5,8 @@
 import os
 from subprocess import check_call
 import shutil
+
+import SimpleITK as sitk
 import pytest
 
 import numpy as np
@@ -289,9 +291,15 @@ def test_constant_field_vs_ants(tmp_path):
     field[..., 2] = 5
 
     field_img = nb.Nifti1Image(field, ref_affine)
-    itk_img = ITKDisplacementsField.to_image(field_img)
+
     warpfile = tmp_path / "const_disp.nii.gz"
-    itk_img.to_filename(warpfile)
+    itk_img = sitk.GetImageFromArray(field, isVector=True)
+    itk_img.SetOrigin(tuple(ref_affine[:3, 3]))
+    zooms = np.sqrt((ref_affine[:3, :3] ** 2).sum(0))
+    itk_img.SetSpacing(tuple(zooms))
+    direction = (ref_affine[:3, :3] / zooms).ravel()
+    itk_img.SetDirection(tuple(direction))
+    sitk.WriteImage(itk_img, str(warpfile))
 
     points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]])
     csvin = tmp_path / "points.csv"
@@ -307,7 +315,7 @@ def test_constant_field_vs_ants(tmp_path):
     ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
     ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
 
-    xfm = DenseFieldTransform(warpfile)
+    xfm = DenseFieldTransform(field_img)
     mapped = xfm.map(points)
 
     assert not np.allclose(mapped, ants_pts, atol=1e-6)

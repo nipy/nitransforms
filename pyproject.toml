@@ -41,6 +41,7 @@ test = [
     "pytest-xdist >= 2.5",
     "coverage[toml] >= 5.2.1",
     "nitransforms[niftiext]",
+    "SimpleITK",
 ]
 # Aliases
 niftiexts = ["nitransforms[niftiext]"]
