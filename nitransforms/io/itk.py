@@ -1,4 +1,5 @@
 """Read/write ITK transforms."""
+
 import warnings
 import numpy as np
 from scipy.io import loadmat as _read_mat, savemat as _save_mat
@@ -138,8 +139,7 @@ class ITKLinearTransform(LinearParameters):
         sa = tf.structarr
 
         affine = mdict.get(
-            "AffineTransform_double_3_3",
-            mdict.get("AffineTransform_float_3_3")
+            "AffineTransform_double_3_3", mdict.get("AffineTransform_float_3_3")
         )
 
         if affine is None:
@@ -337,7 +337,7 @@ class ITKDisplacementsField(DisplacementsField):
         hdr = imgobj.header.copy()
         shape = hdr.get_data_shape()
 
-        if len(shape) != 5 or shape[-2] != 1 or not shape[-1] in (2, 3):
+        if len(shape) != 5 or shape[-2] != 1 or shape[-1] not in (2, 3):
             raise TransformFileError(
                 'Displacements field "%s" does not come from ITK.'
                 % imgobj.file_map["image"].filename
@@ -348,9 +348,7 @@ class ITKDisplacementsField(DisplacementsField):
             hdr.set_intent("vector")
 
         field = np.squeeze(np.asanyarray(imgobj.dataobj))
-        field[..., (0, 1)] *= -1.0
-
-        return imgobj.__class__(field, imgobj.affine, hdr)
+        return imgobj.__class__(field, LPS @ imgobj.affine, hdr)
 
     @classmethod
     def to_image(cls, imgobj):
@@ -360,9 +358,7 @@ class ITKDisplacementsField(DisplacementsField):
         hdr.set_intent("vector")
 
         warp_data = imgobj.get_fdata().reshape(imgobj.shape[:3] + (1, imgobj.shape[-1]))
-        warp_data[..., (0, 1)] *= -1
-
-        return imgobj.__class__(warp_data, imgobj.affine, hdr)
+        return imgobj.__class__(warp_data, LPS @ imgobj.affine, hdr)
 
 
 class ITKCompositeH5:
@@ -410,21 +406,16 @@ class ITKCompositeH5:
                 directions = np.reshape(_fixed[9:], (3, 3))
                 affine = from_matvec(directions * zooms, offset)
                 # ITK uses Fortran ordering, like NIfTI, but with the vector dimension first
-                field = np.moveaxis(
-                    np.reshape(
-                        xfm[f"{typo_fallback}Parameters"], (3, *shape.astype(int)), order='F'
-                    ),
-                    0,
-                    -1,
-                )
-                field[..., (0, 1)] *= -1.0
+                # In practice, this seems to work (see issue #171)
+                field = np.reshape(
+                    xfm[f"{typo_fallback}Parameters"], (*shape.astype(int), 3)
+                ).transpose(2, 1, 0, 3)
+
                 hdr = Nifti1Header()
                 hdr.set_intent("vector")
                 hdr.set_data_dtype("float")
 
-                xfm_list.append(
-                    Nifti1Image(field.astype("float"), LPS @ affine, hdr)
-                )
+                xfm_list.append(Nifti1Image(field.astype("float"), affine, hdr))
                 continue
 
             raise TransformIOError(
