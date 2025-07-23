@@ -250,9 +250,9 @@ def test_bspline_map_manual():
     assert np.allclose(bspline.map(pts), expected, atol=1e-6)
 
 
-def test_densefield_map_against_ants(data_path, tmp_path):
+def test_densefield_map_against_ants(testdata_path, tmp_path):
     """Map points with DenseFieldTransform and compare to ANTs."""
-    warpfile = data_path / "regressions" / (
+    warpfile = testdata_path / "regressions" / (
         "01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz"
     )
     if not warpfile.exists():
@@ -318,5 +318,4 @@ def test_constant_field_vs_ants(tmp_path):
     xfm = DenseFieldTransform(field_img)
     mapped = xfm.map(points)
 
-    assert not np.allclose(mapped, ants_pts, atol=1e-6)
-    assert np.allclose(mapped - ants_pts, [-10.0, 0.0, 0.0])
+    assert np.allclose(mapped, ants_pts, atol=1e-6)
