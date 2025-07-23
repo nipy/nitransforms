@@ -136,21 +136,21 @@ jobs:
           name: Run unit tests
           no_output_timeout: 2h
           command: |
-            mkdir -p /tmp/tests/{artifacts,summaries}
+            mkdir -p /tmp/tests/{artifacts,summaries,coverage}
             docker run -u $( id -u ) -it --rm \
               -w /src/nitransforms -v $PWD:/src/nitransforms \
               -v /tmp/data/nitransforms-tests:/data -e TEST_DATA_HOME=/data \
-              -e COVERAGE_FILE=/tmp/summaries/.pytest.coverage \
+              -e COVERAGE_FILE=/tmp/coverage/.pytest.coverage \
               -v /tmp/fslicense/license.txt:/opt/freesurfer/license.txt:ro \
               -v /tmp/tests:/tmp nitransforms:latest \
               pytest --junit-xml=/tmp/summaries/pytest.xml \
-                     --cov nitransforms --cov-report xml:/tmp/summaries/unittests.xml \
+                     --cov nitransforms --cov-report xml:/tmp/coverage/unittests.xml \
                      nitransforms/
       - run:
           name: Submit unit test coverage
           command: |
             cd /tmp/src/nitransforms
-            python3 -m codecov --file /tmp/tests/summaries/unittests.xml \
+            python3 -m codecov --file /tmp/tests/coverage/unittests.xml \
                 --flags unittests -e CIRCLE_JOB
       - run:
           name: Clean up tests directory
