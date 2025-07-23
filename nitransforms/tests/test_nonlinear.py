@@ -3,6 +3,8 @@
 """Tests of nonlinear transforms."""
 
 import os
+from subprocess import check_call
+import shutil
 import pytest
 
 import numpy as np
@@ -243,3 +245,31 @@ def test_bspline_map_manual():
     pts = np.array([[1.2, 1.5, 2.0], [3.3, 1.7, 2.4]])
     expected = np.vstack([manual_map(p) for p in pts])
     assert np.allclose(bspline.map(pts), expected, atol=1e-6)
+
+
+def test_densefield_map_against_ants(data_path, tmp_path):
+    """Map points with DenseFieldTransform and compare to ANTs."""
+    warpfile = data_path / "regressions" / (
+        "01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz"
+    )
+    if not warpfile.exists():
+        pytest.skip("Composite transform test data not available")
+
+    points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]])
+    csvin = tmp_path / "points.csv"
+    np.savetxt(csvin, points, delimiter=",", header="x,y,z", comments="")
+
+    csvout = tmp_path / "out.csv"
+    cmd = f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {warpfile}"
+    exe = cmd.split()[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+    check_call(cmd, shell=True)
+
+    ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
+    ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
+
+    xfm = DenseFieldTransform(warpfile)
+    mapped = xfm.map(points)
+
+    assert np.allclose(mapped, ants_pts, atol=1e-6)
