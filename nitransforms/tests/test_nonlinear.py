@@ -9,6 +9,7 @@ import pytest
 
 import numpy as np
 import nibabel as nb
+from nibabel.affines import from_matvec
 from nitransforms.resampling import apply
 from nitransforms.base import TransformError
 from nitransforms.io.base import TransformFileError
@@ -273,3 +274,41 @@ def test_densefield_map_against_ants(data_path, tmp_path):
     mapped = xfm.map(points)
 
     assert np.allclose(mapped, ants_pts, atol=1e-6)
+
+
+def test_constant_field_vs_ants(tmp_path):
+    """Create a constant displacement field and compare mappings."""
+
+    # Create a reference centered at the origin
+    shape = (5, 5, 5)
+    ref_affine = from_matvec(np.eye(3), -(np.array(shape) - 1) / 2)
+
+    field = np.zeros(shape + (3,), dtype="float32")
+    field[..., 0] = -5
+    field[..., 1] = 0
+    field[..., 2] = 5
+
+    field_img = nb.Nifti1Image(field, ref_affine)
+    itk_img = ITKDisplacementsField.to_image(field_img)
+    warpfile = tmp_path / "const_disp.nii.gz"
+    itk_img.to_filename(warpfile)
+
+    points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]])
+    csvin = tmp_path / "points.csv"
+    np.savetxt(csvin, points, delimiter=",", header="x,y,z", comments="")
+
+    csvout = tmp_path / "out.csv"
+    cmd = f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {warpfile}"
+    exe = cmd.split()[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+    check_call(cmd, shell=True)
+
+    ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
+    ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
+
+    xfm = DenseFieldTransform(warpfile)
+    mapped = xfm.map(points)
+
+    assert not np.allclose(mapped, ants_pts, atol=1e-6)
+    assert np.allclose(mapped - ants_pts, [-10.0, 0.0, 0.0])
