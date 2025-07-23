@@ -20,7 +20,7 @@ from nitransforms.nonlinear import (
     DenseFieldTransform,
 )
 from nitransforms import io
-from ..io.itk import ITKDisplacementsField
+from nitransforms.io.itk import ITKDisplacementsField
 
 
 @pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 3)])
@@ -252,8 +252,10 @@ def test_bspline_map_manual():
 
 def test_densefield_map_against_ants(testdata_path, tmp_path):
     """Map points with DenseFieldTransform and compare to ANTs."""
-    warpfile = testdata_path / "regressions" / (
-        "01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz"
+    warpfile = (
+        testdata_path
+        / "regressions"
+        / ("01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz")
     )
     if not warpfile.exists():
         pytest.skip("Composite transform test data not available")
