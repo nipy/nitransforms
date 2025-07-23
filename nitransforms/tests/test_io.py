@@ -783,13 +783,13 @@ def test_itk_h5_field_order_fortran(tmp_path):
 
 def test_composite_h5_map_against_ants(testdata_path, tmp_path):
     """Map points with NiTransforms and compare to ANTs."""
-    h5file, _ = _load_composite_testdata(testdata_path)
+    h5file = testdata_path / "regressions" / "ants_t1_to_mniComposite.h5"
+    if not h5file.exists():
+        pytest.skip("Composite transform test data not available")
+
     points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]])
     csvin = tmp_path / "points.csv"
-    with open(csvin, "w") as f:
-        f.write("x,y,z\n")
-        for row in points:
-            f.write(",".join(map(str, row)) + "\n")
+    np.savetxt(csvin, points, delimiter=",", header="x,y,z", comments="")
 
     csvout = tmp_path / "out.csv"
     cmd = f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {h5file}"
