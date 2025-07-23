@@ -258,7 +258,15 @@ def test_densefield_map_against_ants(testdata_path, tmp_path):
     if not warpfile.exists():
         pytest.skip("Composite transform test data not available")
 
-    points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]])
+    points = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 2.0, 3.0],
+            [10.0, -10.0, 5.0],
+            [-5.0, 7.0, -2.0],
+            [-12.0, 12.0, 0.0],
+        ]
+    )
     csvin = tmp_path / "points.csv"
     np.savetxt(csvin, points, delimiter=",", header="x,y,z", comments="")
 
@@ -272,7 +280,7 @@ def test_densefield_map_against_ants(testdata_path, tmp_path):
     ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
     ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
 
-    xfm = DenseFieldTransform(warpfile)
+    xfm = DenseFieldTransform(ITKDisplacementsField.from_filename(warpfile))
     mapped = xfm.map(points)
 
     assert np.allclose(mapped, ants_pts, atol=1e-6)
@@ -282,15 +290,13 @@ def test_constant_field_vs_ants(tmp_path):
     """Create a constant displacement field and compare mappings."""
 
     # Create a reference centered at the origin
-    shape = (5, 5, 5)
+    shape = (25, 25, 25)
     ref_affine = from_matvec(np.eye(3), -(np.array(shape) - 1) / 2)
 
     field = np.zeros(shape + (3,), dtype="float32")
     field[..., 0] = -5
-    field[..., 1] = 0
-    field[..., 2] = 5
-
-    field_img = nb.Nifti1Image(field, ref_affine)
+    field[..., 1] = 5
+    field[..., 2] = 0  # No flip in the third axis
 
     warpfile = tmp_path / "const_disp.nii.gz"
     itk_img = sitk.GetImageFromArray(field, isVector=True)
@@ -301,7 +307,15 @@ def test_constant_field_vs_ants(tmp_path):
     itk_img.SetDirection(tuple(direction))
     sitk.WriteImage(itk_img, str(warpfile))
 
-    points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]])
+    points = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 2.0, 3.0],
+            [10.0, -10.0, 5.0],
+            [-5.0, 7.0, -2.0],
+            [12.0, 0.0, -11.0],
+        ]
+    )
     csvin = tmp_path / "points.csv"
     np.savetxt(csvin, points, delimiter=",", header="x,y,z", comments="")
 
@@ -315,7 +329,7 @@ def test_constant_field_vs_ants(tmp_path):
     ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
     ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
 
-    xfm = DenseFieldTransform(field_img)
+    xfm = DenseFieldTransform(ITKDisplacementsField.from_filename(warpfile))
     mapped = xfm.map(points)
 
     assert np.allclose(mapped, ants_pts, atol=1e-6)
