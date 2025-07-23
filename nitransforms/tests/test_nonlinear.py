@@ -286,17 +286,27 @@ def test_densefield_map_against_ants(testdata_path, tmp_path):
     assert np.allclose(mapped, ants_pts, atol=1e-6)
 
 
-def test_constant_field_vs_ants(tmp_path):
+@pytest.mark.parametrize(
+    "mat",
+    [
+        np.eye(3),
+        np.diag([-1.0, 1.0, 1.0]),
+        np.diag([1.0, -1.0, 1.0]),
+        np.array([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]),
+    ],
+)
+def test_constant_field_vs_ants(tmp_path, mat):
     """Create a constant displacement field and compare mappings."""
 
-    # Create a reference centered at the origin
+    # Create a reference centered at the origin with various axis orders/flips
     shape = (25, 25, 25)
-    ref_affine = from_matvec(np.eye(3), -(np.array(shape) - 1) / 2)
+    center = (np.array(shape) - 1) / 2
+    ref_affine = from_matvec(mat, -mat @ center)
 
     field = np.zeros(shape + (3,), dtype="float32")
     field[..., 0] = -5
-    field[..., 1] = 5
-    field[..., 2] = 0  # No flip in the third axis
+    field[..., 1] = 2
+    field[..., 2] = 0  # No displacement in the third axis
 
     warpfile = tmp_path / "const_disp.nii.gz"
     itk_img = sitk.GetImageFromArray(field, isVector=True)
