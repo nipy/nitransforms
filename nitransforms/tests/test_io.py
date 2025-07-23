@@ -15,6 +15,7 @@ from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from scipy.io import loadmat
 from nitransforms.linear import Affine
+from nitransforms import nonlinear as nitnl, linear as nitl
 from nitransforms.io import (
     afni,
     fsl,
@@ -778,3 +779,57 @@ def test_itk_h5_field_order_fortran(tmp_path):
     expected = np.moveaxis(field, 0, -1)
     expected[..., (0, 1)] *= -1
     assert np.allclose(img.get_fdata(), expected)
+
+
+def test_composite_h5_map_against_ants(tmp_path):
+    """Map points with NiTransforms and compare to ANTs."""
+    shape = (2, 2, 2)
+    disp = np.zeros(shape + (3,), dtype=float)
+    disp += np.array([0.2, -0.3, 0.4])
+
+    params = np.moveaxis(disp, -1, 0).reshape(-1, order="F")
+    fixed = np.array(
+        list(shape) + [0, 0, 0] + [1, 1, 1] + list(np.eye(3).ravel()), dtype=float
+    )
+    fname = tmp_path / "test.h5"
+    with H5File(fname, "w") as f:
+        grp = f.create_group("TransformGroup")
+        grp.create_group("0")["TransformType"] = np.array(
+            [b"CompositeTransform_double_3_3"]
+        )
+        g1 = grp.create_group("1")
+        g1["TransformType"] = np.array([b"DisplacementFieldTransform_float_3_3"])
+        g1["TransformFixedParameters"] = fixed
+        g1["TransformParameters"] = params
+        g2 = grp.create_group("2")
+        g2["TransformType"] = np.array([b"AffineTransform_double_3_3"])
+        g2["TransformFixedParameters"] = np.zeros(3, dtype=float)
+        g2["TransformParameters"] = np.array(
+            [1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.2, -0.1], dtype=float
+        )
+
+    points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]])
+    csvin = tmp_path / "points.csv"
+    with open(csvin, "w") as f:
+        f.write("x,y,z\n")
+        for row in points:
+            f.write(",".join(map(str, row)) + "\n")
+
+    csvout = tmp_path / "out.csv"
+    cmd = (
+        f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {fname}"
+    )
+    exe = cmd.split()[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+    check_call(cmd, shell=True)
+
+    ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
+    ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
+
+    xforms = itk.ITKCompositeH5.from_filename(fname)
+    dfield = nitnl.DenseFieldTransform(xforms[0])
+    affine = nitl.Affine(xforms[1].to_ras())
+    mapped = (affine @ dfield).map(points)
+
+    assert np.allclose(mapped, ants_pts, atol=1e-6)
