@@ -343,3 +343,19 @@ def test_constant_field_vs_ants(tmp_path, mat):
     mapped = xfm.map(points)
 
     assert np.allclose(mapped, ants_pts, atol=1e-6)
+
+    # Verify deformation field generated via NiTransforms matches SimpleITK
+    csvout2 = tmp_path / "out.csv"
+    warpfile2 = tmp_path / "const_disp.nii.gz"
+    ITKDisplacementsField.to_image(nb.Nifti1Image(field, ref_affine, None)).to_filename(
+        warpfile2
+    )
+
+    check_call(
+        f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout2} -t {warpfile}",
+        shell=True,
+    )
+    ants_res2 = np.genfromtxt(csvout2, delimiter=",", names=True)
+    ants_pts2 = np.vstack([ants_res2[n] for n in ("x", "y", "z")]).T
+
+    assert np.allclose(ants_pts, ants_pts2, atol=1e-6)
