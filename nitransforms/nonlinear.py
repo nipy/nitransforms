@@ -285,7 +285,7 @@ class DenseFieldTransform(TransformBase):
         )
 
     @classmethod
-    def from_filename(cls, filename, fmt="X5", x5_position=0):
+    def from_filename(cls, filename, is_deltas=True, fmt="X5", x5_position=0):
         _factory = {
             "afni": io.afni.AFNIDisplacementsField,
             "itk": io.itk.ITKDisplacementsField,
@@ -299,7 +299,7 @@ class DenseFieldTransform(TransformBase):
         if fmt == "X5":
             return from_x5(load_x5(filename), x5_position=x5_position)
 
-        return cls(_factory[fmt.lower()].from_filename(filename))
+        return cls(_factory[fmt.lower()].from_filename(filename), is_deltas=is_deltas)
 
 
 load = DenseFieldTransform.from_filename

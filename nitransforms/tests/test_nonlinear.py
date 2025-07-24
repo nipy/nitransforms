@@ -288,36 +288,30 @@ def test_densefield_map_against_ants(testdata_path, tmp_path):
     assert np.allclose(mapped, ants_pts, atol=1e-6)
 
 
-@pytest.mark.parametrize(
-    "mat",
-    [
-        np.eye(3),
-        np.diag([-1.0, 1.0, 1.0]),
-        np.diag([1.0, -1.0, 1.0]),
-        np.array([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]),
-    ],
-)
-def test_constant_field_vs_ants(tmp_path, mat):
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
+@pytest.mark.parametrize("gridpoints", [True, False])
+def test_constant_field_vs_ants(tmp_path, get_testdata, image_orientation, gridpoints):
     """Create a constant displacement field and compare mappings."""
 
-    # Create a reference centered at the origin with various axis orders/flips
-    shape = (25, 25, 25)
-    center = (np.array(shape) - 1) / 2
-    ref_affine = from_matvec(mat, -mat @ center)
+    nii = get_testdata[image_orientation]
 
-    field = np.zeros(shape + (3,), dtype="float32")
-    field[..., 0] = -5
-    field[..., 1] = 2
-    field[..., 2] = 0  # No displacement in the third axis
+    # Create a reference centered at the origin with various axis orders/flips
+    shape = nii.shape
+    ref_affine = nii.affine.copy()
+
+    field = np.hstack((
+        np.linspace(-50, 50, num=np.prod(shape)),
+        np.linspace(-80, 80, num=np.prod(shape)),
+        np.zeros(np.prod(shape))
+    )).reshape(shape + (3, ))
+    fieldnii = nb.Nifti1Image(field, ref_affine, None)
 
     warpfile = tmp_path / "const_disp.nii.gz"
-    itk_img = sitk.GetImageFromArray(field, isVector=True)
-    itk_img.SetOrigin(tuple(ref_affine[:3, 3]))
-    zooms = np.sqrt((ref_affine[:3, :3] ** 2).sum(0))
-    itk_img.SetSpacing(tuple(zooms))
-    direction = (ref_affine[:3, :3] / zooms).ravel()
-    itk_img.SetDirection(tuple(direction))
-    sitk.WriteImage(itk_img, str(warpfile))
+    ITKDisplacementsField.to_filename(fieldnii, warpfile)
+    xfm = DenseFieldTransform(fieldnii)
+    xfm2 = DenseFieldTransform(ITKDisplacementsField.from_filename(warpfile))
+
+    np.testing.assert_allclose(xfm.reference.affine, xfm2.reference.affine)
 
     points = np.array(
         [
@@ -328,6 +322,11 @@ def test_constant_field_vs_ants(tmp_path, mat):
             [12.0, 0.0, -11.0],
         ]
     )
+
+    if gridpoints:
+        coords = xfm.reference.ndcoords
+        points = (ref_affine @ np.vstack((coords, np.ones((1, coords.shape[1]))))).T[:, :3]
+
     csvin = tmp_path / "points.csv"
     np.savetxt(csvin, points, delimiter=",", header="x,y,z", comments="")
 
@@ -341,23 +340,25 @@ def test_constant_field_vs_ants(tmp_path, mat):
     ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
     ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
 
-    xfm = DenseFieldTransform(ITKDisplacementsField.from_filename(warpfile))
+    import pdb; pdb.set_trace()
+
+    ants_field = ants_pts.reshape(shape + (3, ))
+    diff = xfm._field[..., 0] - ants_field[..., 0]
+    mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
+    assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"
+
+    diff = xfm._field[..., 1] - ants_field[..., 1]
+    mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
+    assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"
+
+    diff = xfm._field[..., 2] - ants_field[..., 2]
+    mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
+    assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"
+
     mapped = xfm.map(points)
+    np.testing.assert_array_equal(np.round(mapped, 3), ants_pts)
 
-    assert np.allclose(mapped, ants_pts, atol=1e-6)
+    diff = mapped - ants_pts
+    mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
 
-    # Verify deformation field generated via NiTransforms matches SimpleITK
-    csvout2 = tmp_path / "out.csv"
-    warpfile2 = tmp_path / "const_disp.nii.gz"
-    ITKDisplacementsField.to_image(nb.Nifti1Image(field, ref_affine, None)).to_filename(
-        warpfile2
-    )
-
-    check_call(
-        f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout2} -t {warpfile}",
-        shell=True,
-    )
-    ants_res2 = np.genfromtxt(csvout2, delimiter=",", names=True)
-    ants_pts2 = np.vstack([ants_res2[n] for n in ("x", "y", "z")]).T
-
-    assert np.allclose(ants_pts, ants_pts2, atol=1e-6)
+    assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"

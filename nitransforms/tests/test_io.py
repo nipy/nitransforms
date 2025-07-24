@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 from h5py import File as H5File
 
+import SimpleITK as sitk
 import nibabel as nb
 from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
@@ -694,6 +695,47 @@ def test_itk_linear_h5(tmpdir, data_path, testdata_path):
     with pytest.raises(TransformIOError):
         itk.ITKLinearTransform.from_filename("test.h5")
 
+# Added tests for displacements fields orientations (ANTs/ITK)
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
+def test_itk_displacements(tmp_path, get_testdata, image_orientation):
+    """Exercise I/O of ITK displacements fields."""
+
+    nii = get_testdata[image_orientation]
+
+    # Create a reference centered at the origin with various axis orders/flips
+    shape = nii.shape
+    ref_affine = nii.affine.copy()
+
+    field = np.hstack((
+        np.linspace(-50, 50, num=np.prod(shape)),
+        np.linspace(-80, 80, num=np.prod(shape)),
+        np.zeros(np.prod(shape))
+    )).reshape(shape + (3, ))
+
+    nit_nii = itk.ITKDisplacementsField.to_image(
+        nb.Nifti1Image(field, ref_affine, None)
+    )
+
+    itk_file = tmp_path / "itk_displacements.nii.gz"
+    itk_img = sitk.GetImageFromArray(field, isVector=True)
+    itk_img.SetOrigin(tuple(ref_affine[:3, 3]))
+    zooms = np.sqrt((ref_affine[:3, :3] ** 2).sum(0))
+    itk_img.SetSpacing(tuple(zooms))
+    direction = (ref_affine[:3, :3] / zooms).ravel()
+    itk_img.SetDirection(tuple(direction))
+    sitk.WriteImage(itk_img, str(itk_file))
+
+    itk_nit_nii = itk.ITKDisplacementsField.from_filename(itk_file)
+
+    assert itk_nit_nii.shape == field.shape
+    np.testing.assert_allclose(itk_nit_nii.affine, ref_affine)
+    np.testing.assert_allclose(itk_nit_nii.dataobj, field)
+
+    itk_nii = nb.load(itk_file)
+    assert nit_nii.shape == itk_nii.shape
+    np.testing.assert_allclose(itk_nii.dataobj, nit_nii.dataobj)
+    np.testing.assert_allclose(itk_nii.affine, nit_nii.affine)
+    
 
 # Added tests for h5 orientation bug (#167)
 def _load_composite_testdata(data_path):

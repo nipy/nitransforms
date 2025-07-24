@@ -347,7 +347,8 @@ class ITKDisplacementsField(DisplacementsField):
             warnings.warn("Incorrect intent identified.")
             hdr.set_intent("vector")
 
-        field = np.squeeze(np.asanyarray(imgobj.dataobj))
+        field = np.squeeze(np.asanyarray(imgobj.dataobj)).transpose(2, 1, 0, 3)
+
         return imgobj.__class__(field, LPS @ imgobj.affine, hdr)
 
     @classmethod
@@ -357,7 +358,7 @@ class ITKDisplacementsField(DisplacementsField):
         hdr = imgobj.header.copy()
         hdr.set_intent("vector")
 
-        warp_data = imgobj.get_fdata().reshape(imgobj.shape[:3] + (1, imgobj.shape[-1]))
+        warp_data = imgobj.get_fdata().transpose(2, 1, 0, 3)[..., None, :]
         return imgobj.__class__(warp_data, LPS @ imgobj.affine, hdr)
 
 
