@@ -254,22 +254,22 @@ def apply(
 
     targets = None
     ref_ndcoords = _ref.ndcoords.T
-    if hasattr(transform, "to_field") and callable(transform.to_field):
-        targets = ImageGrid(spatialimage).index(
-            _as_homogeneous(
-                transform.to_field(reference=reference).map(ref_ndcoords),
-                dim=_ref.ndim,
-            )
+    # if hasattr(transform, "to_field") and callable(transform.to_field):
+    #     targets = ImageGrid(spatialimage).index(
+    #         _as_homogeneous(
+    #             transform.to_field(reference=reference).map(ref_ndcoords),
+    #             dim=_ref.ndim,
+    #         )
+    #     )
+    # else:
+    # Targets' shape is (Nt, 3, Nv) with Nv = Num. voxels, Nt = Num. timepoints.
+    targets = (
+        ImageGrid(spatialimage).index(
+            _as_homogeneous(transform.map(ref_ndcoords), dim=_ref.ndim)
         )
-    else:
-        # Targets' shape is (Nt, 3, Nv) with Nv = Num. voxels, Nt = Num. timepoints.
-        targets = (
-            ImageGrid(spatialimage).index(
-                _as_homogeneous(transform.map(ref_ndcoords), dim=_ref.ndim)
-            )
-            if targets is None
-            else targets
-        )
+        if targets is None
+        else targets
+    )
 
     if targets.ndim == 3:
         targets = np.rollaxis(targets, targets.ndim - 1, 0)

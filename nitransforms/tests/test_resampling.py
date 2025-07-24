@@ -177,15 +177,20 @@ def test_displacements_field1(
     fieldmap[..., axis] = -10.0
 
     _hdr = nii.header.copy()
+    affine = nii.affine.copy()
     if sw_tool in ("itk",):
         _hdr.set_intent("vector")
+        affine = io.itk.LPS @ affine
     _hdr.set_data_dtype("float32")
+    
+    field = nb.Nifti1Image(fieldmap, affine, _hdr)
 
     xfm_fname = "warp.nii.gz"
-    field = nb.Nifti1Image(fieldmap, nii.affine, _hdr)
     field.to_filename(xfm_fname)
 
     xfm = nitnl.load(xfm_fname, fmt=sw_tool)
+
+    np.testing.assert_array_equal(xfm._deltas, np.squeeze(field.dataobj))
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
@@ -226,12 +231,9 @@ def test_displacements_field1(
     sw_moved = nb.load("resampled.nii.gz")
 
     nt_moved = apply(xfm, nii, order=0)
-    nt_moved.set_data_dtype(nii.get_data_dtype())
     nt_moved.to_filename("nt_resampled.nii.gz")
-    sw_moved.set_data_dtype(nt_moved.get_data_dtype())
-    diff = np.asanyarray(
-        sw_moved.dataobj, dtype=sw_moved.get_data_dtype()
-    ) - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())
+    diff = sw_moved.get_fdata() - nt_moved.get_fdata()
+
     # A certain tolerance is necessary because of resampling at borders
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
