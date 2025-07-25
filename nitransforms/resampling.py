@@ -253,7 +253,7 @@ def apply(
     serialize_4d = n_resamplings >= serialize_nvols
 
     targets = None
-    ref_ndcoords = _ref.ndcoords.T
+    ref_ndcoords = _ref.ndcoords
     if hasattr(transform, "to_field") and callable(transform.to_field):
         targets = ImageGrid(spatialimage).index(
             _as_homogeneous(
@@ -332,7 +332,7 @@ def apply(
 
         resampled = ndi.map_coordinates(
             data,
-            targets,
+            targets.T,
             order=order,
             mode=mode,
             cval=cval,
