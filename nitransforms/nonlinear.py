@@ -65,50 +65,45 @@ class DenseFieldTransform(TransformBase):
         <DenseFieldTransform[3D] (57, 67, 56)>
 
         """
+
         if field is None and reference is None:
-            raise TransformError("DenseFieldTransforms require a spatial reference")
+            raise TransformError("cannot initialize field")
 
         super().__init__()
 
-        self._is_deltas = is_deltas
+        if field is not None:
+            field = _ensure_image(field)
+            # Extract data if nibabel object otherwise assume numpy array
+            _data = np.squeeze(
+                np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field.copy()
+            )
 
         try:
             self.reference = ImageGrid(reference if reference is not None else field)
         except AttributeError:
             raise TransformError(
-                "Field must be a spatial image if reference is not provided"
+                "field must be a spatial image if reference is not provided"
                 if reference is None
-                else "Reference is not a spatial image"
+                else "reference is not a spatial image"
             )
 
         fieldshape = (*self.reference.shape, self.reference.ndim)
-        if field is not None:
-            field = _ensure_image(field)
-            self._field = np.squeeze(
-                np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field
-            )
-            if fieldshape != self._field.shape:
-                raise TransformError(
-                    f"Shape of the field ({'x'.join(str(i) for i in self._field.shape)}) "
-                    f"doesn't match that of the reference({'x'.join(str(i) for i in fieldshape)})"
-                )
-        else:
-            self._field = np.zeros(fieldshape, dtype="float32")
-            self._is_deltas = True
-
-        if self._field.shape[-1] != self.ndim:
+        if field is None:
+            _data = np.zeros(fieldshape)
+        elif fieldshape != _data.shape:
             raise TransformError(
-                "The number of components of the field (%d) does not match "
-                "the number of dimensions (%d)" % (self._field.shape[-1], self.ndim)
+                f"Shape of the field ({'x'.join(str(i) for i in _data.shape)}) "
+                f"doesn't match that of the reference({'x'.join(str(i) for i in fieldshape)})"
             )
+
+        self._is_deltas = is_deltas
+        self._field = self.reference.ndcoords.reshape(fieldshape)
 
         if self.is_deltas:
-            self._deltas = (
-                self._field.copy()
-            )  # IMPORTANT: you don't want to update deltas
-            # Convert from displacements (deltas) to deformations fields
-            # (just add its origin to each delta vector)
-            self._field += self.reference.ndcoords.T.reshape(fieldshape)
+            self._deltas = _data.copy()
+            self._field += self._deltas
+        else:
+            self._field = _data.copy()
 
     def __repr__(self):
         """Beautify the python representation."""
@@ -185,12 +180,16 @@ class DenseFieldTransform(TransformBase):
         if inverse is True:
             raise NotImplementedError
 
-        ijk = self.reference.index(x)
+        ijk = self.reference.index(np.array(x, dtype="float32"))
         indexes = np.round(ijk).astype("int")
+        ongrid = np.where(np.linalg.norm(ijk - indexes, axis=1) < 1e-3)[0]
+        mapped = np.empty_like(x, dtype="float32")
 
-        if np.all(np.abs(ijk - indexes) < 1e-3):
-            indexes = tuple(tuple(i) for i in indexes)
-            return self._field[indexes]
+        if ongrid.size:
+            mapped[ongrid] = self._field[*indexes[ongrid].T, :]
+
+        if ongrid.size == x.shape[0]:
+            return mapped
 
         new_map = np.vstack(
             tuple(

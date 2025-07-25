@@ -270,12 +270,9 @@ def apply(
             if targets is None
             else targets
         )
-
-    if targets.ndim == 3:
-        targets = np.rollaxis(targets, targets.ndim - 1, 0)
-    else:
-        assert targets.ndim == 2
-        targets = targets[np.newaxis, ...]
+    
+    if targets.ndim == 2:
+        targets = targets.T[np.newaxis, ...]
 
     if serialize_4d:
         data = (
@@ -289,6 +286,9 @@ def apply(
         resampled = np.zeros(
             (len(ref_ndcoords), n_resamplings), dtype=input_dtype, order="F"
         )
+
+        if targets.ndim == 3:
+            targets = np.rollaxis(targets, targets.ndim - 1, 1)
 
         resampled = asyncio.run(
             _apply_serial(
@@ -311,6 +311,9 @@ def apply(
     else:
         data = np.asanyarray(spatialimage.dataobj, dtype=input_dtype)
 
+        if targets.ndim == 3:
+            targets = np.rollaxis(targets, targets.ndim - 1, 0)
+
         if data_nvols == 1 and xfm_nvols == 1:
             targets = np.squeeze(targets)
             assert targets.ndim == 2
@@ -320,19 +323,23 @@ def apply(
 
         if xfm_nvols > 1:
             assert targets.ndim == 3
-            n_time, n_dim, n_vox = targets.shape
+            
+            # Targets must have shape (n_dim x n_time x n_vox)
+            n_dim, n_time, n_vox = targets.shape
             # Reshape to (3, n_time x n_vox)
-            ijk_targets = np.rollaxis(targets, 0, 2).reshape((n_dim, -1))
+            ijk_targets = targets.reshape((n_dim, -1))
             time_row = np.repeat(np.arange(n_time), n_vox)[None, :]
 
             # Now targets is (4, n_vox x n_time), with indexes (t, i, j, k)
             # t is the slowest-changing axis, so we put it first
             targets = np.vstack((time_row, ijk_targets))
             data = np.rollaxis(data, data.ndim - 1, 0)
+        else:
+            targets = targets.T
 
         resampled = ndi.map_coordinates(
             data,
-            targets.T,
+            targets,
             order=order,
             mode=mode,
             cval=cval,
