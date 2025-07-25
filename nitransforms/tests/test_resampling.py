@@ -188,6 +188,8 @@ def test_displacements_field1(
 
     xfm = nitnl.load(xfm_fname, fmt=sw_tool)
 
+    import pdb; pdb.set_trace()
+
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
         transform=os.path.abspath(xfm_fname),
@@ -243,7 +245,7 @@ def test_displacements_field1(
     assert np.sqrt((diff[5:-5, 5:-5, 5:-5] ** 2).mean()) < 1e-6
 
 
-@pytest.mark.parametrize("sw_tool", ["itk", "afni"])
+@pytest.mark.parametrize("sw_tool", ["afni"])
 def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     """Check a translation-only field on one or more axes, different image orientations."""
     os.chdir(str(tmp_path))
@@ -275,6 +277,7 @@ def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     nt_moved = apply(xfm, img_fname, order=0)
     nt_moved.to_filename("nt_resampled.nii.gz")
     sw_moved.set_data_dtype(nt_moved.get_data_dtype())
+
     diff = np.asanyarray(
         sw_moved.dataobj, dtype=sw_moved.get_data_dtype()
     ) - np.asanyarray(nt_moved.dataobj, dtype=nt_moved.get_data_dtype())

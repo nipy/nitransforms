@@ -188,6 +188,7 @@ class DenseFieldTransform(TransformBase):
         ijk = self.reference.index(x)
         indexes = np.round(ijk).astype("int")
 
+        import pdb; pdb.set_trace()
         if np.all(np.abs(ijk - indexes) < 1e-3):
             indexes = tuple(tuple(i) for i in indexes)
             return self._field[indexes]

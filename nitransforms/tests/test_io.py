@@ -710,7 +710,8 @@ def test_itk_disp_load_intent():
 
 # Added tests for displacements fields orientations (ANTs/ITK)
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
-def test_itk_displacements(tmp_path, get_testdata, image_orientation):
+@pytest.mark.parametrize("field_is_random", [False, True])
+def test_itk_displacements(tmp_path, get_testdata, image_orientation, field_is_random):
     """Exercise I/O of ITK displacements fields."""
 
     nii = get_testdata[image_orientation]
@@ -719,13 +720,17 @@ def test_itk_displacements(tmp_path, get_testdata, image_orientation):
     shape = nii.shape
     ref_affine = nii.affine.copy()
 
-    field = np.hstack(
-        (
-            np.linspace(-50, 50, num=np.prod(shape)),
-            np.linspace(-80, 80, num=np.prod(shape)),
-            np.zeros(np.prod(shape)),
-        )
-    ).reshape(shape + (3,))
+    field = (
+        np.hstack(
+            (
+                np.linspace(-50, 50, num=np.prod(shape)),
+                np.linspace(-80, 80, num=np.prod(shape)),
+                np.zeros(np.prod(shape)),
+            )
+        ).reshape(shape + (3,))
+        if not field_is_random
+        else np.random.normal(size=shape + (3,))
+    )
 
     nit_nii = itk.ITKDisplacementsField.to_image(
         nb.Nifti1Image(field, ref_affine, None)
