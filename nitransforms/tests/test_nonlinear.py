@@ -20,6 +20,17 @@ from nitransforms.tests.utils import get_points
 rng = np.random.default_rng()
 
 
+SOME_TEST_POINTS = np.array(
+    [
+        [0.0, 0.0, 0.0],
+        [1.0, 2.0, 3.0],
+        [10.0, -10.0, 5.0],
+        [-5.0, 7.0, -2.0],
+        [12.0, 0.0, -11.0],
+    ]
+)
+
+
 def test_displacements_init():
     identity1 = DenseFieldTransform(
         np.zeros((10, 10, 10, 3)),
