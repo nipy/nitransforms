@@ -348,8 +348,6 @@ class ITKDisplacementsField(DisplacementsField):
             hdr.set_intent("vector")
 
         field = np.squeeze(np.asanyarray(imgobj.dataobj)).transpose(2, 1, 0, 3)
-        field[..., (0, 1)] *= -1.0
-
         return imgobj.__class__(field, LPS @ imgobj.affine, hdr)
 
     @classmethod
@@ -360,7 +358,6 @@ class ITKDisplacementsField(DisplacementsField):
         hdr.set_intent("vector")
 
         field = imgobj.get_fdata().transpose(2, 1, 0, 3)[..., None, :]
-        field[..., (0, 1)] *= -1.0
         return imgobj.__class__(field, LPS @ imgobj.affine, hdr)
 
 
