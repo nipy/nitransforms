@@ -202,30 +202,26 @@ class ImageGrid(SampledSpatialData):
     def ndindex(self):
         """List the indexes corresponding to the space grid."""
         if self._ndindex is None:
-            indexes = tuple([np.arange(s) for s in self._shape])
-            self._ndindex = np.array(np.meshgrid(*indexes, indexing="ij")).reshape(
-                self._ndim, self._npoints
-            )
+            indexes = np.mgrid[
+                0:self._shape[0], 0:self._shape[1], 0:self._shape[2]
+            ]
+            self._ndindex = indexes.reshape((indexes.shape[0], -1)).T
         return self._ndindex
 
     @property
     def ndcoords(self):
         """List the physical coordinates of this gridded space samples."""
         if self._coords is None:
-            self._coords = np.tensordot(
-                self._affine,
-                np.vstack((self.ndindex, np.ones((1, self._npoints)))),
-                axes=1,
-            )[:3, ...]
+            self._coords = self.ras(self.ndindex)
         return self._coords
 
     def ras(self, ijk):
         """Get RAS+ coordinates from input indexes."""
-        return _apply_affine(ijk, self._affine, self._ndim)
+        return _apply_affine(ijk, self._affine, self._ndim).T
 
     def index(self, x):
         """Get the image array's indexes corresponding to coordinates."""
-        return _apply_affine(x, self._inverse, self._ndim)
+        return _apply_affine(x, self._inverse, self._ndim).T
 
     def _to_hdf5(self, group):
         group.attrs["Type"] = "image"

@@ -17,13 +17,13 @@ from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from scipy.io import loadmat
 from nitransforms.linear import Affine
-from nitransforms import nonlinear as nitnl
+from nitransforms.nonlinear import DenseFieldTransform, BSplineFieldTransform
 from nitransforms.io import (
     afni,
     fsl,
     lta as fs,
     itk,
-    x5
+    x5,
 )
 from nitransforms.io.lta import (
     VolumeGeometry as VG,
@@ -773,7 +773,7 @@ def test_densefield_x5_roundtrip(tmp_path, is_deltas):
     ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
     disp = nb.Nifti1Image(np.random.rand(2, 2, 2, 3).astype("float32"), np.eye(4))
 
-    xfm = nitnl.DenseFieldTransform(disp, is_deltas=is_deltas, reference=ref)
+    xfm = DenseFieldTransform(disp, is_deltas=is_deltas, reference=ref)
 
     node = xfm.to_x5(metadata={"GeneratedBy": "pytest"})
     assert node.type == "nonlinear"
@@ -785,7 +785,7 @@ def test_densefield_x5_roundtrip(tmp_path, is_deltas):
     fname = tmp_path / "test.x5"
     x5.to_filename(fname, [node])
 
-    xfm2 = nitnl.DenseFieldTransform.from_filename(fname, fmt="X5")
+    xfm2 = DenseFieldTransform.from_filename(fname, fmt="X5")
 
     assert xfm2.reference.shape == ref.shape
     assert np.allclose(xfm2.reference.affine, ref.affine)
@@ -797,7 +797,7 @@ def test_bspline_to_x5(tmp_path):
     coeff = nb.Nifti1Image(np.zeros((2, 2, 2, 3), dtype="float32"), np.eye(4))
     ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
 
-    xfm = nitnl.BSplineFieldTransform(coeff, reference=ref)
+    xfm = BSplineFieldTransform(coeff, reference=ref)
     node = xfm.to_x5(metadata={"tool": "pytest"})
     assert node.type == "nonlinear"
     assert node.subtype == "bspline"
@@ -807,7 +807,7 @@ def test_bspline_to_x5(tmp_path):
     fname = tmp_path / "bspline.x5"
     x5.to_filename(fname, [node])
 
-    xfm2 = nitnl.BSplineFieldTransform.from_filename(fname, fmt="X5")
+    xfm2 = BSplineFieldTransform.from_filename(fname, fmt="X5")
     assert np.allclose(xfm._coeffs, xfm2._coeffs)
     assert xfm2.reference.shape == ref.shape
     assert np.allclose(xfm2.reference.affine, ref.affine)
