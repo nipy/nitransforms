@@ -270,7 +270,7 @@ def apply(
             if targets is None
             else targets
         )
-    
+
     if targets.ndim == 2:
         targets = targets.T[np.newaxis, ...]
 
@@ -323,7 +323,7 @@ def apply(
 
         if xfm_nvols > 1:
             assert targets.ndim == 3
-            
+
             # Targets must have shape (n_dim x n_time x n_vox)
             n_dim, n_time, n_vox = targets.shape
             # Reshape to (3, n_time x n_vox)

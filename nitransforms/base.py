@@ -202,7 +202,9 @@ class ImageGrid(SampledSpatialData):
     def ndindex(self):
         """List the indexes corresponding to the space grid."""
         if self._ndindex is None:
-            indexes = np.mgrid[0:self._shape[0], 0:self._shape[1], 0:self._shape[2]]
+            indexes = np.mgrid[
+                0:self._shape[0], 0:self._shape[1], 0:self._shape[2]
+            ]
             self._ndindex = indexes.reshape((indexes.shape[0], -1)).T
         return self._ndindex
 
