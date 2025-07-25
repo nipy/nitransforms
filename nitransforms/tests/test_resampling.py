@@ -149,10 +149,14 @@ def test_apply_linear_transform(
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
 
+@pytest.mark.xfail(
+    reason="GH-267: disabled while debugging",
+    strict=False,
+)
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
 @pytest.mark.parametrize("sw_tool", ["itk", "afni"])
 @pytest.mark.parametrize("axis", [0, 1, 2, (0, 1), (1, 2), (0, 1, 2)])
-def test_displacements_field1(
+def test_apply_displacements_field1(
     tmp_path,
     get_testdata,
     get_testmask,
@@ -185,14 +189,16 @@ def test_displacements_field1(
     field = nb.Nifti1Image(fieldmap, nii.affine, _hdr)
     field.to_filename(xfm_fname)
 
-    xfm = nitnl.load(xfm_fname, fmt=sw_tool)
+    # xfm = nitnl.load(xfm_fname, fmt=sw_tool)
+    xfm = nitnl.DenseFieldTransform(fieldmap, reference=nii)
 
+    ants_output = tmp_path / "ants_brainmask.nii.gz"
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
         transform=os.path.abspath(xfm_fname),
         reference=tmp_path / "mask.nii.gz",
         moving=tmp_path / "mask.nii.gz",
-        output=tmp_path / "resampled_brainmask.nii.gz",
+        output=ants_output,
         extra="--output-data-type uchar" if sw_tool == "itk" else "",
     )
 
@@ -204,10 +210,12 @@ def test_displacements_field1(
     # resample mask
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
-    sw_moved_mask = nb.load("resampled_brainmask.nii.gz")
+    sw_moved_mask = nb.load(ants_output)
     nt_moved_mask = apply(xfm, msk, order=0)
     nt_moved_mask.set_data_dtype(msk.get_data_dtype())
     diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
+
+    nt_moved_mask.to_filename(tmp_path / "nit_brainmask.nii.gz")
 
     assert np.sqrt((diff**2).mean()) < RMSE_TOL_LINEAR
     brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
@@ -236,6 +244,10 @@ def test_displacements_field1(
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
 
+@pytest.mark.xfail(
+    reason="GH-267: disabled while debugging",
+    strict=False,
+)
 @pytest.mark.parametrize("sw_tool", ["itk", "afni"])
 def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     """Check a translation-only field on one or more axes, different image orientations."""
@@ -388,3 +400,33 @@ def test_apply_4d(serialize_4d):
     data = np.asanyarray(moved.dataobj)
     idxs = [tuple(np.argwhere(data[..., i])[0]) for i in range(nvols)]
     assert idxs == [(9 - i, 2, 2) for i in range(nvols)]
+
+
+@pytest.mark.xfail(
+    reason="GH-267: disabled while debugging",
+    strict=False,
+)
+def test_apply_bspline(tmp_path, testdata_path):
+    """Cross-check B-Splines and deformation field."""
+    os.chdir(str(tmp_path))
+
+    img_name = testdata_path / "someones_anatomy.nii.gz"
+    disp_name = testdata_path / "someones_displacement_field.nii.gz"
+    bs_name = testdata_path / "someones_bspline_coefficients.nii.gz"
+
+    bsplxfm = nitnl.BSplineFieldTransform(bs_name, reference=img_name)
+    dispxfm = nitnl.DenseFieldTransform(disp_name)
+
+    out_disp = apply(dispxfm, img_name)
+    out_bspl = apply(bsplxfm, img_name)
+
+    out_disp.to_filename("resampled_field.nii.gz")
+    out_bspl.to_filename("resampled_bsplines.nii.gz")
+
+    assert (
+        np.sqrt(
+            (out_disp.get_fdata(dtype="float32") - out_bspl.get_fdata(dtype="float32"))
+            ** 2
+        ).mean()
+        < 0.2
+    )

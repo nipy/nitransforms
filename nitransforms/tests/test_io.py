@@ -1,6 +1,7 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """I/O test cases."""
+
 import os
 from subprocess import check_call
 from io import StringIO
@@ -15,11 +16,13 @@ from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from scipy.io import loadmat
 from nitransforms.linear import Affine
+from nitransforms.nonlinear import DenseFieldTransform, BSplineFieldTransform
 from nitransforms.io import (
     afni,
     fsl,
     lta as fs,
     itk,
+    x5,
 )
 from nitransforms.io.lta import (
     VolumeGeometry as VG,
@@ -68,11 +71,13 @@ cras   = 0 0 0""")
 def test_VG_from_LTA(data_path):
     """Check the affine interpolation from volume geometries."""
     # affine manually clipped after running mri_info on the image
-    oracle = np.loadtxt(StringIO("""\
+    oracle = np.loadtxt(
+        StringIO("""\
 -3.0000   0.0000  -0.0000    91.3027
 -0.0000   2.0575  -2.9111   -25.5251
  0.0000   2.1833   2.7433  -105.0820
- 0.0000   0.0000   0.0000     1.0000"""))
+ 0.0000   0.0000   0.0000     1.0000""")
+    )
 
     lta_text = "\n".join(
         (data_path / "bold-to-t1w.lta").read_text().splitlines()[13:21]
@@ -419,10 +424,17 @@ def test_afni_Displacements():
 
 
 @pytest.mark.parametrize("only_linear", [True, False])
-@pytest.mark.parametrize("h5_path,nxforms", [
-    (_datadir / "affine-antsComposite.h5", 1),
-    (_testdir / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5", 2),
-])
+@pytest.mark.parametrize(
+    "h5_path,nxforms",
+    [
+        (_datadir / "affine-antsComposite.h5", 1),
+        (
+            _testdir
+            / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+            2,
+        ),
+    ],
+)
 def test_itk_h5(tmpdir, only_linear, h5_path, nxforms):
     """Test displacements fields."""
     assert (
@@ -434,7 +446,9 @@ def test_itk_h5(tmpdir, only_linear, h5_path, nxforms):
                 )
             )
         )
-        == nxforms if not only_linear else 1
+        == nxforms
+        if not only_linear
+        else 1
     )
 
     with pytest.raises(TransformFileError):
@@ -465,24 +479,33 @@ def test_regressions(file_type, test_file, data_path):
     file_type.from_filename(data_path / "regressions" / test_file)
 
 
-@pytest.mark.parametrize("parameters", [
-    {"x": 0.1, "y": 0.03, "z": 0.002},
-    {"x": 0.001, "y": 0.3, "z": 0.002},
-    {"x": 0.01, "y": 0.03, "z": 0.2},
-])
+@pytest.mark.parametrize(
+    "parameters",
+    [
+        {"x": 0.1, "y": 0.03, "z": 0.002},
+        {"x": 0.001, "y": 0.3, "z": 0.002},
+        {"x": 0.01, "y": 0.03, "z": 0.2},
+    ],
+)
 @pytest.mark.parametrize("dir_x", (-1, 1))
 @pytest.mark.parametrize("dir_y", (-1, 1))
 @pytest.mark.parametrize("dir_z", (1, -1))
-@pytest.mark.parametrize("swapaxes", [
-    None, (0, 1), (1, 2), (0, 2),
-])
+@pytest.mark.parametrize(
+    "swapaxes",
+    [
+        None,
+        (0, 1),
+        (1, 2),
+        (0, 2),
+    ],
+)
 def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y, dir_z):
     tmpdir.chdir()
     img, R = _generate_reoriented(
         testdata_path / "someones_anatomy.nii.gz",
         (dir_x, dir_y, dir_z),
         swapaxes,
-        parameters
+        parameters,
     )
     img.to_filename("orig.nii.gz")
 
@@ -507,9 +530,8 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
         "orig.nii.gz",
     )
 
-    diff = (
-        np.asanyarray(img.dataobj, dtype="uint8")
-        - np.asanyarray(nt3drefit.dataobj, dtype="uint8")
+    diff = np.asanyarray(img.dataobj, dtype="uint8") - np.asanyarray(
+        nt3drefit.dataobj, dtype="uint8"
     )
     assert np.sqrt((diff[10:-10, 10:-10, 10:-10] ** 2).mean()) < 0.1
 
@@ -522,14 +544,15 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
         "deob_3drefit.nii.gz",
     )
 
-    diff = (
-        np.asanyarray(img.dataobj, dtype="uint8")
-        - np.asanyarray(nt_undo3drefit.dataobj, dtype="uint8")
+    diff = np.asanyarray(img.dataobj, dtype="uint8") - np.asanyarray(
+        nt_undo3drefit.dataobj, dtype="uint8"
     )
     assert np.sqrt((diff[10:-10, 10:-10, 10:-10] ** 2).mean()) < 0.1
 
     # Check the target grid by 3dWarp and the affine & size interpolated by NiTransforms
-    cmd = f"3dWarp -verb -deoblique -NN -prefix {tmpdir}/deob.nii.gz {tmpdir}/orig.nii.gz"
+    cmd = (
+        f"3dWarp -verb -deoblique -NN -prefix {tmpdir}/deob.nii.gz {tmpdir}/orig.nii.gz"
+    )
     assert check_call([cmd], shell=True) == 0
 
     deobnii = nb.load("deob.nii.gz")
@@ -540,11 +563,12 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
 
     # Check resampling in deobliqued grid
     ntdeobnii = apply(
-        Affine(np.eye(4), reference=deobnii.__class__(
-            np.zeros(deobshape, dtype="uint8"),
-            deobaff,
-            deobnii.header
-        )),
+        Affine(
+            np.eye(4),
+            reference=deobnii.__class__(
+                np.zeros(deobshape, dtype="uint8"), deobaff, deobnii.header
+            ),
+        ),
         img,
         order=0,
     )
@@ -559,9 +583,8 @@ def test_afni_oblique(tmpdir, parameters, swapaxes, testdata_path, dir_x, dir_y,
     )
     mask = np.asanyarray(ntdeobmask.dataobj, dtype=bool)
 
-    diff = (
-        np.asanyarray(deobnii.dataobj, dtype="uint8")
-        - np.asanyarray(ntdeobnii.dataobj, dtype="uint8")
+    diff = np.asanyarray(deobnii.dataobj, dtype="uint8") - np.asanyarray(
+        ntdeobnii.dataobj, dtype="uint8"
     )
     assert np.sqrt((diff[mask] ** 2).mean()) < 0.1
 
@@ -591,7 +614,7 @@ def _generate_reoriented(path, directions, swapaxes, parameters):
         aff = np.diag((*directions, 1)) @ aff
 
         for ax in range(3):
-            if (directions[ax] == -1):
+            if directions[ax] == -1:
                 aff[ax, 3] = last_xyz[ax]
                 data = np.flip(data, ax)
 
@@ -621,16 +644,15 @@ def test_itk_linear_h5(tmpdir, data_path, testdata_path):
     assert len(h5xfm.xforms) == 1
 
     # File loadable with single affine object
-    itk.ITKLinearTransform.from_filename(
-        data_path / "affine-antsComposite.h5"
-    )
+    itk.ITKLinearTransform.from_filename(data_path / "affine-antsComposite.h5")
 
     with open(data_path / "affine-antsComposite.h5", "rb") as f:
         itk.ITKLinearTransform.from_fileobj(f)
 
     # Exercise only_linear
     itk.ITKCompositeH5.from_filename(
-        testdata_path / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
+        testdata_path
+        / "ds-005_sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5",
         only_linear=True,
     )
 
@@ -673,9 +695,54 @@ def test_itk_linear_h5(tmpdir, data_path, testdata_path):
     with pytest.raises(TransformIOError):
         itk.ITKLinearTransform.from_filename("test.h5")
 
+
+@pytest.mark.parametrize("is_deltas", [True, False])
+def test_densefield_x5_roundtrip(tmp_path, is_deltas):
+    """Ensure dense field transforms roundtrip via X5."""
+    ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
+    disp = nb.Nifti1Image(np.random.rand(2, 2, 2, 3).astype("float32"), np.eye(4))
+
+    xfm = DenseFieldTransform(disp, is_deltas=is_deltas, reference=ref)
+
+    node = xfm.to_x5(metadata={"GeneratedBy": "pytest"})
+    assert node.type == "nonlinear"
+    assert node.subtype == "densefield"
+    assert node.representation == "displacements" if is_deltas else "deformations"
+    assert node.domain.size == ref.shape
+    assert node.metadata["GeneratedBy"] == "pytest"
+
+    fname = tmp_path / "test.x5"
+    x5.to_filename(fname, [node])
+
+    xfm2 = DenseFieldTransform.from_filename(fname, fmt="X5")
+
+    assert xfm2.reference.shape == ref.shape
+    assert np.allclose(xfm2.reference.affine, ref.affine)
+    assert xfm == xfm2
+
+
+def test_bspline_to_x5(tmp_path):
+    """Check BSpline transforms export to X5."""
+    coeff = nb.Nifti1Image(np.zeros((2, 2, 2, 3), dtype="float32"), np.eye(4))
+    ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
+
+    xfm = BSplineFieldTransform(coeff, reference=ref)
+    node = xfm.to_x5(metadata={"tool": "pytest"})
+    assert node.type == "nonlinear"
+    assert node.subtype == "bspline"
+    assert node.representation == "coefficients"
+    assert node.metadata["tool"] == "pytest"
+
+    fname = tmp_path / "bspline.x5"
+    x5.to_filename(fname, [node])
+
+    xfm2 = BSplineFieldTransform.from_filename(fname, fmt="X5")
+    assert np.allclose(xfm._coeffs, xfm2._coeffs)
+    assert xfm2.reference.shape == ref.shape
+    assert np.allclose(xfm2.reference.affine, ref.affine)
+
+
 # Added tests for h5 orientation bug
-
-
 @pytest.mark.xfail(
     reason="GH-137/GH-171: displacement field dimension order is wrong",
     strict=False,
@@ -687,11 +754,15 @@ def test_itk_h5_field_order(tmp_path):
     field = np.stack([vals, vals + 100, vals + 200], axis=0)
 
     params = field.reshape(-1, order="C")
-    fixed = np.array(list(shape) + [0, 0, 0] + [1, 1, 1] + list(np.eye(3).ravel()), dtype=float)
+    fixed = np.array(
+        list(shape) + [0, 0, 0] + [1, 1, 1] + list(np.eye(3).ravel()), dtype=float
+    )
     fname = tmp_path / "field.h5"
     with H5File(fname, "w") as f:
         grp = f.create_group("TransformGroup")
-        grp.create_group("0")["TransformType"] = np.array([b"CompositeTransform_double_3_3"])
+        grp.create_group("0")["TransformType"] = np.array(
+            [b"CompositeTransform_double_3_3"]
+        )
         g1 = grp.create_group("1")
         g1["TransformType"] = np.array([b"DisplacementFieldTransform_float_3_3"])
         g1["TransformFixedParameters"] = fixed
@@ -709,8 +780,10 @@ def _load_composite_testdata(data_path):
     # Generated using
     # CompositeTransformUtil --disassemble ants_t1_to_mniComposite.h5 \
     #     ants_t1_to_mniComposite
-    warpfile = data_path / "regressions" / (
-        "01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz"
+    warpfile = (
+        data_path
+        / "regressions"
+        / ("01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz")
     )
     if not (h5file.exists() and warpfile.exists()):
         pytest.skip("Composite transform test data not available")
@@ -764,11 +837,15 @@ def test_itk_h5_field_order_fortran(tmp_path):
     field = np.stack([vals, vals + 100, vals + 200], axis=0)
 
     params = field.reshape(-1, order="F")
-    fixed = np.array(list(shape) + [0, 0, 0] + [1, 1, 1] + list(np.eye(3).ravel()), dtype=float)
+    fixed = np.array(
+        list(shape) + [0, 0, 0] + [1, 1, 1] + list(np.eye(3).ravel()), dtype=float
+    )
     fname = tmp_path / "field_f.h5"
     with H5File(fname, "w") as f:
         grp = f.create_group("TransformGroup")
-        grp.create_group("0")["TransformType"] = np.array([b"CompositeTransform_double_3_3"])
+        grp.create_group("0")["TransformType"] = np.array(
+            [b"CompositeTransform_double_3_3"]
+        )
         g1 = grp.create_group("1")
         g1["TransformType"] = np.array([b"DisplacementFieldTransform_float_3_3"])
         g1["TransformFixedParameters"] = fixed

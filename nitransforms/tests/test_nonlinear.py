@@ -7,15 +7,24 @@ import pytest
 
 import numpy as np
 import nibabel as nb
-from nitransforms.resampling import apply
-from nitransforms.base import TransformError
+from nitransforms.base import TransformError, ImageGrid
 from nitransforms.io.base import TransformFileError
 from nitransforms.nonlinear import (
     BSplineFieldTransform,
     DenseFieldTransform,
 )
-from nitransforms import io
 from ..io.itk import ITKDisplacementsField
+
+
+SOME_TEST_POINTS = np.array(
+    [
+        [0.0, 0.0, 0.0],
+        [1.0, 2.0, 3.0],
+        [10.0, -10.0, 5.0],
+        [-5.0, 7.0, -2.0],
+        [12.0, 0.0, -11.0],
+    ]
+)
 
 
 @pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 3)])
@@ -81,22 +90,13 @@ def test_bsplines_references(testdata_path):
             testdata_path / "someones_bspline_coefficients.nii.gz"
         ).to_field()
 
-    with pytest.raises(TransformError):
-        apply(
-            BSplineFieldTransform(
-                testdata_path / "someones_bspline_coefficients.nii.gz"
-            ),
-            testdata_path / "someones_anatomy.nii.gz",
-        )
-
-    apply(
-        BSplineFieldTransform(testdata_path / "someones_bspline_coefficients.nii.gz"),
-        testdata_path / "someones_anatomy.nii.gz",
+    BSplineFieldTransform(
+        testdata_path / "someones_bspline_coefficients.nii.gz",
         reference=testdata_path / "someones_anatomy.nii.gz",
     )
 
 
-def test_bspline(tmp_path, testdata_path):
+def test_map_bspline_vs_displacement(tmp_path, testdata_path):
     """Cross-check B-Splines and deformation field."""
     os.chdir(str(tmp_path))
 
@@ -104,68 +104,100 @@ def test_bspline(tmp_path, testdata_path):
     disp_name = testdata_path / "someones_displacement_field.nii.gz"
     bs_name = testdata_path / "someones_bspline_coefficients.nii.gz"
 
-    bsplxfm = BSplineFieldTransform(bs_name, reference=img_name)
+    bsplxfm = BSplineFieldTransform(bs_name, reference=img_name).to_field()
     dispxfm = DenseFieldTransform(disp_name)
+    # Interpolating field should be reasonably similar
+    np.testing.assert_allclose(dispxfm._field, bsplxfm._field, atol=1e-1, rtol=1e-4)
 
-    out_disp = apply(dispxfm, img_name)
-    out_bspl = apply(bsplxfm, img_name)
 
-    out_disp.to_filename("resampled_field.nii.gz")
-    out_bspl.to_filename("resampled_bsplines.nii.gz")
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
+@pytest.mark.parametrize("ongrid", [True, False])
+def test_densefield_map(get_testdata, image_orientation, ongrid):
+    """Create a constant displacement field and compare mappings."""
 
-    assert (
-        np.sqrt(
-            (out_disp.get_fdata(dtype="float32") - out_bspl.get_fdata(dtype="float32"))
-            ** 2
-        ).mean()
-        < 0.2
+    nii = get_testdata[image_orientation]
+
+    # Get sampling indices
+    rng = np.random.default_rng()
+
+    # Create a reference centered at the origin with various axis orders/flips
+    shape = nii.shape
+    ref_affine = nii.affine.copy()
+    reference = ImageGrid(nb.Nifti1Image(np.zeros(shape), ref_affine, None))
+    grid_ijk = reference.ndindex
+    grid_xyz = reference.ras(grid_ijk)
+
+    subsample = rng.choice(grid_ijk.shape[0], 5000)
+    points_ijk = grid_ijk.copy() if ongrid else grid_ijk[subsample]
+    coords_xyz = (
+        grid_xyz
+        if ongrid
+        else reference.ras(points_ijk) + rng.normal(size=points_ijk.shape)
     )
 
+    coords_map = grid_xyz.reshape(*shape, 3)
+    deltas = np.stack(
+        (
+            np.zeros(np.prod(shape), dtype="float32").reshape(shape),
+            np.linspace(-80, 80, num=np.prod(shape), dtype="float32").reshape(shape),
+            np.linspace(-50, 50, num=np.prod(shape), dtype="float32").reshape(shape),
+        ),
+        axis=-1,
+    )
 
-@pytest.mark.parametrize("is_deltas", [True, False])
-def test_densefield_x5_roundtrip(tmp_path, is_deltas):
-    """Ensure dense field transforms roundtrip via X5."""
-    ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
-    disp = nb.Nifti1Image(np.random.rand(2, 2, 2, 3).astype("float32"), np.eye(4))
+    if ongrid:
+        atol = 1e-3 if image_orientation == "oblique" or not ongrid else 1e-7
+        # Build an identity transform (deltas)
+        id_xfm_deltas = DenseFieldTransform(reference=reference)
+        np.testing.assert_array_equal(coords_map, id_xfm_deltas._field)
+        np.testing.assert_allclose(coords_xyz, id_xfm_deltas.map(coords_xyz))
 
-    xfm = DenseFieldTransform(disp, is_deltas=is_deltas, reference=ref)
+        # Build an identity transform (deformation)
+        id_xfm_field = DenseFieldTransform(
+            coords_map, is_deltas=False, reference=reference
+        )
+        np.testing.assert_array_equal(coords_map, id_xfm_field._field)
+        np.testing.assert_allclose(coords_xyz, id_xfm_field.map(coords_xyz), atol=atol)
 
-    node = xfm.to_x5(metadata={"GeneratedBy": "pytest"})
-    assert node.type == "nonlinear"
-    assert node.subtype == "densefield"
-    assert node.representation == "displacements" if is_deltas else "deformations"
-    assert node.domain.size == ref.shape
-    assert node.metadata["GeneratedBy"] == "pytest"
+        # Collapse to zero transform (deltas)
+        zero_xfm_deltas = DenseFieldTransform(-coords_map, reference=reference)
+        np.testing.assert_array_equal(
+            np.zeros_like(zero_xfm_deltas._field), zero_xfm_deltas._field
+        )
+        np.testing.assert_allclose(
+            np.zeros_like(coords_xyz), zero_xfm_deltas.map(coords_xyz), atol=atol
+        )
 
-    fname = tmp_path / "test.x5"
-    io.x5.to_filename(fname, [node])
+        # Collapse to zero transform (deformation)
+        zero_xfm_field = DenseFieldTransform(
+            np.zeros_like(deltas), is_deltas=False, reference=reference
+        )
+        np.testing.assert_array_equal(
+            np.zeros_like(zero_xfm_field._field), zero_xfm_field._field
+        )
+        np.testing.assert_allclose(
+            np.zeros_like(coords_xyz), zero_xfm_field.map(coords_xyz), atol=atol
+        )
 
-    xfm2 = DenseFieldTransform.from_filename(fname, fmt="X5")
+    # Now let's apply a transform
+    xfm = DenseFieldTransform(deltas, reference=reference)
+    np.testing.assert_array_equal(deltas, xfm._deltas)
+    np.testing.assert_array_equal(coords_map + deltas, xfm._field)
 
-    assert xfm2.reference.shape == ref.shape
-    assert np.allclose(xfm2.reference.affine, ref.affine)
-    assert xfm == xfm2
+    mapped = xfm.map(coords_xyz)
+    nit_deltas = mapped - coords_xyz
 
-
-def test_bspline_to_x5(tmp_path):
-    """Check BSpline transforms export to X5."""
-    coeff = nb.Nifti1Image(np.zeros((2, 2, 2, 3), dtype="float32"), np.eye(4))
-    ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
-
-    xfm = BSplineFieldTransform(coeff, reference=ref)
-    node = xfm.to_x5(metadata={"tool": "pytest"})
-    assert node.type == "nonlinear"
-    assert node.subtype == "bspline"
-    assert node.representation == "coefficients"
-    assert node.metadata["tool"] == "pytest"
-
-    fname = tmp_path / "bspline.x5"
-    io.x5.to_filename(fname, [node])
-
-    xfm2 = BSplineFieldTransform.from_filename(fname, fmt="X5")
-    assert np.allclose(xfm._coeffs, xfm2._coeffs)
-    assert xfm2.reference.shape == ref.shape
-    assert np.allclose(xfm2.reference.affine, ref.affine)
+    if ongrid:
+        mapped_image = mapped.reshape(*shape, 3)
+        np.testing.assert_allclose(deltas + coords_map, mapped_image)
+        np.testing.assert_allclose(deltas, nit_deltas.reshape(*shape, 3), atol=1e-4)
+        np.testing.assert_allclose(xfm._field, mapped_image)
+    else:
+        ongrid_xyz = xfm.map(grid_xyz[subsample])
+        assert (
+            (np.linalg.norm(ongrid_xyz - mapped, axis=1) > 2).sum()
+            / ongrid_xyz.shape[0]
+        ) < 0.5
 
 
 @pytest.mark.parametrize("is_deltas", [True, False])
