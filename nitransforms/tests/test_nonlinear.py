@@ -3,6 +3,9 @@
 """Tests of nonlinear transforms."""
 
 import os
+from subprocess import check_call
+import shutil
+
 import pytest
 
 import numpy as np
@@ -234,3 +237,128 @@ def test_bspline_map_manual():
     pts = np.array([[1.2, 1.5, 2.0], [3.3, 1.7, 2.4]])
     expected = np.vstack([manual_map(p) for p in pts])
     assert np.allclose(bspline.map(pts), expected, atol=1e-6)
+
+
+def test_densefield_map_against_ants(testdata_path, tmp_path):
+    """Map points with DenseFieldTransform and compare to ANTs."""
+    warpfile = (
+        testdata_path
+        / "regressions"
+        / ("01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz")
+    )
+    if not warpfile.exists():
+        pytest.skip("Composite transform test data not available")
+
+    points = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 2.0, 3.0],
+            [10.0, -10.0, 5.0],
+            [-5.0, 7.0, -2.0],
+            [-12.0, 12.0, 0.0],
+        ]
+    )
+    csvin = tmp_path / "points.csv"
+    np.savetxt(csvin, points, delimiter=",", header="x,y,z", comments="")
+
+    csvout = tmp_path / "out.csv"
+    cmd = f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {warpfile}"
+    exe = cmd.split()[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+    check_call(cmd, shell=True)
+
+    ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
+    ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
+
+    xfm = DenseFieldTransform(ITKDisplacementsField.from_filename(warpfile))
+    mapped = xfm.map(points)
+
+    assert np.allclose(mapped, ants_pts, atol=1e-6)
+
+
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
+@pytest.mark.parametrize("gridpoints", [True, False])
+def test_constant_field_vs_ants(tmp_path, get_testdata, image_orientation, gridpoints):
+    """Create a constant displacement field and compare mappings."""
+
+    nii = get_testdata[image_orientation]
+
+    # Create a reference centered at the origin with various axis orders/flips
+    shape = nii.shape
+    ref_affine = nii.affine.copy()
+
+    field = np.hstack((
+        np.zeros(np.prod(shape)),
+        np.linspace(-80, 80, num=np.prod(shape)),
+        np.linspace(-50, 50, num=np.prod(shape)),
+    )).reshape(shape + (3, ))
+    fieldnii = nb.Nifti1Image(field, ref_affine, None)
+
+    warpfile = tmp_path / "itk_transform.nii.gz"
+    ITKDisplacementsField.to_filename(fieldnii, warpfile)
+
+    # Ensure direct (xfm) and ITK roundtrip (itk_xfm) are equivalent
+    xfm = DenseFieldTransform(fieldnii)
+    itk_xfm = DenseFieldTransform(ITKDisplacementsField.from_filename(warpfile))
+
+    assert xfm == itk_xfm
+    np.testing.assert_allclose(xfm.reference.affine, itk_xfm.reference.affine)
+    np.testing.assert_allclose(ref_affine, itk_xfm.reference.affine)
+    np.testing.assert_allclose(xfm.reference.shape, itk_xfm.reference.shape)
+    np.testing.assert_allclose(xfm._field, itk_xfm._field)
+
+    points = (
+        xfm.reference.ndcoords.T if gridpoints
+        else np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 2.0, 3.0],
+                [10.0, -10.0, 5.0],
+                [-5.0, 7.0, -2.0],
+                [12.0, 0.0, -11.0],
+            ]
+        )
+    )
+
+    mapped = xfm.map(points)
+    nit_deltas = mapped - points
+
+    if gridpoints:
+        np.testing.assert_array_equal(field, nit_deltas.reshape(*shape, -1))
+
+    csvin = tmp_path / "points.csv"
+    np.savetxt(csvin, points, delimiter=",", header="x,y,z", comments="")
+
+    csvout = tmp_path / "out.csv"
+    cmd = f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {warpfile}"
+    exe = cmd.split()[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+    check_call(cmd, shell=True)
+
+    ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
+    ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
+
+    # if gridpoints:
+    #     ants_field = ants_pts.reshape(shape + (3, ))
+    #     diff = xfm._field[..., 0] - ants_field[..., 0]
+    #     mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
+    #     assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"
+
+    #     diff = xfm._field[..., 1] - ants_field[..., 1]
+    #     mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
+    #     assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"
+
+    #     diff = xfm._field[..., 2] - ants_field[..., 2]
+    #     mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
+    #     assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"
+
+    ants_deltas = ants_pts - points
+    np.testing.assert_array_equal(nit_deltas, ants_deltas)
+    np.testing.assert_array_equal(mapped, ants_pts)
+
+    diff = mapped - ants_pts
+    mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
+
+    assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"
