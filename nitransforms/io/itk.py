@@ -348,9 +348,11 @@ class ITKDisplacementsField(DisplacementsField):
             hdr.set_intent("vector")
 
         field = np.squeeze(np.asanyarray(imgobj.dataobj))
-        field[..., (0, 1)] *= 1.0
-        field = field.transpose(2, 1, 0, 3)
-        return imgobj.__class__(field, LPS @ imgobj.affine, hdr)
+        affine = imgobj.affine
+        midindex = (np.array(field.shape[:3]) - 1) * 0.5
+        offset = (LPS @ affine - affine) @ (*midindex, 1)
+        affine[:3, 3] += offset[:3]
+        return imgobj.__class__(np.flip(field, axis=(0, 1)), imgobj.affine, hdr)
 
     @classmethod
     def to_image(cls, imgobj):
