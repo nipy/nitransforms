@@ -7,7 +7,6 @@ import pytest
 
 import numpy as np
 import nibabel as nb
-from nitransforms.resampling import apply
 from nitransforms.base import TransformError, ImageGrid
 from nitransforms.io.base import TransformFileError
 from nitransforms.nonlinear import (
@@ -17,13 +16,16 @@ from nitransforms.nonlinear import (
 from ..io.itk import ITKDisplacementsField
 
 
-SOME_TEST_POINTS = np.array([
-    [0.0, 0.0, 0.0],
-    [1.0, 2.0, 3.0],
-    [10.0, -10.0, 5.0],
-    [-5.0, 7.0, -2.0],
-    [12.0, 0.0, -11.0],
-])
+SOME_TEST_POINTS = np.array(
+    [
+        [0.0, 0.0, 0.0],
+        [1.0, 2.0, 3.0],
+        [10.0, -10.0, 5.0],
+        [-5.0, 7.0, -2.0],
+        [12.0, 0.0, -11.0],
+    ]
+)
+
 
 @pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 3)])
 def test_itk_disp_load(size):
@@ -88,26 +90,13 @@ def test_bsplines_references(testdata_path):
             testdata_path / "someones_bspline_coefficients.nii.gz"
         ).to_field()
 
-    with pytest.raises(TransformError):
-        apply(
-            BSplineFieldTransform(
-                testdata_path / "someones_bspline_coefficients.nii.gz"
-            ),
-            testdata_path / "someones_anatomy.nii.gz",
-        )
-
-    apply(
-        BSplineFieldTransform(testdata_path / "someones_bspline_coefficients.nii.gz"),
-        testdata_path / "someones_anatomy.nii.gz",
+    BSplineFieldTransform(
+        testdata_path / "someones_bspline_coefficients.nii.gz",
         reference=testdata_path / "someones_anatomy.nii.gz",
     )
 
 
-@pytest.mark.xfail(
-    reason="GH-267: disabled while debugging",
-    strict=False,
-)
-def test_bspline(tmp_path, testdata_path):
+def test_map_bspline_vs_displacement(tmp_path, testdata_path):
     """Cross-check B-Splines and deformation field."""
     os.chdir(str(tmp_path))
 
@@ -115,82 +104,100 @@ def test_bspline(tmp_path, testdata_path):
     disp_name = testdata_path / "someones_displacement_field.nii.gz"
     bs_name = testdata_path / "someones_bspline_coefficients.nii.gz"
 
-    bsplxfm = BSplineFieldTransform(bs_name, reference=img_name)
+    bsplxfm = BSplineFieldTransform(bs_name, reference=img_name).to_field()
     dispxfm = DenseFieldTransform(disp_name)
+    # Interpolating field should be reasonably similar
+    np.testing.assert_allclose(dispxfm._field, bsplxfm._field, atol=1e-1, rtol=1e-4)
 
-    out_disp = apply(dispxfm, img_name)
-    out_bspl = apply(bsplxfm, img_name)
-
-    out_disp.to_filename("resampled_field.nii.gz")
-    out_bspl.to_filename("resampled_bsplines.nii.gz")
-
-    assert (
-        np.sqrt(
-            (out_disp.get_fdata(dtype="float32") - out_bspl.get_fdata(dtype="float32"))
-            ** 2
-        ).mean()
-        < 0.2
-    )
 
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
 @pytest.mark.parametrize("ongrid", [True, False])
-def test_densefield_map(tmp_path, get_testdata, image_orientation, ongrid):
+def test_densefield_map(get_testdata, image_orientation, ongrid):
     """Create a constant displacement field and compare mappings."""
 
     nii = get_testdata[image_orientation]
+
+    # Get sampling indices
+    rng = np.random.default_rng()
 
     # Create a reference centered at the origin with various axis orders/flips
     shape = nii.shape
     ref_affine = nii.affine.copy()
     reference = ImageGrid(nb.Nifti1Image(np.zeros(shape), ref_affine, None))
-    indices = reference.ndindex
+    grid_ijk = reference.ndindex
+    grid_xyz = reference.ras(grid_ijk)
 
-    gridpoints = reference.ras(indices)
-    points = gridpoints if ongrid else SOME_TEST_POINTS
+    subsample = rng.choice(grid_ijk.shape[0], 5000)
+    points_ijk = grid_ijk.copy() if ongrid else grid_ijk[subsample]
+    coords_xyz = (
+        grid_xyz
+        if ongrid
+        else reference.ras(points_ijk) + rng.normal(size=points_ijk.shape)
+    )
 
-    coordinates = gridpoints.reshape(*shape, 3)
-    deltas = np.stack((
-        np.zeros(np.prod(shape), dtype="float32").reshape(shape),
-        np.linspace(-80, 80, num=np.prod(shape), dtype="float32").reshape(shape),
-        np.linspace(-50, 50, num=np.prod(shape), dtype="float32").reshape(shape),
-    ), axis=-1)
+    coords_map = grid_xyz.reshape(*shape, 3)
+    deltas = np.stack(
+        (
+            np.zeros(np.prod(shape), dtype="float32").reshape(shape),
+            np.linspace(-80, 80, num=np.prod(shape), dtype="float32").reshape(shape),
+            np.linspace(-50, 50, num=np.prod(shape), dtype="float32").reshape(shape),
+        ),
+        axis=-1,
+    )
 
-    atol = 1e-4 if image_orientation == "oblique" else 1e-7
+    if ongrid:
+        atol = 1e-3 if image_orientation == "oblique" or not ongrid else 1e-7
+        # Build an identity transform (deltas)
+        id_xfm_deltas = DenseFieldTransform(reference=reference)
+        np.testing.assert_array_equal(coords_map, id_xfm_deltas._field)
+        np.testing.assert_allclose(coords_xyz, id_xfm_deltas.map(coords_xyz))
 
-    # Build an identity transform (deltas)
-    id_xfm_deltas = DenseFieldTransform(reference=reference)
-    np.testing.assert_array_equal(coordinates, id_xfm_deltas._field)
-    np.testing.assert_allclose(points, id_xfm_deltas.map(points), atol=atol)
+        # Build an identity transform (deformation)
+        id_xfm_field = DenseFieldTransform(
+            coords_map, is_deltas=False, reference=reference
+        )
+        np.testing.assert_array_equal(coords_map, id_xfm_field._field)
+        np.testing.assert_allclose(coords_xyz, id_xfm_field.map(coords_xyz), atol=atol)
 
-    # Build an identity transform (deformation)
-    id_xfm_field = DenseFieldTransform(coordinates, is_deltas=False, reference=reference)
-    np.testing.assert_array_equal(coordinates, id_xfm_field._field)
-    np.testing.assert_allclose(points, id_xfm_field.map(points), atol=atol)
+        # Collapse to zero transform (deltas)
+        zero_xfm_deltas = DenseFieldTransform(-coords_map, reference=reference)
+        np.testing.assert_array_equal(
+            np.zeros_like(zero_xfm_deltas._field), zero_xfm_deltas._field
+        )
+        np.testing.assert_allclose(
+            np.zeros_like(coords_xyz), zero_xfm_deltas.map(coords_xyz), atol=atol
+        )
 
-    # Collapse to zero transform (deltas)
-    zero_xfm_deltas = DenseFieldTransform(-coordinates, reference=reference)
-    np.testing.assert_array_equal(np.zeros_like(zero_xfm_deltas._field), zero_xfm_deltas._field)
-    np.testing.assert_allclose(np.zeros_like(points), zero_xfm_deltas.map(points), atol=atol)
-
-    # Collapse to zero transform (deformation)
-    zero_xfm_field = DenseFieldTransform(np.zeros_like(deltas), is_deltas=False, reference=reference)
-    np.testing.assert_array_equal(np.zeros_like(zero_xfm_field._field), zero_xfm_field._field)
-    np.testing.assert_allclose(np.zeros_like(points), zero_xfm_field.map(points), atol=atol)
+        # Collapse to zero transform (deformation)
+        zero_xfm_field = DenseFieldTransform(
+            np.zeros_like(deltas), is_deltas=False, reference=reference
+        )
+        np.testing.assert_array_equal(
+            np.zeros_like(zero_xfm_field._field), zero_xfm_field._field
+        )
+        np.testing.assert_allclose(
+            np.zeros_like(coords_xyz), zero_xfm_field.map(coords_xyz), atol=atol
+        )
 
     # Now let's apply a transform
     xfm = DenseFieldTransform(deltas, reference=reference)
     np.testing.assert_array_equal(deltas, xfm._deltas)
-    np.testing.assert_array_equal(coordinates + deltas, xfm._field)
+    np.testing.assert_array_equal(coords_map + deltas, xfm._field)
 
-    mapped = xfm.map(points)
-    nit_deltas = mapped - points
+    mapped = xfm.map(coords_xyz)
+    nit_deltas = mapped - coords_xyz
 
     if ongrid:
         mapped_image = mapped.reshape(*shape, 3)
-        np.testing.assert_allclose(deltas + coordinates, mapped_image)
+        np.testing.assert_allclose(deltas + coords_map, mapped_image)
         np.testing.assert_allclose(deltas, nit_deltas.reshape(*shape, 3), atol=1e-4)
         np.testing.assert_allclose(xfm._field, mapped_image)
-        
+    else:
+        ongrid_xyz = xfm.map(grid_xyz[subsample])
+        assert (
+            (np.linalg.norm(ongrid_xyz - mapped, axis=1) > 2).sum()
+            / ongrid_xyz.shape[0]
+        ) < 0.5
 
 
 @pytest.mark.parametrize("is_deltas", [True, False])

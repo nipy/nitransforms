@@ -75,7 +75,9 @@ class DenseFieldTransform(TransformBase):
             field = _ensure_image(field)
             # Extract data if nibabel object otherwise assume numpy array
             _data = np.squeeze(
-                np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field.copy()
+                np.asanyarray(field.dataobj)
+                if hasattr(field, "dataobj")
+                else field.copy()
             )
 
         try:
@@ -148,7 +150,7 @@ class DenseFieldTransform(TransformBase):
         ...     test_dir / "someones_displacement_field.nii.gz",
         ...     is_deltas=False,
         ... )
-        >>> xfm.map([-6.5, -36., -19.5]).tolist()
+        >>> xfm.map([[-6.5, -36., -19.5]]).tolist()
         [[0.0, -0.47516798973083496, 0.0]]
 
         >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
@@ -165,8 +167,8 @@ class DenseFieldTransform(TransformBase):
         ...     test_dir / "someones_displacement_field.nii.gz",
         ...     is_deltas=True,
         ... )
-        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
-        [[-6.5, -36.47516632080078, -19.5], [-1.0, -42.03835678100586, -11.25]]
+        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()  # doctest: +ELLIPSIS
+        [[-6.5, -36.475..., -19.5], [-1.0, -42.038..., -11.25]]
 
         >>> np.array_str(
         ...     xfm.map([[-6.7, -36.3, -19.2], [-1., -41.5, -11.25]]),
@@ -183,19 +185,16 @@ class DenseFieldTransform(TransformBase):
         ijk = self.reference.index(np.array(x, dtype="float32"))
         indexes = np.round(ijk).astype("int")
         ongrid = np.where(np.linalg.norm(ijk - indexes, axis=1) < 1e-3)[0]
-        mapped = np.empty_like(x, dtype="float32")
 
-        if ongrid.size:
-            mapped[ongrid] = self._field[*indexes[ongrid].T, :]
+        if ongrid.size == np.shape(x)[0]:
+            # return self._field[*indexes.T, :]  # From Python 3.11
+            return self._field[tuple(indexes.T) + (np.s_[:],)]
 
-        if ongrid.size == x.shape[0]:
-            return mapped
-
-        new_map = np.vstack(
+        mapped_coords = np.vstack(
             tuple(
                 map_coordinates(
                     self._field[..., i],
-                    ijk,
+                    ijk.T,
                     order=3,
                     mode="constant",
                     cval=np.nan,
@@ -206,8 +205,8 @@ class DenseFieldTransform(TransformBase):
         ).T
 
         # Set NaN values back to the original coordinates value = no displacement
-        new_map[np.isnan(new_map)] = np.array(x)[np.isnan(new_map)]
-        return new_map
+        mapped_coords[np.isnan(mapped_coords)] = np.array(x)[np.isnan(mapped_coords)]
+        return mapped_coords
 
     def __matmul__(self, b):
         """

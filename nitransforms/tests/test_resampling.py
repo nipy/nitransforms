@@ -388,3 +388,33 @@ def test_apply_4d(serialize_4d):
     data = np.asanyarray(moved.dataobj)
     idxs = [tuple(np.argwhere(data[..., i])[0]) for i in range(nvols)]
     assert idxs == [(9 - i, 2, 2) for i in range(nvols)]
+
+
+@pytest.mark.xfail(
+    reason="GH-267: disabled while debugging",
+    strict=False,
+)
+def test_apply_bspline(tmp_path, testdata_path):
+    """Cross-check B-Splines and deformation field."""
+    os.chdir(str(tmp_path))
+
+    img_name = testdata_path / "someones_anatomy.nii.gz"
+    disp_name = testdata_path / "someones_displacement_field.nii.gz"
+    bs_name = testdata_path / "someones_bspline_coefficients.nii.gz"
+
+    bsplxfm = nitnl.BSplineFieldTransform(bs_name, reference=img_name)
+    dispxfm = nitnl.DenseFieldTransform(disp_name)
+
+    out_disp = apply(dispxfm, img_name)
+    out_bspl = apply(bsplxfm, img_name)
+
+    out_disp.to_filename("resampled_field.nii.gz")
+    out_bspl.to_filename("resampled_bsplines.nii.gz")
+
+    assert (
+        np.sqrt(
+            (out_disp.get_fdata(dtype="float32") - out_bspl.get_fdata(dtype="float32"))
+            ** 2
+        ).mean()
+        < 0.2
+    )
