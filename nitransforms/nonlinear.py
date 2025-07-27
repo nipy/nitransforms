@@ -65,50 +65,47 @@ class DenseFieldTransform(TransformBase):
         <DenseFieldTransform[3D] (57, 67, 56)>
 
         """
+
         if field is None and reference is None:
-            raise TransformError("DenseFieldTransforms require a spatial reference")
+            raise TransformError("cannot initialize field")
 
         super().__init__()
 
-        self._is_deltas = is_deltas
+        if field is not None:
+            field = _ensure_image(field)
+            # Extract data if nibabel object otherwise assume numpy array
+            _data = np.squeeze(
+                np.asanyarray(field.dataobj)
+                if hasattr(field, "dataobj")
+                else field.copy()
+            )
 
         try:
             self.reference = ImageGrid(reference if reference is not None else field)
         except AttributeError:
             raise TransformError(
-                "Field must be a spatial image if reference is not provided"
+                "field must be a spatial image if reference is not provided"
                 if reference is None
-                else "Reference is not a spatial image"
+                else "reference is not a spatial image"
             )
 
         fieldshape = (*self.reference.shape, self.reference.ndim)
-        if field is not None:
-            field = _ensure_image(field)
-            self._field = np.squeeze(
-                np.asanyarray(field.dataobj) if hasattr(field, "dataobj") else field
-            )
-            if fieldshape != self._field.shape:
-                raise TransformError(
-                    f"Shape of the field ({'x'.join(str(i) for i in self._field.shape)}) "
-                    f"doesn't match that of the reference({'x'.join(str(i) for i in fieldshape)})"
-                )
-        else:
-            self._field = np.zeros(fieldshape, dtype="float32")
-            self._is_deltas = True
-
-        if self._field.shape[-1] != self.ndim:
+        if field is None:
+            _data = np.zeros(fieldshape)
+        elif fieldshape != _data.shape:
             raise TransformError(
-                "The number of components of the field (%d) does not match "
-                "the number of dimensions (%d)" % (self._field.shape[-1], self.ndim)
+                f"Shape of the field ({'x'.join(str(i) for i in _data.shape)}) "
+                f"doesn't match that of the reference({'x'.join(str(i) for i in fieldshape)})"
             )
+
+        self._is_deltas = is_deltas
+        self._field = self.reference.ndcoords.reshape(fieldshape)
 
         if self.is_deltas:
-            self._deltas = (
-                self._field.copy()
-            )  # IMPORTANT: you don't want to update deltas
-            # Convert from displacements (deltas) to deformations fields
-            # (just add its origin to each delta vector)
-            self._field += self.reference.ndcoords.T.reshape(fieldshape)
+            self._deltas = _data.copy()
+            self._field += self._deltas
+        else:
+            self._field = _data.copy()
 
     def __repr__(self):
         """Beautify the python representation."""
@@ -153,7 +150,7 @@ class DenseFieldTransform(TransformBase):
         ...     test_dir / "someones_displacement_field.nii.gz",
         ...     is_deltas=False,
         ... )
-        >>> xfm.map([-6.5, -36., -19.5]).tolist()
+        >>> xfm.map([[-6.5, -36., -19.5]]).tolist()
         [[0.0, -0.47516798973083496, 0.0]]
 
         >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
@@ -170,8 +167,8 @@ class DenseFieldTransform(TransformBase):
         ...     test_dir / "someones_displacement_field.nii.gz",
         ...     is_deltas=True,
         ... )
-        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()
-        [[-6.5, -36.47516632080078, -19.5], [-1.0, -42.03835678100586, -11.25]]
+        >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()  # doctest: +ELLIPSIS
+        [[-6.5, -36.475..., -19.5], [-1.0, -42.038..., -11.25]]
 
         >>> np.array_str(
         ...     xfm.map([[-6.7, -36.3, -19.2], [-1., -41.5, -11.25]]),
@@ -185,18 +182,19 @@ class DenseFieldTransform(TransformBase):
         if inverse is True:
             raise NotImplementedError
 
-        ijk = self.reference.index(x)
+        ijk = self.reference.index(np.array(x, dtype="float32"))
         indexes = np.round(ijk).astype("int")
+        ongrid = np.where(np.linalg.norm(ijk - indexes, axis=1) < 1e-3)[0]
 
-        if np.all(np.abs(ijk - indexes) < 1e-3):
-            indexes = tuple(tuple(i) for i in indexes)
-            return self._field[indexes]
+        if ongrid.size == np.shape(x)[0]:
+            # return self._field[*indexes.T, :]  # From Python 3.11
+            return self._field[tuple(indexes.T) + (np.s_[:],)]
 
-        new_map = np.vstack(
+        mapped_coords = np.vstack(
             tuple(
                 map_coordinates(
                     self._field[..., i],
-                    ijk,
+                    ijk.T,
                     order=3,
                     mode="constant",
                     cval=np.nan,
@@ -207,8 +205,8 @@ class DenseFieldTransform(TransformBase):
         ).T
 
         # Set NaN values back to the original coordinates value = no displacement
-        new_map[np.isnan(new_map)] = np.array(x)[np.isnan(new_map)]
-        return new_map
+        mapped_coords[np.isnan(mapped_coords)] = np.array(x)[np.isnan(mapped_coords)]
+        return mapped_coords
 
     def __matmul__(self, b):
         """

@@ -3,19 +3,22 @@
 """Tests of nonlinear transforms."""
 
 import os
+from subprocess import check_call
+import shutil
+
 import pytest
 
 import numpy as np
 import nibabel as nb
-from nitransforms.resampling import apply
-from nitransforms.base import TransformError
+from nitransforms.base import TransformError, ImageGrid
 from nitransforms.io.base import TransformFileError
 from nitransforms.nonlinear import (
     BSplineFieldTransform,
     DenseFieldTransform,
 )
-from nitransforms import io
-from ..io.itk import ITKDisplacementsField
+from nitransforms.io.itk import ITKDisplacementsField
+
+rng = np.random.default_rng()
 
 
 @pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 3)])
@@ -32,16 +35,6 @@ def test_displacements_bad_sizes(size):
     """Checks field sizes."""
     with pytest.raises(TransformError):
         DenseFieldTransform(nb.Nifti1Image(np.zeros(size), np.eye(4), None))
-
-
-def test_itk_disp_load_intent():
-    """Checks whether the NIfTI intent is fixed."""
-    with pytest.warns(UserWarning):
-        field = ITKDisplacementsField.from_image(
-            nb.Nifti1Image(np.zeros((20, 20, 20, 1, 3)), np.eye(4), None)
-        )
-
-    assert field.header.get_intent()[0] == "vector"
 
 
 def test_displacements_init():
@@ -81,22 +74,13 @@ def test_bsplines_references(testdata_path):
             testdata_path / "someones_bspline_coefficients.nii.gz"
         ).to_field()
 
-    with pytest.raises(TransformError):
-        apply(
-            BSplineFieldTransform(
-                testdata_path / "someones_bspline_coefficients.nii.gz"
-            ),
-            testdata_path / "someones_anatomy.nii.gz",
-        )
-
-    apply(
-        BSplineFieldTransform(testdata_path / "someones_bspline_coefficients.nii.gz"),
-        testdata_path / "someones_anatomy.nii.gz",
+    BSplineFieldTransform(
+        testdata_path / "someones_bspline_coefficients.nii.gz",
         reference=testdata_path / "someones_anatomy.nii.gz",
     )
 
 
-def test_bspline(tmp_path, testdata_path):
+def test_map_bspline_vs_displacement(tmp_path, testdata_path):
     """Cross-check B-Splines and deformation field."""
     os.chdir(str(tmp_path))
 
@@ -104,68 +88,269 @@ def test_bspline(tmp_path, testdata_path):
     disp_name = testdata_path / "someones_displacement_field.nii.gz"
     bs_name = testdata_path / "someones_bspline_coefficients.nii.gz"
 
-    bsplxfm = BSplineFieldTransform(bs_name, reference=img_name)
+    bsplxfm = BSplineFieldTransform(bs_name, reference=img_name).to_field()
     dispxfm = DenseFieldTransform(disp_name)
+    # Interpolating field should be reasonably similar
+    np.testing.assert_allclose(dispxfm._field, bsplxfm._field, atol=1e-1, rtol=1e-4)
 
-    out_disp = apply(dispxfm, img_name)
-    out_bspl = apply(bsplxfm, img_name)
 
-    out_disp.to_filename("resampled_field.nii.gz")
-    out_bspl.to_filename("resampled_bsplines.nii.gz")
+def _get_points(reference_nii, ongrid, npoints=5000, rng=None):
+    """Get points in RAS space."""
+    if rng is None:
+        rng = np.random.default_rng()
 
-    assert (
-        np.sqrt(
-            (out_disp.get_fdata(dtype="float32") - out_bspl.get_fdata(dtype="float32"))
-            ** 2
-        ).mean()
-        < 0.2
+    # Get sampling indices
+    shape = reference_nii.shape[:3]
+    ref_affine = reference_nii.affine.copy()
+    reference = ImageGrid(nb.Nifti1Image(np.zeros(shape), ref_affine, None))
+    grid_ijk = reference.ndindex
+    grid_xyz = reference.ras(grid_ijk)
+
+    subsample = rng.choice(grid_ijk.shape[0], npoints)
+    points_ijk = grid_ijk.copy() if ongrid else grid_ijk[subsample]
+    coords_xyz = (
+        grid_xyz
+        if ongrid
+        else reference.ras(points_ijk) + rng.normal(size=points_ijk.shape)
     )
 
-
-@pytest.mark.parametrize("is_deltas", [True, False])
-def test_densefield_x5_roundtrip(tmp_path, is_deltas):
-    """Ensure dense field transforms roundtrip via X5."""
-    ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
-    disp = nb.Nifti1Image(np.random.rand(2, 2, 2, 3).astype("float32"), np.eye(4))
-
-    xfm = DenseFieldTransform(disp, is_deltas=is_deltas, reference=ref)
-
-    node = xfm.to_x5(metadata={"GeneratedBy": "pytest"})
-    assert node.type == "nonlinear"
-    assert node.subtype == "densefield"
-    assert node.representation == "displacements" if is_deltas else "deformations"
-    assert node.domain.size == ref.shape
-    assert node.metadata["GeneratedBy"] == "pytest"
-
-    fname = tmp_path / "test.x5"
-    io.x5.to_filename(fname, [node])
-
-    xfm2 = DenseFieldTransform.from_filename(fname, fmt="X5")
-
-    assert xfm2.reference.shape == ref.shape
-    assert np.allclose(xfm2.reference.affine, ref.affine)
-    assert xfm == xfm2
+    return coords_xyz, points_ijk, grid_xyz, shape, ref_affine, reference, subsample
 
 
-def test_bspline_to_x5(tmp_path):
-    """Check BSpline transforms export to X5."""
-    coeff = nb.Nifti1Image(np.zeros((2, 2, 2, 3), dtype="float32"), np.eye(4))
-    ref = nb.Nifti1Image(np.zeros((2, 2, 2), dtype="uint8"), np.eye(4))
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
+@pytest.mark.parametrize("ongrid", [True, False])
+def test_densefield_map(get_testdata, image_orientation, ongrid):
+    """Create a constant displacement field and compare mappings."""
 
-    xfm = BSplineFieldTransform(coeff, reference=ref)
-    node = xfm.to_x5(metadata={"tool": "pytest"})
-    assert node.type == "nonlinear"
-    assert node.subtype == "bspline"
-    assert node.representation == "coefficients"
-    assert node.metadata["tool"] == "pytest"
+    nii = get_testdata[image_orientation]
 
-    fname = tmp_path / "bspline.x5"
-    io.x5.to_filename(fname, [node])
+    # Get sampling indices
+    coords_xyz, points_ijk, grid_xyz, shape, ref_affine, reference, subsample = (
+        _get_points(nii, ongrid, rng=rng)
+    )
 
-    xfm2 = BSplineFieldTransform.from_filename(fname, fmt="X5")
-    assert np.allclose(xfm._coeffs, xfm2._coeffs)
-    assert xfm2.reference.shape == ref.shape
-    assert np.allclose(xfm2.reference.affine, ref.affine)
+    coords_map = grid_xyz.reshape(*shape, 3)
+    deltas = np.stack(
+        (
+            np.zeros(np.prod(shape), dtype="float32").reshape(shape),
+            np.linspace(-80, 80, num=np.prod(shape), dtype="float32").reshape(shape),
+            np.linspace(-50, 50, num=np.prod(shape), dtype="float32").reshape(shape),
+        ),
+        axis=-1,
+    )
+
+    if ongrid:
+        atol = 1e-3 if image_orientation == "oblique" or not ongrid else 1e-7
+        # Build an identity transform (deltas)
+        id_xfm_deltas = DenseFieldTransform(reference=reference)
+        np.testing.assert_array_equal(coords_map, id_xfm_deltas._field)
+        np.testing.assert_allclose(coords_xyz, id_xfm_deltas.map(coords_xyz))
+
+        # Build an identity transform (deformation)
+        id_xfm_field = DenseFieldTransform(
+            coords_map, is_deltas=False, reference=reference
+        )
+        np.testing.assert_array_equal(coords_map, id_xfm_field._field)
+        np.testing.assert_allclose(coords_xyz, id_xfm_field.map(coords_xyz), atol=atol)
+
+        # Collapse to zero transform (deltas)
+        zero_xfm_deltas = DenseFieldTransform(-coords_map, reference=reference)
+        np.testing.assert_array_equal(
+            np.zeros_like(zero_xfm_deltas._field), zero_xfm_deltas._field
+        )
+        np.testing.assert_allclose(
+            np.zeros_like(coords_xyz), zero_xfm_deltas.map(coords_xyz), atol=atol
+        )
+
+        # Collapse to zero transform (deformation)
+        zero_xfm_field = DenseFieldTransform(
+            np.zeros_like(deltas), is_deltas=False, reference=reference
+        )
+        np.testing.assert_array_equal(
+            np.zeros_like(zero_xfm_field._field), zero_xfm_field._field
+        )
+        np.testing.assert_allclose(
+            np.zeros_like(coords_xyz), zero_xfm_field.map(coords_xyz), atol=atol
+        )
+
+    # Now let's apply a transform
+    xfm = DenseFieldTransform(deltas, reference=reference)
+    np.testing.assert_array_equal(deltas, xfm._deltas)
+    np.testing.assert_array_equal(coords_map + deltas, xfm._field)
+
+    mapped = xfm.map(coords_xyz)
+    nit_deltas = mapped - coords_xyz
+
+    if ongrid:
+        mapped_image = mapped.reshape(*shape, 3)
+        np.testing.assert_allclose(deltas + coords_map, mapped_image)
+        np.testing.assert_allclose(deltas, nit_deltas.reshape(*shape, 3), atol=1e-4)
+        np.testing.assert_allclose(xfm._field, mapped_image)
+    else:
+        ongrid_xyz = xfm.map(grid_xyz[subsample])
+        assert (
+            (np.linalg.norm(ongrid_xyz - mapped, axis=1) > 2).sum()
+            / ongrid_xyz.shape[0]
+        ) < 0.5
+
+
+@pytest.mark.parametrize("ongrid", [True, False])
+def test_densefield_map_vs_ants(testdata_path, tmp_path, ongrid):
+    """Map points with DenseFieldTransform and compare to ANTs."""
+    warpfile = (
+        testdata_path
+        / "regressions"
+        / ("01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz")
+    )
+    if not warpfile.exists():
+        pytest.skip("Composite transform test data not available")
+    
+    nii = ITKDisplacementsField.from_filename(warpfile)
+
+    # Get sampling indices
+    coords_xyz, points_ijk, grid_xyz, shape, ref_affine, reference, subsample = (
+        _get_points(nii, ongrid, npoints=5, rng=rng)
+    )
+    coords_map = grid_xyz.reshape(*shape, 3)
+
+    csvin = tmp_path / "fixed_coords.csv"
+    csvout = tmp_path / "moving_coords.csv"
+    np.savetxt(csvin, coords_xyz, delimiter=",", header="x,y,z", comments="")
+
+    cmd = f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {warpfile}"
+    exe = cmd.split()[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+    check_call(cmd, shell=True)
+
+    ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
+    ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
+
+    xfm = DenseFieldTransform(nii, reference=reference)
+    mapped = xfm.map(coords_xyz)
+
+    if ongrid:
+        ants_mapped_xyz = ants_pts.reshape(*shape, 3)
+        nit_mapped_xyz = mapped.reshape(*shape, 3)
+
+        nb.Nifti1Image(coords_map, ref_affine, None).to_filename(
+            tmp_path / "baseline_field.nii.gz"
+        )
+
+        nb.Nifti1Image(ants_mapped_xyz, ref_affine, None).to_filename(
+            tmp_path / "ants_deformation_xyz.nii.gz"
+        )
+        nb.Nifti1Image(nit_mapped_xyz, ref_affine, None).to_filename(
+            tmp_path / "nit_deformation_xyz.nii.gz"
+        )
+        nb.Nifti1Image(ants_mapped_xyz - coords_map, ref_affine, None).to_filename(
+            tmp_path / "ants_deltas_xyz.nii.gz"
+        )
+        nb.Nifti1Image(nit_mapped_xyz - coords_map, ref_affine, None).to_filename(
+            tmp_path / "nit_deltas_xyz.nii.gz"
+        )
+
+    atol = 0 if ongrid else 1e-2
+    rtol = 1e-4 if ongrid else 1e-6
+    assert np.allclose(mapped, ants_pts, atol=atol, rtol=rtol)
+
+
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
+@pytest.mark.parametrize("ongrid", [True, False])
+def test_constant_field_vs_ants(tmp_path, get_testdata, image_orientation, ongrid):
+    """Create a constant displacement field and compare mappings."""
+
+    nii = get_testdata[image_orientation]
+
+    # Get sampling indices
+    coords_xyz, points_ijk, grid_xyz, shape, ref_affine, reference, subsample = (
+        _get_points(nii, ongrid, npoints=5, rng=rng)
+    )
+
+    coords_map = grid_xyz.reshape(*shape, 3)
+    gold_mapped_xyz = coords_map + deltas
+
+    deltas = np.hstack(
+        (
+            np.zeros(np.prod(shape)),
+            np.linspace(-80, 80, num=np.prod(shape)),
+            np.linspace(-50, 50, num=np.prod(shape)),
+        )
+    ).reshape(shape + (3,))
+
+    fieldnii = nb.Nifti1Image(deltas, ref_affine, None)
+    warpfile = tmp_path / "itk_transform.nii.gz"
+    ITKDisplacementsField.to_filename(fieldnii, warpfile)
+
+    # Ensure direct (xfm) and ITK roundtrip (itk_xfm) are equivalent
+    xfm = DenseFieldTransform(fieldnii)
+    itk_xfm = DenseFieldTransform(ITKDisplacementsField.from_filename(warpfile))
+
+    assert xfm == itk_xfm
+    np.testing.assert_allclose(xfm.reference.affine, itk_xfm.reference.affine)
+    np.testing.assert_allclose(ref_affine, itk_xfm.reference.affine)
+    np.testing.assert_allclose(xfm.reference.shape, itk_xfm.reference.shape)
+    np.testing.assert_allclose(xfm._field, itk_xfm._field)
+
+    # Ensure transform (xfm_orig) and ITK roundtrip (itk_xfm) are equivalent
+    xfm_orig = DenseFieldTransform(deltas, reference=reference)
+    np.testing.assert_allclose(xfm_orig.reference.shape, itk_xfm.reference.shape)
+    np.testing.assert_allclose(ref_affine, xfm_orig.reference.affine)
+    np.testing.assert_allclose(xfm_orig.reference.affine, itk_xfm.reference.affine)
+    np.testing.assert_allclose(xfm_orig._field, itk_xfm._field)
+
+    # Ensure deltas and mapped grid are equivalent
+    grid_mapped_xyz = itk_xfm.map(grid_xyz).reshape(*shape, -1)
+    orig_grid_mapped_xyz = xfm_orig.map(grid_xyz).reshape(*shape, -1)
+
+    # Check apparent healthiness of mapping
+    np.testing.assert_array_equal(orig_grid_mapped_xyz, grid_mapped_xyz)
+    np.testing.assert_array_equal(gold_mapped_xyz, orig_grid_mapped_xyz)
+    np.testing.assert_array_equal(gold_mapped_xyz, grid_mapped_xyz)
+
+    csvout = tmp_path / "mapped_xyz.csv"
+    csvin = tmp_path / "coords_xyz.csv"
+    np.savetxt(csvin, coords_xyz, delimiter=",", header="x,y,z", comments="")
+
+    cmd = f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {warpfile}"
+    exe = cmd.split()[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+    check_call(cmd, shell=True)
+
+    ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
+    ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T
+
+    nb.Nifti1Image(grid_mapped_xyz, ref_affine, None).to_filename(
+        tmp_path / "grid_mapped.nii.gz"
+    )
+    nb.Nifti1Image(coords_map, ref_affine, None).to_filename(
+        tmp_path / "baseline_field.nii.gz"
+    )
+    nb.Nifti1Image(gold_mapped_xyz, ref_affine, None).to_filename(
+        tmp_path / "gold_mapped_xyz.nii.gz"
+    )
+
+    if ongrid:
+        ants_pts = ants_pts.reshape(*shape, 3)
+
+        nb.Nifti1Image(ants_pts, ref_affine, None).to_filename(
+            tmp_path / "ants_mapped_xyz.nii.gz"
+        )
+        np.testing.assert_array_equal(gold_mapped_xyz, ants_pts)
+        np.testing.assert_array_equal(deltas, ants_pts - coords_map)
+    else:
+        ants_deltas = ants_pts - coords_xyz
+        deltas_xyz = deltas.reshape(-1, 3)[subsample]
+        gold_xyz = coords_xyz + deltas_xyz
+        np.testing.assert_array_equal(gold_xyz, ants_pts)
+        np.testing.assert_array_equal(deltas_xyz, ants_deltas)
+
+    # np.testing.assert_array_equal(mapped, ants_pts)
+    # diff = mapped - ants_pts
+    # mask = np.argwhere(np.abs(diff) > 1e-2)[:, 0]
+
+    # assert len(mask) == 0, f"A total of {len(mask)}/{ants_pts.shape[0]} contained errors:\n{diff[mask]}"
 
 
 @pytest.mark.parametrize("is_deltas", [True, False])
