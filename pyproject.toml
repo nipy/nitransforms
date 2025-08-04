@@ -40,6 +40,8 @@ test = [
     "pytest-env",
     "pytest-xdist >= 2.5",
     "coverage[toml] >= 5.2.1",
+    "SimpleITK ~= 2.5",
+    "scikit-build",
     "nitransforms[niftiext]",
 ]
 # Aliases
