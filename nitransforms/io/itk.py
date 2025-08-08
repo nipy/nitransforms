@@ -329,7 +329,15 @@ class ITKLinearTransformArray(BaseLinearTransformList):
 
 
 class ITKDisplacementsField(DisplacementsField):
-    """A data structure representing displacements fields."""
+    """
+    A data structure representing displacements fields.
+
+    Note that ITK's world coordinates are LPS:
+    http://sourceforge.net/p/advants/discussion/840261/thread/2a1e9307/.
+    This translates into the fact that `antsApplyTransformsToPoints` expects LPS coordinates,
+    and therefore, points must correct for the x and y directions before feeding into the tool.
+
+    """
 
     @classmethod
     def from_image(cls, imgobj):
@@ -347,12 +355,31 @@ class ITKDisplacementsField(DisplacementsField):
             warnings.warn("Incorrect intent identified.")
             hdr.set_intent("vector")
 
-        field = np.squeeze(np.asanyarray(imgobj.dataobj))
-        affine = imgobj.affine
-        midindex = (np.array(field.shape[:3]) - 1) * 0.5
-        offset = (LPS @ affine - affine) @ (*midindex, 1)
-        affine[:3, 3] += offset[:3]
-        return imgobj.__class__(np.flip(field, axis=(0, 1)), imgobj.affine, hdr)
+        affine, qcode = hdr.get_qform(coded=True)
+
+        if qcode != 1:
+            warnings.warn(
+                "Displacements field has qform code={qcode}, which is not ITK-like. "
+                "Setting it to 1 (aligned with the image)."
+            )
+            affine = imgobj.affine
+            hdr.set_qform(imgobj.affine, code=1)
+            hdr.set_sform(imgobj.affine, code=0)
+
+        # ITK uses LPS coordinates, so first we patch the affine's offset
+        # This patch was developed under gh-266, by adapting
+        # nitransforms/tests/test_nonlinear.py::test_densefield_map_vs_ants[True]
+        # until the same delta maps were obtained with `antsApplyTransformsToPoints`
+        # and our NiTransforms transform's `.map()`.
+        mid_ijk = 0.5 * (np.array(imgobj.shape[:3]) - 1)
+        offset = (affine - LPS @ affine) @ (*mid_ijk, 1.0)
+        affine[:3, 3] -= offset[:3]
+
+        # Create a NIfTI image with the patched affine
+        data = np.squeeze(imgobj.get_fdata(dtype="float32"))
+        refmap = imgobj.__class__(np.flip(data, axis=(0, 1)), affine, hdr)
+
+        return refmap
 
     @classmethod
     def to_image(cls, imgobj):
@@ -360,11 +387,15 @@ class ITKDisplacementsField(DisplacementsField):
 
         hdr = imgobj.header.copy()
         hdr.set_intent("vector")
+        hdr.set_data_dtype("float32")
+        affine = LPS @ imgobj.affine @ LPS
+        hdr.set_qform(affine, code=1)
+        hdr.set_sform(affine, code=0)
+        hdr.set_xyzt_units("mm", None)
 
-        field = imgobj.get_fdata()
-        field = field.transpose(2, 1, 0, 3)[..., None, :]
-        field[..., (0, 1)] *= 1.0
-        return imgobj.__class__(field, LPS @ imgobj.affine, hdr)
+        return imgobj.__class__(
+            imgobj.get_fdata(dtype="float32")[..., None, :], affine, hdr
+        )
 
 
 class ITKCompositeH5:

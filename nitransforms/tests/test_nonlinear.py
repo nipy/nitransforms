@@ -172,7 +172,7 @@ def test_densefield_map_vs_ants(testdata_path, tmp_path, ongrid):
     )
     if not warpfile.exists():
         pytest.skip("Composite transform test data not available")
-    
+
     nii = ITKDisplacementsField.from_filename(warpfile)
 
     # Get sampling indices
@@ -201,13 +201,14 @@ def test_densefield_map_vs_ants(testdata_path, tmp_path, ongrid):
         ants_mapped_xyz = ants_pts.reshape(*shape, 3)
         nit_mapped_xyz = mapped.reshape(*shape, 3)
 
+        nb.load(warpfile).to_filename(tmp_path / "original_ants_deltas.nii.gz")
+
         nb.Nifti1Image(coords_map, ref_affine, None).to_filename(
-            tmp_path / "baseline_field.nii.gz"
+            tmp_path / "baseline_positions.nii.gz"
         )
 
-        nb.Nifti1Image(ants_mapped_xyz, ref_affine, None).to_filename(
-            tmp_path / "ants_deformation_xyz.nii.gz"
-        )
+        nii.to_filename(tmp_path / "original_interpreted_deltas.nii.gz")
+
         nb.Nifti1Image(nit_mapped_xyz, ref_affine, None).to_filename(
             tmp_path / "nit_deformation_xyz.nii.gz"
         )
@@ -236,7 +237,6 @@ def test_constant_field_vs_ants(tmp_path, get_testdata, image_orientation, ongri
     )
 
     coords_map = grid_xyz.reshape(*shape, 3)
-    gold_mapped_xyz = coords_map + deltas
 
     deltas = np.hstack(
         (
@@ -245,6 +245,7 @@ def test_constant_field_vs_ants(tmp_path, get_testdata, image_orientation, ongri
             np.linspace(-50, 50, num=np.prod(shape)),
         )
     ).reshape(shape + (3,))
+    gold_mapped_xyz = coords_map + deltas
 
     fieldnii = nb.Nifti1Image(deltas, ref_affine, None)
     warpfile = tmp_path / "itk_transform.nii.gz"
