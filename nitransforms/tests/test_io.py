@@ -17,7 +17,6 @@ from nibabel.eulerangles import euler2mat
 from nibabel.affines import from_matvec
 from scipy.io import loadmat
 from nitransforms.linear import Affine
-from nitransforms.nonlinear import DenseFieldTransform, BSplineFieldTransform
 from nitransforms.io import (
     afni,
     fsl,
@@ -696,7 +695,6 @@ def test_itk_linear_h5(tmpdir, data_path, testdata_path):
         itk.ITKLinearTransform.from_filename("test.h5")
 
 
-
 def test_itk_disp_load_intent():
     """Checks whether the NIfTI intent is fixed."""
     with pytest.warns(UserWarning):
@@ -708,6 +706,41 @@ def test_itk_disp_load_intent():
 
 
 # Added tests for displacements fields orientations (ANTs/ITK)
+def test_itk_densefield_read(testdata_path, tmp_path):
+    """Map points with DenseFieldTransform and compare to ANTs."""
+    warpfile = (
+        testdata_path
+        / "regressions"
+        / ("01_ants_t1_to_mniComposite_DisplacementFieldTransform.nii.gz")
+    )
+    if not warpfile.exists():
+        pytest.skip("Composite transform test data not available")
+
+    nib_from_itk = nb.load(warpfile)
+    nit_from_itk = itk.ITKDisplacementsField.from_filename(warpfile)
+    itk_from_nit = itk.ITKDisplacementsField.to_image(nit_from_itk)
+
+    # Enable for debugging
+    # nib_from_itk.to_filename(tmp_path / "nib_from_itk.nii.gz")
+    # itk_from_nit.to_filename(tmp_path / "itk_from_nit.nii.gz")
+    # nit_from_itk.to_filename(tmp_path / "nit_from_itk.nii.gz")
+
+    # import pdb; pdb.set_trace()
+
+    np.testing.assert_allclose(
+        nib_from_itk.dataobj, itk_from_nit.dataobj, rtol=1e-5, atol=1e-5
+    )
+    np.testing.assert_allclose(
+        nit_from_itk.dataobj, np.squeeze(itk_from_nit.dataobj), rtol=1e-5, atol=1e-5
+    )
+    np.testing.assert_allclose(
+        nib_from_itk.affine, itk_from_nit.affine, rtol=1e-5, atol=1e-5
+    )
+    np.testing.assert_allclose(
+        nit_from_itk.affine, itk_from_nit.affine, rtol=1e-5, atol=1e-5
+    )
+
+
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
 @pytest.mark.parametrize("field_is_random", [False, True])
 def test_itk_displacements(tmp_path, get_testdata, image_orientation, field_is_random):
@@ -747,6 +780,15 @@ def test_itk_displacements(tmp_path, get_testdata, image_orientation, field_is_r
     itk_nit_nii = itk.ITKDisplacementsField.from_filename(itk_file)
     itk_nii = nb.load(itk_file)
 
+    # Test round trip
+    assert itk_nit_nii.shape == field.shape
+    np.testing.assert_allclose(itk_nit_nii.dataobj, field)
+    np.testing.assert_allclose(
+        itk_nit_nii.dataobj.transpose(2, 1, 0, 3)[..., None, :], nit_nii.dataobj
+    )
+    np.testing.assert_allclose(itk_nit_nii.affine, ref_affine)
+    np.testing.assert_allclose(LPS @ itk_nit_nii.affine, nit_nii.affine)
+
     assert nit_nii.shape == itk_nii.shape, (
         "ITK-generated and nitransforms-generated field shapes are different"
     )
@@ -756,14 +798,9 @@ def test_itk_displacements(tmp_path, get_testdata, image_orientation, field_is_r
     # Check ITK-generated field has LPS-rotated affine
     np.testing.assert_allclose(itk_nii.affine, LPS @ ref_affine)
     # Test ITK-generated dataobject vs. original field
-    np.testing.assert_allclose(itk_nii.dataobj, field.transpose(2, 1, 0, 3)[..., None, :])
-
-    # Test round trip
-    assert itk_nit_nii.shape == field.shape
-    np.testing.assert_allclose(itk_nit_nii.dataobj, field)
-    np.testing.assert_allclose(itk_nit_nii.dataobj.transpose(2, 1, 0, 3)[..., None, :], nit_nii.dataobj)
-    np.testing.assert_allclose(itk_nit_nii.affine, ref_affine)
-    np.testing.assert_allclose(LPS @ itk_nit_nii.affine, nit_nii.affine)
+    np.testing.assert_allclose(
+        itk_nii.dataobj, field.transpose(2, 1, 0, 3)[..., None, :]
+    )
 
 
 # Added tests for h5 orientation bug
