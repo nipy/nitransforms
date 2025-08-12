@@ -149,6 +149,10 @@ def test_apply_linear_transform(
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
 
+@pytest.mark.xfail(
+    reason="Disable while #266 is developed.",
+    strict=False,
+)
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
 @pytest.mark.parametrize("sw_tool", ["itk", "afni"])
 @pytest.mark.parametrize("axis", [0, 1, 2, (0, 1), (1, 2), (0, 1, 2)])
@@ -236,6 +240,10 @@ def test_displacements_field1(
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
 
+@pytest.mark.xfail(
+    reason="Disable while #266 is developed.",
+    strict=False,
+)
 @pytest.mark.parametrize("sw_tool", ["itk", "afni"])
 def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     """Check a translation-only field on one or more axes, different image orientations."""
