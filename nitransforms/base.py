@@ -206,14 +206,14 @@ class ImageGrid(SampledSpatialData):
                 0:self._shape[0], 0:self._shape[1], 0:self._shape[2]
             ]
             self._ndindex = indexes.reshape((indexes.shape[0], -1)).T
-        return self._ndindex
+        return self._ndindex.copy()  # Return copies to disallow alteration
 
     @property
     def ndcoords(self):
         """List the physical coordinates of this gridded space samples."""
         if self._coords is None:
             self._coords = self.ras(self.ndindex)
-        return self._coords
+        return self._coords.copy()  # Return copies to disallow alteration
 
     def ras(self, ijk):
         """Get RAS+ coordinates from input indexes."""

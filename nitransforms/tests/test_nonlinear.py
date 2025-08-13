@@ -40,6 +40,30 @@ def test_displacements_init():
         )
 
 
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
+@pytest.mark.parametrize("axis", [0, 1, 2, (0, 1), (1, 2), (0, 1, 2)])
+def test_displacements_to_filename(tmp_path, get_testdata, image_orientation, axis):
+    """Exercise to_filename."""
+
+    nii = get_testdata[image_orientation]
+    fieldmap = np.zeros((*nii.shape[:3], 3), dtype="float32")
+    fieldmap[..., axis] = -10.0
+
+    xfm = DenseFieldTransform(
+        fieldmap,
+        reference=nii,
+    )
+    xfm.to_filename(tmp_path / "warp_itk.nii.gz", fmt="itk")
+    xfm.to_filename(tmp_path / "warp_afni.nii.gz", fmt="afni")
+    xfm.to_filename(tmp_path / "warp_fsl.nii.gz", fmt="fsl")
+
+    with pytest.raises(NotImplementedError):
+        xfm.to_filename(tmp_path / "warp_freesurfer.nii.gz", fmt="fs")
+
+    with pytest.raises(TypeError):
+        xfm.to_filename(tmp_path / "warp.x5", fmt="X5")
+
+
 @pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 2, 3), (20, 20, 20, 1, 4)])
 def test_displacements_bad_sizes(size):
     """Checks field sizes."""

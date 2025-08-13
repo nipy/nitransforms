@@ -65,13 +65,14 @@ def test_ImageGrid(get_testdata, image_orientation):
     assert idxs.shape[1] == coords.shape[1] == img.ndim == 3
     assert idxs.shape[0] == coords.shape[0] == img.npoints == np.prod(im.shape)
 
+    # Test indexing round trip
+    np.testing.assert_allclose(coords, img.ras(idxs))
+    np.testing.assert_allclose(idxs, img.index(coords), rtol=1e-3, atol=1e-3)
+
+    # Test equality
     img2 = ImageGrid(img)
     assert img2 == img
     assert (img2 != img) is False
-
-    # Test indexing round trip
-    np.testing.assert_allclose(img.ndcoords, img.ras(img.ndindex))
-    np.testing.assert_allclose(img.ndindex, np.round(img.index(img.ndcoords)))
 
 
 def test_ImageGrid_utils(tmpdir, testdata_path, get_testdata):

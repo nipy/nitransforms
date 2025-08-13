@@ -149,10 +149,6 @@ def test_apply_linear_transform(
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
 
-@pytest.mark.xfail(
-    reason="Disable while #266 is developed.",
-    strict=False,
-)
 @pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
 @pytest.mark.parametrize("sw_tool", ["itk", "afni"])
 @pytest.mark.parametrize("axis", [0, 1, 2, (0, 1), (1, 2), (0, 1, 2)])
@@ -174,29 +170,24 @@ def test_displacements_field1(
     nii.to_filename("reference.nii.gz")
     msk.to_filename("mask.nii.gz")
 
-    fieldmap = np.zeros(
-        (*nii.shape[:3], 1, 3) if sw_tool != "fsl" else (*nii.shape[:3], 3),
-        dtype="float32",
-    )
+    fieldmap = np.zeros((*nii.shape[:3], 3), dtype="float32")
     fieldmap[..., axis] = -10.0
 
-    _hdr = nii.header.copy()
-    if sw_tool in ("itk",):
-        _hdr.set_intent("vector")
-    _hdr.set_data_dtype("float32")
-
+    # Generate a transform file for the particular software
     xfm_fname = "warp.nii.gz"
-    field = nb.Nifti1Image(fieldmap, nii.affine, _hdr)
-    field.to_filename(xfm_fname)
+    xfm = nitnl.DenseFieldTransform(
+        fieldmap,
+        reference=nii,
+    )
+    xfm.to_filename(xfm_fname, fmt=sw_tool)
 
-    xfm = nitnl.load(xfm_fname, fmt=sw_tool)
-
+    tool_output = tmp_path / f"{sw_tool}_brainmask.nii.gz"
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
         transform=os.path.abspath(xfm_fname),
         reference=tmp_path / "mask.nii.gz",
         moving=tmp_path / "mask.nii.gz",
-        output=tmp_path / "resampled_brainmask.nii.gz",
+        output=tool_output,
         extra="--output-data-type uchar" if sw_tool == "itk" else "",
     )
 
@@ -208,26 +199,28 @@ def test_displacements_field1(
     # resample mask
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
-    sw_moved_mask = nb.load("resampled_brainmask.nii.gz")
+    sw_moved_mask = np.asanyarray(nb.load(tool_output).dataobj, dtype=bool)
     nt_moved_mask = apply(xfm, msk, order=0)
-    nt_moved_mask.set_data_dtype(msk.get_data_dtype())
-    diff = np.asanyarray(sw_moved_mask.dataobj) - np.asanyarray(nt_moved_mask.dataobj)
-
-    assert np.sqrt((diff**2).mean()) < RMSE_TOL_LINEAR
+    nt_moved_mask.to_filename(tmp_path / "nit_brainmask.nii.gz")
     brainmask = np.asanyarray(nt_moved_mask.dataobj, dtype=bool)
+    percent_diff = (sw_moved_mask != brainmask)[5:-5, 5:-5, 5:-5].sum() / brainmask.size
+
+    assert percent_diff < 1e-8, (
+        f"Resampled masks differed by {percent_diff * 100:0.2f}%."
+    )
 
     # Then apply the transform and cross-check with software
     cmd = APPLY_NONLINEAR_CMD[sw_tool](
         transform=os.path.abspath(xfm_fname),
         reference=tmp_path / "reference.nii.gz",
         moving=tmp_path / "reference.nii.gz",
-        output=tmp_path / "resampled.nii.gz",
+        output=tmp_path / f"{sw_tool}_resampled.nii.gz",
         extra="--output-data-type uchar" if sw_tool == "itk" else "",
     )
 
     exit_code = check_call([cmd], shell=True)
     assert exit_code == 0
-    sw_moved = nb.load("resampled.nii.gz")
+    sw_moved = nb.load(f"{sw_tool}_resampled.nii.gz")
 
     nt_moved = apply(xfm, nii, order=0)
     nt_moved.set_data_dtype(nii.get_data_dtype())
@@ -240,10 +233,6 @@ def test_displacements_field1(
     assert np.sqrt((diff[brainmask] ** 2).mean()) < RMSE_TOL_LINEAR
 
 
-@pytest.mark.xfail(
-    reason="Disable while #266 is developed.",
-    strict=False,
-)
 @pytest.mark.parametrize("sw_tool", ["itk", "afni"])
 def test_displacements_field2(tmp_path, testdata_path, sw_tool):
     """Check a translation-only field on one or more axes, different image orientations."""
