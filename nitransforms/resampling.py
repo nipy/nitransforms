@@ -254,6 +254,7 @@ def apply(
 
     targets = None
     ref_ndcoords = _ref.ndcoords
+
     if hasattr(transform, "to_field") and callable(transform.to_field):
         targets = ImageGrid(spatialimage).index(
             _as_homogeneous(

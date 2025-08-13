@@ -257,6 +257,34 @@ class DenseFieldTransform(TransformBase):
             warnings.warn("Fields are equal, but references do not match.")
         return _eq
 
+    def to_filename(self, filename, fmt="X5", moving=None, x5_inverse=False):
+        """Store the transform in the designated format."""
+
+        if fmt.upper() == "X5":
+            raise TypeError("Please use .to_x5()")
+
+        field = nb.Nifti1Image(
+            self._deltas if self.is_deltas else self._field,
+            self.reference.affine,
+            None,
+        )
+
+        if fmt.lower() == "afni":
+            from nitransforms.io.afni import AFNIDisplacementsField as FieldIOType
+
+        elif fmt.lower() in ("itk", "ants", "elastix"):
+            from nitransforms.io.itk import ITKDisplacementsField as FieldIOType
+
+        elif fmt.lower() == "fsl":
+            from nitransforms.io.fsl import FSLDisplacementsField as FieldIOType
+
+        else:
+            raise NotImplementedError(
+                f"Dense field of type '{fmt}' cannot be converted."
+            )
+
+        FieldIOType.to_image(field).to_filename(filename)
+
     def to_x5(self, metadata=None):
         """Return an :class:`~nitransforms.io.x5.X5Transform` representation."""
         metadata = {"WrittenBy": f"NiTransforms {__version__}"} | (metadata or {})
