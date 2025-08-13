@@ -1,4 +1,5 @@
 """Read/write FSL's transforms."""
+
 import os
 import warnings
 import numpy as np
@@ -41,7 +42,9 @@ class FSLLinearTransform(LinearParameters):
             moving = reference
 
         if reference is None:
-            raise TransformIOError("Cannot build FSL linear transform without a reference")
+            raise TransformIOError(
+                "Cannot build FSL linear transform without a reference"
+            )
 
         reference = _ensure_image(reference)
         moving = _ensure_image(moving)
@@ -78,7 +81,9 @@ class FSLLinearTransform(LinearParameters):
     def to_ras(self, moving=None, reference=None):
         """Return a nitransforms internal RAS+ matrix."""
         if reference is None:
-            raise TransformIOError("Cannot build FSL linear transform without a reference")
+            raise TransformIOError(
+                "Cannot build FSL linear transform without a reference"
+            )
 
         if moving is None:
             warnings.warn(
@@ -180,10 +185,11 @@ class FSLDisplacementsField(DisplacementsField):
         hdr = imgobj.header.copy()
         shape = hdr.get_data_shape()
 
-        if len(shape) != 4 or not shape[-1] in (2, 3):
+        if len(shape) != 4 or shape[-1] not in (2, 3):
             raise TransformFileError(
-                'Displacements field "%s" does not come from FSL.' %
-                imgobj.file_map['image'].filename)
+                'Displacements field "%s" does not come from FSL.'
+                % imgobj.file_map["image"].filename
+            )
 
         field = np.squeeze(np.asanyarray(imgobj.dataobj))
         field[..., 0] *= -1.0

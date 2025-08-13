@@ -8,7 +8,7 @@ from nitransforms.base import SurfaceMesh
 from nitransforms.surface import (
     SurfaceTransformBase,
     SurfaceCoordinateTransform,
-    SurfaceResampler
+    SurfaceResampler,
 )
 
 # def test_surface_transform_npz():
@@ -42,6 +42,7 @@ from nitransforms.surface import (
 #     assert y_none.sum() != y_element.sum()
 #     assert y_none.sum() != y_sum.sum()
 
+
 def test_SurfaceTransformBase(testdata_path):
     # note these transformations are a bit of a weird use of surface transformation, but I'm
     # just testing the base class and the io
@@ -49,7 +50,9 @@ def test_SurfaceTransformBase(testdata_path):
         testdata_path
         / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
     )
-    pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    pial_path = (
+        testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    )
 
     sphere_reg = SurfaceMesh(nb.load(sphere_reg_path))
     pial = SurfaceMesh(nb.load(pial_path))
@@ -78,7 +81,9 @@ def test_SurfaceCoordinateTransform(testdata_path):
         testdata_path
         / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
     )
-    pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    pial_path = (
+        testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    )
     fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
 
     sphere_reg = SurfaceMesh(nb.load(sphere_reg_path))
@@ -91,12 +96,15 @@ def test_SurfaceCoordinateTransform(testdata_path):
 
     # test loading from filenames
     sct = SurfaceCoordinateTransform(pial, sphere_reg)
-    sctf = SurfaceCoordinateTransform.from_filename(reference_path=pial_path,
-                                                    moving_path=sphere_reg_path)
+    sctf = SurfaceCoordinateTransform.from_filename(
+        reference_path=pial_path, moving_path=sphere_reg_path
+    )
     assert sct == sctf
 
     # test mapping
-    assert np.all(sct.map(sct.moving._coords[:100], inverse=True) == sct.reference._coords[:100])
+    assert np.all(
+        sct.map(sct.moving._coords[:100], inverse=True) == sct.reference._coords[:100]
+    )
     assert np.all(sct.map(sct.reference._coords[:100]) == sct.moving._coords[:100])
     with pytest.raises(NotImplementedError):
         sct.map(sct.moving._coords[0])
@@ -119,7 +127,9 @@ def test_SurfaceCoordinateTransformIO(testdata_path, tmpdir):
         testdata_path
         / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
     )
-    pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    pial_path = (
+        testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    )
 
     sct = SurfaceCoordinateTransform(pial_path, sphere_reg_path)
     fn = tempfile.mktemp(suffix=".h5")
@@ -129,7 +139,6 @@ def test_SurfaceCoordinateTransformIO(testdata_path, tmpdir):
 
 
 def test_ProjectUnproject(testdata_path):
-
     sphere_reg_path = (
         testdata_path
         / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsLR_desc-reg_sphere.surf.gii"
@@ -140,10 +149,11 @@ def test_ProjectUnproject(testdata_path):
         / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_space-fsaverage_desc-reg_sphere.surf.gii"
     )
     fslr_fsaverage_sphere_path = (
-        testdata_path
-        / "tpl-fsLR_space-fsaverage_hemi-R_den-32k_sphere.surf.gii"
+        testdata_path / "tpl-fsLR_space-fsaverage_hemi-R_den-32k_sphere.surf.gii"
     )
-    pial_path = testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    pial_path = (
+        testdata_path / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_pial.surf.gii"
+    )
 
     # test project-unproject funcitonality
     projunproj = SurfaceResampler(sphere_reg_path, fslr_sphere_path)
@@ -157,10 +167,7 @@ def test_ProjectUnproject(testdata_path):
 
 def test_SurfaceResampler(testdata_path, tmpdir):
     dif_tol = 0.001
-    fslr_sphere_path = (
-        testdata_path
-        / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
-    )
+    fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
     shape_path = (
         testdata_path
         / "sub-sid000005_ses-budapest_acq-MPRAGE_hemi-R_thickness.shape.gii"
@@ -190,7 +197,9 @@ def test_SurfaceResampler(testdata_path, tmpdir):
     moving = sphere_reg
     # compare results to what connectome workbench produces
     resampling = SurfaceResampler(reference, moving)
-    resampled_thickness = resampling.apply(subj_thickness.agg_data(), normalize='element')
+    resampled_thickness = resampling.apply(
+        subj_thickness.agg_data(), normalize="element"
+    )
     ref_resampled = nb.load(ref_resampled_thickness_path).agg_data()
 
     max_dif = np.abs(resampled_thickness.astype(np.float32) - ref_resampled).max()
@@ -218,13 +227,17 @@ def test_SurfaceResampler(testdata_path, tmpdir):
     assert np.allclose(resampling2.reference._coords, resampling.reference._coords)
     assert np.all(resampling2.moving._triangles == resampling.moving._triangles)
 
-    resampled_thickness2 = resampling2.apply(subj_thickness.agg_data(), normalize='element')
+    resampled_thickness2 = resampling2.apply(
+        subj_thickness.agg_data(), normalize="element"
+    )
     assert np.all(resampled_thickness2 == resampled_thickness)
 
     # test loading with a csr
     assert isinstance(resampling.mat, sparse.csr_array)
     resampling2a = SurfaceResampler(reference, moving, mat=resampling.mat)
-    resampled_thickness2a = resampling2a.apply(subj_thickness.agg_data(), normalize='element')
+    resampled_thickness2a = resampling2a.apply(
+        subj_thickness.agg_data(), normalize="element"
+    )
     assert np.all(resampled_thickness2a == resampled_thickness)
 
     with pytest.raises(ValueError):
@@ -234,8 +247,11 @@ def test_SurfaceResampler(testdata_path, tmpdir):
     assert np.all(resampling.map(np.array([[0, 0, 0]])) == np.array([[0, 0, 0]]))
 
     # test loading from surfaces
-    resampling3 = SurfaceResampler.from_filename(reference_path=fslr_sphere_path,
-                                                 moving_path=sphere_reg_path)
+    resampling3 = SurfaceResampler.from_filename(
+        reference_path=fslr_sphere_path, moving_path=sphere_reg_path
+    )
     assert resampling3 == resampling
-    resampled_thickness3 = resampling3.apply(subj_thickness.agg_data(), normalize='element')
+    resampled_thickness3 = resampling3.apply(
+        subj_thickness.agg_data(), normalize="element"
+    )
     assert np.all(resampled_thickness3 == resampled_thickness)

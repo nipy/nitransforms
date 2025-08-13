@@ -1,6 +1,7 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 """Conversions between formats."""
+
 import numpy as np
 import pytest
 from .. import linear as _l
@@ -109,7 +110,10 @@ def test_lta2fsl_conversions(data_path, fromto, testdata_path):
     ],
 )
 def test_fsl2lta_conversions(
-    data_path, testdata_path, tmp_path, fromto,
+    data_path,
+    testdata_path,
+    tmp_path,
+    fromto,
 ):
     """Check conversions between formats."""
     filename = f"from-{fromto[0]}_to-{fromto[1]}_mode-image"
@@ -119,7 +123,7 @@ def test_fsl2lta_conversions(
         data_path / "regressions" / f"{filename}.fsl",
         reference=testdata_path / f"T1w_{fromto[0]}.nii.gz",
         moving=testdata_path / refname,
-        fmt="fsl"
+        fmt="fsl",
     )
     fsl.to_filename(
         tmp_path / "test.lta",
@@ -134,4 +138,6 @@ def test_fsl2lta_conversions(
         expected_fname = data_path / "regressions" / "".join((filename, ".lta"))
 
     exp_lta = LTA.from_filename(expected_fname)
-    assert np.allclose(converted_lta["xforms"][0]["m_L"], exp_lta["xforms"][0]["m_L"], atol=1e-4)
+    assert np.allclose(
+        converted_lta["xforms"][0]["m_L"], exp_lta["xforms"][0]["m_L"], atol=1e-4
+    )
