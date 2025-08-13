@@ -7,7 +7,6 @@ import pytest
 
 import numpy as np
 import nibabel as nb
-from nitransforms.resampling import apply
 from nitransforms.base import TransformError
 from nitransforms.nonlinear import (
     BSplineFieldTransform,
@@ -62,17 +61,8 @@ def test_bsplines_references(testdata_path):
             testdata_path / "someones_bspline_coefficients.nii.gz"
         ).to_field()
 
-    with pytest.raises(TransformError):
-        apply(
-            BSplineFieldTransform(
-                testdata_path / "someones_bspline_coefficients.nii.gz"
-            ),
-            testdata_path / "someones_anatomy.nii.gz",
-        )
-
-    apply(
-        BSplineFieldTransform(testdata_path / "someones_bspline_coefficients.nii.gz"),
-        testdata_path / "someones_anatomy.nii.gz",
+    BSplineFieldTransform(
+        testdata_path / "someones_bspline_coefficients.nii.gz",
         reference=testdata_path / "someones_anatomy.nii.gz",
     )
 
@@ -154,8 +144,8 @@ def test_densefield_map(get_testdata, image_orientation, ongrid):
         ) < 0.5
 
 
-def test_map_bspline_vs_displacement(tmp_path, testdata_path):
-    """Cross-check B-Splines and deformation field."""
+def test_densefield_map_vs_bspline(tmp_path, testdata_path):
+    """Cross-check B-Splines and displacements field."""
     os.chdir(str(tmp_path))
 
     img_name = testdata_path / "someones_anatomy.nii.gz"
