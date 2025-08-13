@@ -144,8 +144,8 @@ def test_densefield_map(get_testdata, image_orientation, ongrid):
         ) < 0.5
 
 
-def test_map_bspline_vs_displacement(tmp_path, testdata_path):
-    """Cross-check B-Splines and deformation field."""
+def test_densefield_map_vs_bspline(tmp_path, testdata_path):
+    """Cross-check B-Splines and displacements field."""
     os.chdir(str(tmp_path))
 
     img_name = testdata_path / "someones_anatomy.nii.gz"
