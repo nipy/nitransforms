@@ -38,6 +38,13 @@ def test_displacements_init():
         )
 
 
+@pytest.mark.parametrize("size", [(20, 20, 20), (20, 20, 20, 2, 3), (20, 20, 20, 1, 4)])
+def test_displacements_bad_sizes(size):
+    """Checks field sizes."""
+    with pytest.raises(TransformError):
+        DenseFieldTransform(nb.Nifti1Image(np.zeros(size), np.eye(4), None))
+
+
 def test_bsplines_init():
     with pytest.raises(TransformError):
         BSplineFieldTransform(
