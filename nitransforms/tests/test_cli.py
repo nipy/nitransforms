@@ -6,8 +6,11 @@ import pytest
 from ..cli import cli_apply, main as ntcli
 
 if os.getenv("PYTEST_XDIST_WORKER"):
-    breaks_on_xdist = pytest.mark.skip(reason="xdist is active; rerun without to run this test.")
+    breaks_on_xdist = pytest.mark.skip(
+        reason="xdist is active; rerun without to run this test."
+    )
 else:
+
     def breaks_on_xdist(test):
         return test
 

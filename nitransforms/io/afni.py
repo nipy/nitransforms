@@ -1,4 +1,5 @@
 """Read/write AFNI's transforms."""
+
 from math import pi
 import numpy as np
 from nibabel.affines import (
@@ -132,15 +133,16 @@ class AFNILinearTransformArray(BaseLinearTransformList):
         """Return a nitransforms' internal RAS matrix."""
 
         pre_rotation = post_rotation = np.eye(4)
-        if reference is not None and _is_oblique(ref_aff := _ensure_image(reference).affine):
+        if reference is not None and _is_oblique(
+            ref_aff := _ensure_image(reference).affine
+        ):
             pre_rotation = _cardinal_rotation(ref_aff, True)
         if moving is not None and _is_oblique(mov_aff := _ensure_image(moving).affine):
             post_rotation = _cardinal_rotation(mov_aff, False)
 
-        return np.stack([
-            post_rotation @ (xfm.to_ras() @ pre_rotation)
-            for xfm in self.xforms
-        ])
+        return np.stack(
+            [post_rotation @ (xfm.to_ras() @ pre_rotation) for xfm in self.xforms]
+        )
 
     def to_string(self):
         """Convert to a string directly writeable to file."""
@@ -161,7 +163,9 @@ class AFNILinearTransformArray(BaseLinearTransformList):
 
         pre_rotation = post_rotation = np.eye(4)
 
-        if reference is not None and _is_oblique(ref_aff := _ensure_image(reference).affine):
+        if reference is not None and _is_oblique(
+            ref_aff := _ensure_image(reference).affine
+        ):
             pre_rotation = _cardinal_rotation(ref_aff, False)
         if moving is not None and _is_oblique(mov_aff := _ensure_image(moving).affine):
             post_rotation = _cardinal_rotation(mov_aff, True)
@@ -198,7 +202,7 @@ class AFNIDisplacementsField(DisplacementsField):
         hdr = imgobj.header.copy()
         shape = hdr.get_data_shape()
 
-        if len(shape) != 5 or shape[-2] != 1 or not shape[-1] in (2, 3):
+        if len(shape) != 5 or shape[-2] != 1 or shape[-1] not in (2, 3):
             raise TransformFileError(
                 'Displacements field "%s" does not come from AFNI.'
                 % imgobj.file_map["image"].filename

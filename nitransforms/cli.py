@@ -32,8 +32,8 @@ def cli_apply(pargs):
 
     xfm = (
         nlinload(pargs.transform, fmt=fmt)
-        if pargs.nonlinear else
-        linload(pargs.transform, fmt=fmt)
+        if pargs.nonlinear
+        else linload(pargs.transform, fmt=fmt)
     )
 
     # ensure a reference is set

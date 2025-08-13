@@ -1,4 +1,5 @@
 """py.test configuration."""
+
 import os
 from pathlib import Path
 import numpy as np
@@ -64,7 +65,9 @@ def _reorient(path):
     newaff = imgaff.copy()
     newaff[0, 0] *= -1.0
     newaff[0, 3] = imgaff.dot(np.hstack((np.array(img.shape[:3]) - 1, 1.0)))[0]
-    _data["LAS"] = nb.Nifti1Image(np.flip(np.asanyarray(img.dataobj), 0), newaff, img.header)
+    _data["LAS"] = nb.Nifti1Image(
+        np.flip(np.asanyarray(img.dataobj), 0), newaff, img.header
+    )
     _data["LAS"].set_data_dtype(img.get_data_dtype())
     newaff = imgaff.copy()
     newaff[0, 0] *= -1.0
