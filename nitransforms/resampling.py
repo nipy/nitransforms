@@ -19,6 +19,7 @@ import numpy as np
 from nibabel.loadsave import load as _nbload
 from nibabel.arrayproxy import get_obj_dtype
 from nibabel.spatialimages import SpatialImage
+from nibabel.funcs import squeeze_image
 from scipy import ndimage as ndi
 
 from nitransforms.base import (
@@ -232,6 +233,8 @@ def apply(
 
     if isinstance(spatialimage, (str, Path)):
         spatialimage = _nbload(str(spatialimage))
+
+    spatialimage = squeeze_image(spatialimage)
 
     # Avoid opening the data array just yet
     input_dtype = cap_dtype(get_obj_dtype(spatialimage.dataobj), dtype_width)
