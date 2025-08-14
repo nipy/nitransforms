@@ -234,6 +234,7 @@ def apply(
     if isinstance(spatialimage, (str, Path)):
         spatialimage = _nbload(str(spatialimage))
 
+    singleton_4d = spatialimage.ndim == 4 and spatialimage.shape[-1] == 1
     spatialimage = squeeze_image(spatialimage)
 
     # Avoid opening the data array just yet
@@ -370,7 +371,8 @@ def apply(
             with suppress(ValueError):
                 resampled = np.squeeze(resampled, axis=3)
 
-        moved = spatialimage.__class__(resampled, _ref.affine, hdr)
+        moved = spatialimage.__class__(
+            resampled[..., None] if singleton_4d else resampled, _ref.affine, hdr)
         return moved
 
     output_dtype = output_dtype or input_dtype
