@@ -27,8 +27,7 @@ from nitransforms import nonlinear as nitnl
 from nitransforms.conftest import _datadir, _testdir
 from nitransforms.tests.utils import get_points
 
-rng = np.random.default_rng()
-
+RNG_SEED = 202508140819
 LPS = np.diag([-1, -1, 1, 1])
 ITK_MAT = LPS.dot(np.ones((4, 4)).dot(LPS))
 
@@ -386,6 +385,8 @@ def test_itk_h5_field_order_fortran(tmp_path):
 @pytest.mark.parametrize("ongrid", [True, False])
 def test_densefield_map_vs_ants(testdata_path, tmp_path, ongrid):
     """Map points with DenseFieldTransform and compare to ANTs."""
+
+    rng = np.random.default_rng(RNG_SEED)
     warpfile = (
         testdata_path
         / "regressions"
@@ -451,3 +452,104 @@ def test_densefield_map_vs_ants(testdata_path, tmp_path, ongrid):
     atol = 0 if ongrid else 1e-1
     rtol = 1e-4 if ongrid else 1e-3
     np.testing.assert_allclose(mapped, ants_pts, atol=atol, rtol=rtol)
+
+
+@pytest.mark.parametrize("image_orientation", ["RAS", "LAS", "LPS", "oblique"])
+@pytest.mark.parametrize("ongrid", [True, False])
+def test_constant_field_vs_ants(tmp_path, get_testdata, image_orientation, ongrid):
+    """Create a constant displacement field and compare mappings."""
+
+    rng = np.random.default_rng(RNG_SEED)
+
+    nii = get_testdata[image_orientation]
+
+    # Get sampling indices
+    coords_xyz, points_ijk, grid_xyz, shape, ref_affine, reference, subsample = (
+        get_points(nii, ongrid, npoints=5, rng=rng)
+    )
+
+    tol = (
+        {"atol": 0, "rtol": 1e-4}
+        if image_orientation != "oblique"
+        else {"atol": 1e-4, "rtol": 1e-2}
+    )
+    coords_map = grid_xyz.reshape(*shape, 3)
+
+    deltas = np.hstack(
+        (
+            np.zeros(np.prod(shape)),
+            np.linspace(-80, 80, num=np.prod(shape)),
+            np.linspace(-50, 50, num=np.prod(shape)),
+        )
+    ).reshape(shape + (3,))
+    gold_mapped_xyz = coords_map + deltas
+
+    fieldnii = nb.Nifti1Image(deltas, ref_affine, None)
+    warpfile = tmp_path / "itk_transform.nii.gz"
+
+    # Ensure direct (xfm) and ITK roundtrip (itk_xfm) are equivalent
+    xfm = nitnl.DenseFieldTransform(fieldnii)
+    xfm.to_filename(warpfile, fmt="itk")
+    itk_xfm = nitnl.DenseFieldTransform(ITKDisplacementsField.from_filename(warpfile))
+
+    np.testing.assert_allclose(xfm.reference.affine, itk_xfm.reference.affine)
+    np.testing.assert_allclose(ref_affine, itk_xfm.reference.affine)
+    np.testing.assert_allclose(xfm.reference.shape, itk_xfm.reference.shape)
+    np.testing.assert_allclose(xfm._field, itk_xfm._field, **tol)
+    if image_orientation != "oblique":
+        assert xfm == itk_xfm
+
+    # Ensure deltas and mapped grid are equivalent
+    orig_grid_mapped_xyz = xfm.map(grid_xyz).reshape(*shape, -1)
+    np.testing.assert_allclose(gold_mapped_xyz, orig_grid_mapped_xyz)
+
+    # Test ANTs mapping
+    grid_mapped_xyz = itk_xfm.map(grid_xyz).reshape(*shape, -1)
+
+    # Check apparent healthiness of mapping
+    np.testing.assert_allclose(gold_mapped_xyz, grid_mapped_xyz, **tol)
+    np.testing.assert_allclose(orig_grid_mapped_xyz, grid_mapped_xyz, **tol)
+
+    csvout = tmp_path / "mapped_xyz.csv"
+    csvin = tmp_path / "coords_xyz.csv"
+    # antsApplyTransformsToPoints wants LPS coordinates, see last post at
+    # http://sourceforge.net/p/advants/discussion/840261/thread/2a1e9307/
+    lps_xyz = coords_xyz.copy() * (-1, -1, 1)
+    np.savetxt(csvin, lps_xyz, delimiter=",", header="x,y,z", comments="")
+
+    cmd = f"antsApplyTransformsToPoints -d 3 -i {csvin} -o {csvout} -t {warpfile}"
+    exe = cmd.split()[0]
+    if not shutil.which(exe):
+        pytest.skip(f"Command {exe} not found on host")
+    check_call(cmd, shell=True)
+
+    ants_res = np.genfromtxt(csvout, delimiter=",", names=True)
+    # antsApplyTransformsToPoints writes LPS coordinates, see last post at
+    # http://sourceforge.net/p/advants/discussion/840261/thread/2a1e9307/
+    ants_pts = np.vstack([ants_res[n] for n in ("x", "y", "z")]).T * (-1, -1, 1)
+
+    nb.Nifti1Image(grid_mapped_xyz, ref_affine, None).to_filename(
+        tmp_path / "grid_mapped.nii.gz"
+    )
+    nb.Nifti1Image(coords_map, ref_affine, None).to_filename(
+        tmp_path / "baseline_field.nii.gz"
+    )
+    nb.Nifti1Image(gold_mapped_xyz, ref_affine, None).to_filename(
+        tmp_path / "gold_mapped_xyz.nii.gz"
+    )
+
+    if ongrid:
+        ants_pts = ants_pts.reshape(*shape, 3)
+
+        nb.Nifti1Image(ants_pts, ref_affine, None).to_filename(
+            tmp_path / "ants_mapped_xyz.nii.gz"
+        )
+        np.testing.assert_allclose(gold_mapped_xyz, ants_pts, rtol=1e-2, atol=1e-3)
+        np.testing.assert_allclose(deltas, ants_pts - coords_map, rtol=1e-2, atol=1e-3)
+    else:
+        # TODO Change test to norms and investigate extreme cases
+        # We're likely hitting OBB points (see gh-188)
+        # https://github.com/nipy/nitransforms/pull/188
+        np.testing.assert_allclose(
+            xfm.map(coords_xyz) - coords_xyz, ants_pts - coords_xyz, rtol=1, atol=1
+        )
