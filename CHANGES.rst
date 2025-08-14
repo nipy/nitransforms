@@ -1,3 +1,23 @@
+25.0.1 (August 14, 2025)
+========================
+A patch release addressing a critical issue in the ``ImageGrid`` class relating coordinates,
+and bolstered the testing of ANTs' generated displacements fields by cross-comparing against
+``antsApplyTransformsToPoints`` in several new tests.
+
+CHANGES
+-------
+* FIX: ``ImageGrid._coords`` was somehow overwritten + re-enable tests by @oesteban in https://github.com/nipy/nitransforms/pull/276
+* FIX: Revision of index and RAS coordinate grids generation by @oesteban in https://github.com/nipy/nitransforms/pull/271
+* ENH: Implement ITK densefields checks vs ``antsApplyTransformsToPoints`` by @oesteban in https://github.com/nipy/nitransforms/pull/277
+* ENH: Add unit test on dense fields (extracted from #266) by @oesteban in https://github.com/nipy/nitransforms/pull/274
+* RF: Move tests to better locations by @oesteban in https://github.com/nipy/nitransforms/pull/272
+* MNT: Minimal housekeeping of tests by @oesteban in https://github.com/nipy/nitransforms/pull/275
+* MNT: Fix coverage XML path in CircleCI by @oesteban in https://github.com/nipy/nitransforms/pull/265
+* MNT: Add test cases demonstrating ordering bug reading composite ITK's HDF5 files by @oesteban in https://github.com/nipy/nitransforms/pull/263
+* STY: Run ruff at the source root by @oesteban in https://github.com/nipy/nitransforms/pull/273
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/25.0.0...25.0.1
+
 25.0.0 (July 22, 2025)
 ======================
 A new major release introducing critical fixes and important new functionality.
@@ -10,7 +30,7 @@ CHANGES
 -------
 * FIX: BSpline mapping of individual points by @oesteban in https://github.com/nipy/nitransforms/pull/256
 * FIX: Remove implementation of an abstract class by @oesteban in https://github.com/nipy/nitransforms/pull/255
-* FIX: Add test for `DenseFieldTransform` handling of OOB points by @oesteban in https://github.com/nipy/nitransforms/pull/254
+* FIX: Add test for ``DenseFieldTransform`` handling of OOB points by @oesteban in https://github.com/nipy/nitransforms/pull/254
 * ENH: X5 read/write support of ``TransformChain`` by @oesteban in https://github.com/nipy/nitransforms/pull/253
 * ENH: Loading of X5 (linear) transforms by @oesteban in https://github.com/nipy/nitransforms/pull/243
 * ENH: Implement X5 representation and output to filesystem by @oesteban in https://github.com/nipy/nitransforms/pull/241
