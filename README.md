@@ -29,6 +29,11 @@ Compatibility between software tools and imaging formats is a necessary bridge
 to ensure the reproducibility of results and enable the optimization and evaluation
 of current image processing and analysis workflows.
 
+## BIDS' X5 format
+As of [the 25.0.0 release](https://github.com/nipy/nitransforms/releases/tag/25.0.0),
+*NiTransforms* experimentally supports writing X5 transform files, as drafted in the
+BIDS Extension Proposal 14 (BEP014).
+
 ## Integration with *NiBabel*
 *NiTransforms* started as a feature-repo spun off of *NiBabel*.
 Shortly after starting with [nipy/nibabel#656](https://github.com/nipy/nibabel/pull/656), it became apparent that it was going to build up in a humongous PR nobody would be able to review as thoroughly as it would require.
