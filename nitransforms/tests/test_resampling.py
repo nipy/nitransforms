@@ -57,7 +57,8 @@ def test_apply_singleton_time_dimension():
     data = np.reshape(np.arange(27, dtype=np.uint8), (3, 3, 3, 1))
     nii = nb.Nifti1Image(data, np.eye(4))
     xfm = nitl.Affine(np.eye(4), reference=nii)
-    apply(xfm, nii)
+    movednii = apply(xfm, nii)
+    assert movednii.shape == nii.shape
 
 
 @pytest.mark.parametrize(
