@@ -10,33 +10,19 @@ jobs:
 
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - env-v6-{{ .Branch }}-
-            - env-v6-master-
-            - env-v6-
+      - run:
+          name: Ensure uv is present
+          command: uv -V || curl -LsSf https://astral.sh/uv/install.sh | sh
       - run:
           name: Setup git-annex
           command: |
-              sudo apt update && sudo apt-get install apt-transport-https ca-certificates -y && sudo update-ca-certificates
-              if [[ ! -d /opt/circleci/git-annex.linux ]]; then
-                cd /tmp
-                wget https://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz
-                tar xzf git-annex-standalone-amd64.tar.gz -C /opt/circleci/
-              fi
+              uv tool install git-annex
               git config --global user.name 'NiPy'
               git config --global user.email 'nipreps@gmail.com'
       - run:
           name: Setup DataLad
           command: |
-              python3 -m pip install --no-cache-dir -U pip "setuptools >= 45.0" "setuptools_scm[toml] >= 6.2"
-              python3 -m pip install --no-cache-dir -U datalad datalad-osf
-
-      - save_cache:
-          key: env-v6-{{ .Branch }}-{{ .BuildNum }}
-          paths:
-            - /opt/circleci/git-annex.linux
-            - /opt/circleci/.pyenv/versions
+              uv tool install --with-executables-from=datalad-osf,datalad-next datalad
 
       - restore_cache:
           keys:
@@ -46,9 +32,6 @@ jobs:
       - run:
           name: Install test data from GIN
           command: |
-              export PATH=/opt/circleci/git-annex.linux:$PATH
-              pyenv local 3
-              eval "$(pyenv init --path)"
               mkdir -p /tmp/data
               cd /tmp/data
               datalad install -r https://gin.g-node.org/oesteban/nitransforms-tests
@@ -99,7 +82,7 @@ jobs:
                   -t nitransforms:latest \
                   --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
                   --build-arg VCS_REF=`git rev-parse --short HEAD` \
-                  --build-arg VERSION=$( python3 -m setuptools_scm ) . \
+                  --build-arg VERSION=$( uv run --no-project -w setuptools_scm -m setuptools_scm ) . \
                   && e=0 && break || sleep 15
               done && [ "$e" -eq "0" ]
               docker tag nitransforms:latest localhost:5000/nitransforms
@@ -116,7 +99,7 @@ jobs:
       - run:
           name: Check version packaged in Docker image
           command: |
-              THISVERSION=${CIRCLE_TAG:-$(python3 -m setuptools_scm)}
+              THISVERSION=${CIRCLE_TAG:-$( uv run --no-project -w setuptools_scm -m setuptools_scm )}
               INSTALLED_VERSION=$(\
                 docker run -it --rm --entrypoint=python nitransforms \
                     -c 'import nitransforms as nit; print(nit.__version__, end="")' )
