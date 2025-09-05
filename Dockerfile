@@ -4,12 +4,10 @@ ARG BASE_IMAGE=ubuntu:jammy-20240125
 #
 # Build wheel
 #
-FROM python:slim AS src
-RUN pip install build
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends git
+FROM ghcr.io/astral-sh/uv:python3.13-alpine AS src
+RUN apk add git
 COPY . /src
-RUN python -m build /src
+RUN uv build --wheel /src
 
 #
 # Download stages
