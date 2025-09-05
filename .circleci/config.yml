@@ -10,33 +10,19 @@ jobs:
 
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - env-v6-{{ .Branch }}-
-            - env-v6-master-
-            - env-v6-
+      - run:
+          name: Ensure uv is present
+          command: uv -V || curl -LsSf https://astral.sh/uv/install.sh | sh
       - run:
           name: Setup git-annex
           command: |
-              sudo apt update && sudo apt-get install apt-transport-https ca-certificates -y && sudo update-ca-certificates
-              if [[ ! -d /opt/circleci/git-annex.linux ]]; then
-                cd /tmp
-                wget https://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz
-                tar xzf git-annex-standalone-amd64.tar.gz -C /opt/circleci/
-              fi
+              uv tool install git-annex
               git config --global user.name 'NiPy'
               git config --global user.email 'nipreps@gmail.com'
       - run:
           name: Setup DataLad
           command: |
-              python3 -m pip install --no-cache-dir -U pip "setuptools >= 45.0" "setuptools_scm[toml] >= 6.2"
-              python3 -m pip install --no-cache-dir -U datalad datalad-osf
-
-      - save_cache:
-          key: env-v6-{{ .Branch }}-{{ .BuildNum }}
-          paths:
-            - /opt/circleci/git-annex.linux
-            - /opt/circleci/.pyenv/versions
+              uv tool install --with-executables-from=datalad-osf,datalad-next datalad
 
       - restore_cache:
           keys:
@@ -46,9 +32,6 @@ jobs:
       - run:
           name: Install test data from GIN
           command: |
-              export PATH=/opt/circleci/git-annex.linux:$PATH
-              pyenv local 3
-              eval "$(pyenv init --path)"
               mkdir -p /tmp/data
               cd /tmp/data
               datalad install -r https://gin.g-node.org/oesteban/nitransforms-tests
@@ -61,10 +44,10 @@ jobs:
 
       - restore_cache:
           keys:
-            - build-v1-{{ .Branch }}-{{ epoch }}
-            - build-v1-{{ .Branch }}-
-            - build-v1-master-
-            - build-v1-
+            - build-v2-{{ .Branch }}-{{ epoch }}
+            - build-v2-{{ .Branch }}-
+            - build-v2-master-
+            - build-v2-
           paths:
             - /tmp/docker
       - run:
@@ -81,13 +64,13 @@ jobs:
               set -e
               if [[ "$success" = "0" ]]; then
                   echo "Pulling from local registry"
-                  docker tag localhost:5000/ubuntu ubuntu:xenial-20200114
+                  docker tag localhost:5000/ubuntu ubuntu:jammy-20250730
                   docker pull localhost:5000/nitransforms
                   docker tag localhost:5000/nitransforms nitransforms:latest
               else
                   echo "Pulling from Docker Hub"
-                  docker pull ubuntu:xenial-20200114
-                  docker tag ubuntu:xenial-20200114 localhost:5000/ubuntu
+                  docker pull ubuntu:jammy-20250730
+                  docker tag ubuntu:jammy-20250730 localhost:5000/ubuntu
                   docker push localhost:5000/ubuntu
               fi
       - run:
@@ -99,7 +82,7 @@ jobs:
                   -t nitransforms:latest \
                   --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
                   --build-arg VCS_REF=`git rev-parse --short HEAD` \
-                  --build-arg VERSION=$( python3 -m setuptools_scm ) . \
+                  --build-arg VERSION=$( uv run --no-project -w setuptools_scm -m setuptools_scm ) . \
                   && e=0 && break || sleep 15
               done && [ "$e" -eq "0" ]
               docker tag nitransforms:latest localhost:5000/nitransforms
@@ -110,13 +93,13 @@ jobs:
               docker exec -it registry /bin/registry garbage-collect --delete-untagged \
                   /etc/docker/registry/config.yml
       - save_cache:
-          key: build-v1-{{ .Branch }}-{{ epoch }}
+          key: build-v2-{{ .Branch }}-{{ epoch }}
           paths:
             - /tmp/docker
       - run:
           name: Check version packaged in Docker image
           command: |
-              THISVERSION=${CIRCLE_TAG:-$(python3 -m setuptools_scm)}
+              THISVERSION=${CIRCLE_TAG:-$( uv run --no-project -w setuptools_scm -m setuptools_scm )}
               INSTALLED_VERSION=$(\
                 docker run -it --rm --entrypoint=python nitransforms \
                     -c 'import nitransforms as nit; print(nit.__version__, end="")' )
@@ -141,10 +124,11 @@ jobs:
               -w /src/nitransforms -v $PWD:/src/nitransforms \
               -v /tmp/data/nitransforms-tests:/data -e TEST_DATA_HOME=/data \
               -e COVERAGE_FILE=/tmp/coverage/.pytest.coverage \
-              -v /tmp/fslicense/license.txt:/opt/freesurfer/license.txt:ro \
+              -v /tmp/fslicense/license.txt:/usr/local/freesurfer/license.txt:ro \
               -v /tmp/tests:/tmp nitransforms:latest \
               pytest --junit-xml=/tmp/summaries/pytest.xml \
                      --cov nitransforms --cov-report xml:/tmp/coverage/unittests.xml \
+                     -n auto \
                      nitransforms/
       - run:
           name: Submit unit test coverage

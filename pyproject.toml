@@ -20,9 +20,9 @@ description = "NiTransforms -- Neuroimaging spatial transforms in Python."
 license = {text = "MIT License"}
 requires-python = ">= 3.10"
 dependencies = [
-    "numpy >= 2.1",
-    "scipy >= 1.8",
-    "nibabel >= 5.2",
+    "numpy >= 2.0",
+    "scipy >= 1.10",
+    "nibabel >= 5.1.1",
     "h5py >= 3.11",
 ]
 dynamic = ["version"]
