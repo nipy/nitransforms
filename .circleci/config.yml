@@ -128,6 +128,7 @@ jobs:
               -v /tmp/tests:/tmp nitransforms:latest \
               pytest --junit-xml=/tmp/summaries/pytest.xml \
                      --cov nitransforms --cov-report xml:/tmp/coverage/unittests.xml \
+                     -n auto \
                      nitransforms/
       - run:
           name: Submit unit test coverage
