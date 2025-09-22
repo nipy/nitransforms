@@ -1,3 +1,23 @@
+25.1.0 (September 22, 2025)
+===========================
+A new feature release in the 25.1.x series.
+
+Version 25.0.1 introduced a backwards-incompatible transposition of coordinate arrays.
+That version will be yanked from PyPI, which will mean that installers will skip over it
+unless specifically requested.
+
+This version requires NumPy 2.0, SciPy 1.10 and h5py 3.11 or later.
+
+CHANGES
+-------
+* FIX: ``apply()`` fails with 4D singleton images by @oesteban in https://github.com/nipy/nitransforms/pull/278
+* FIX: Respect singleton 4th-D by @oesteban in https://github.com/nipy/nitransforms/pull/279
+* FIX: Remove "densification" of B-Spline transforms in ``apply()`` by @oesteban in https://github.com/nipy/nitransforms/pull/280
+* MNT: Relax dependencies to numpy 2.0 compatibility by @effigies in https://github.com/nipy/nitransforms/pull/284
+
+**Full Changelog**: https://github.com/nipy/nitransforms/compare/25.0.1...25.1.0
+
+
 25.0.1 (August 14, 2025)
 ========================
 A patch release addressing a critical issue in the ``ImageGrid`` class relating coordinates,
