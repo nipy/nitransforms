@@ -29,7 +29,7 @@ jobs:
       SHA: ${{ steps.test-head.outputs.SHA }}
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - name: Git settings (pacify DataLad)
         run: |
           git config --global user.name 'NiPreps Bot'
@@ -87,7 +87,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - uses: actions/cache/restore@v4
         with:
           path: ${{ env.TEST_DATA_HOME }}
@@ -120,7 +120,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - name: Show tox config
         run: uvx tox c
       - name: Show tox config (this call)
