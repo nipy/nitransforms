@@ -82,7 +82,7 @@ jobs:
       DEPENDS: ${{ matrix.dependencies }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
@@ -93,7 +93,7 @@ jobs:
           path: ${{ env.TEST_DATA_HOME }}
           key: data-cache-v2-${{ needs.cache-test-data.outputs.SHA }}
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Display Python version
@@ -118,7 +118,7 @@ jobs:
         check: ['style']
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v7
       - name: Show tox config
