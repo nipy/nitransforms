@@ -34,10 +34,13 @@ jobs:
         run: |
           git config --global user.name 'NiPreps Bot'
           git config --global user.email 'nipreps@gmail.com'
-      - name: Install DataLad
+      - name: Install git-annex and DataLad
         run: |
-          $CONDA/bin/conda install -c conda-forge git-annex
-          uv tool install --with=datalad-next --with=datalad-osf datalad
+          uv tool install \
+            --with-executables-from=git-annex \
+            --with-executables-from=datalad-next \
+            --with-executables-from=datalad-osf \
+            datalad
       - name: Check remote HEAD
         id: test-head
         run: |
