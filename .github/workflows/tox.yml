@@ -34,17 +34,20 @@ jobs:
         run: |
           git config --global user.name 'NiPreps Bot'
           git config --global user.email 'nipreps@gmail.com'
-      - name: Install DataLad
+      - name: Install git-annex and DataLad
         run: |
-          $CONDA/bin/conda install -c conda-forge git-annex
-          uv tool install --with=datalad-next --with=datalad-osf datalad
+          uv tool install \
+            --with-executables-from=git-annex \
+            --with-executables-from=datalad-next \
+            --with-executables-from=datalad-osf \
+            datalad
       - name: Check remote HEAD
         id: test-head
         run: |
           git ls-remote https://gin.g-node.org/oesteban/nitransforms-tests \
             | awk '/HEAD/{ print "SHA=" $1 }' >> $GITHUB_OUTPUT
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ${{ env.TEST_DATA_HOME }}
           key: data-cache-v2-${{ steps.test-head.outputs.SHA }}
@@ -82,18 +85,18 @@ jobs:
       DEPENDS: ${{ matrix.dependencies }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v7
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v5
         with:
           path: ${{ env.TEST_DATA_HOME }}
           key: data-cache-v2-${{ needs.cache-test-data.outputs.SHA }}
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Display Python version
@@ -118,7 +121,7 @@ jobs:
         check: ['style']
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v7
       - name: Show tox config
