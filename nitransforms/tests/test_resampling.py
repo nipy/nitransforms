@@ -376,26 +376,85 @@ def test_LinearTransformsMapping_apply(
         )
 
 
+def _assert_apply(img, xfm, expected, **kwargs):
+    """Apply ``xfm`` to ``img`` and check each output volume.
+
+    ``expected`` is a list of ``((i, j, k), value)`` pairs, one per output volume.
+    """
+    data = np.asanyarray(apply(xfm, img, order=0, reference=img, **kwargs).dataobj)
+    is_4d = data.ndim == 4
+    assert data.shape == img.shape[:3] + ((len(expected),) if is_4d else ())
+    for vol, (loc, value) in enumerate(expected):
+        volume = data[..., vol] if is_4d else data
+        assert tuple(np.argwhere(volume)[0]) == loc
+        assert volume[loc] == value
+
+
+def test_apply_3d():
+    """Resample a single 3D volume through a single 3D transform."""
+    base = np.zeros((10, 5, 5), dtype=np.float32)
+    base[9, 2, 2] = 7
+    img = nb.Nifti1Image(base, np.eye(4))
+
+    mat = np.eye(4)
+    mat[0, 3] = 1  # shift by one voxel along x
+    _assert_apply(img, nitl.Affine(mat), [((8, 2, 2), 7)])
+
+
+@pytest.mark.parametrize("serialize_4d", [True, False])
+def test_apply_3d_transform_4d_data(serialize_4d):
+    """Regression test for a single 3D transform applied to 4D data."""
+    nvols = 9
+    base = np.zeros((10, 5, 5), dtype=np.float32)
+    base[9, 2, 2] = 1
+    # Distinguish volumes so a per-volume mix-up would be caught
+    img = nb.Nifti1Image(
+        np.stack([(vol + 1) * base for vol in range(nvols)], axis=-1), np.eye(4)
+    )
+    kwargs = {} if serialize_4d else {"serialize_nvols": nvols + 1}
+
+    mat = np.eye(4)
+    mat[0, 3] = 1  # single shift broadcast over all volumes
+    expected = [((8, 2, 2), vol + 1) for vol in range(nvols)]
+    _assert_apply(img, nitl.Affine(mat), expected, **kwargs)
+
+
+@pytest.mark.parametrize("serialize_4d", [True, False])
+def test_apply_4d_transform_3d_data(serialize_4d):
+    """Regression test for a 4D transform applied to a single 3D volume."""
+    nvols = 9
+    base = np.zeros((10, 5, 5), dtype=np.float32)
+    base[9, 2, 2] = 1
+    img = nb.Nifti1Image(base, np.eye(4))
+    kwargs = {} if serialize_4d else {"serialize_nvols": nvols + 1}
+
+    # A distinct shift per output volume, all sampling the same 3D image
+    transforms = []
+    for vol in range(nvols):
+        mat = np.eye(4)
+        mat[0, 3] = vol
+        transforms.append(nitl.Affine(mat))
+    xfm = nitl.LinearTransformsMapping(transforms, reference=img)
+
+    expected = [((9 - vol, 2, 2), 1) for vol in range(nvols)]
+    _assert_apply(img, xfm, expected, **kwargs)
+
+
 @pytest.mark.parametrize("serialize_4d", [True, False])
 def test_apply_4d(serialize_4d):
     """Regression test for per-volume transforms with serialized resampling."""
     nvols = 9
-    shape = (10, 5, 5)
-    base = np.zeros(shape, dtype=np.float32)
+    base = np.zeros((10, 5, 5), dtype=np.float32)
     base[9, 2, 2] = 1
     img = nb.Nifti1Image(np.stack([base] * nvols, axis=-1), np.eye(4))
+    kwargs = {} if serialize_4d else {"serialize_nvols": nvols + 1}
 
     transforms = []
-    for i in range(nvols):
+    for vol in range(nvols):
         mat = np.eye(4)
-        mat[0, 3] = i
+        mat[0, 3] = vol
         transforms.append(nitl.Affine(mat))
-
-    extraparams = {} if serialize_4d else {"serialize_nvols": nvols + 1}
-
     xfm = nitl.LinearTransformsMapping(transforms, reference=img)
 
-    moved = apply(xfm, img, order=0, **extraparams)
-    data = np.asanyarray(moved.dataobj)
-    idxs = [tuple(np.argwhere(data[..., i])[0]) for i in range(nvols)]
-    assert idxs == [(9 - i, 2, 2) for i in range(nvols)]
+    expected = [((9 - vol, 2, 2), 1) for vol in range(nvols)]
+    _assert_apply(img, xfm, expected, **kwargs)
