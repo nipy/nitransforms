@@ -46,9 +46,6 @@ async def _apply_serial(
     data: np.ndarray,
     spatialimage: SpatialImage,
     targets: np.ndarray,
-    transform: TransformBase,
-    ref_ndim: int,
-    ref_ndcoords: np.ndarray,
     n_resamplings: int,
     output: np.ndarray,
     input_dtype: np.dtype,
@@ -69,14 +66,8 @@ async def _apply_serial(
         The image object containing the data to be resampled in reference
         space
     targets : :obj:`~numpy.ndarray`
-        The target coordinates for mapping.
-    transform : :obj:`~nitransforms.base.TransformBase`
-        The 3D, 3D+t, or 4D transform through which data will be resampled.
-    ref_ndim : :obj:`int`
-        Dimensionality of the resampling target (reference image).
-    ref_ndcoords : :obj:`~numpy.ndarray`
-        Physical coordinates (RAS+) where data will be interpolated, if the resampling
-        target is a grid, the scanner coordinates of all voxels.
+        The precomputed target coordinates for mapping, with shape
+        ``(n_xfms, n_dim, n_vox)``.
     n_resamplings : :obj:`int`
         Total number of 3D resamplings (can be defined by the input image, the transform,
         or be matched, that is, same number of volumes in the input and number of transforms).
@@ -110,16 +101,9 @@ async def _apply_serial(
     semaphore = asyncio.Semaphore(max_concurrent)
 
     for t in range(n_resamplings):
-        xfm_t = (
-            transform if (n_resamplings == 1 or transform.ndim < 4) else transform[t]
-        )
-
-        if targets is None:
-            targets_t = ImageGrid(spatialimage).index(
-                _as_homogeneous(xfm_t.map(ref_ndcoords), dim=ref_ndim)
-            )
-        else:
-            targets_t = targets[t if targets.shape[0] > 1 else 0, ...]
+        # A 4D transform has one coordinate set per volume; a 3D transform has a
+        # single set (shape[0] == 1) reused for every volume.
+        targets_t = targets[t if targets.shape[0] > 1 else 0, ...]
 
         data_t = (
             data
@@ -290,9 +274,6 @@ def apply(
                 data,
                 spatialimage,
                 targets,
-                transform,
-                _ref.ndim,
-                ref_ndcoords,
                 n_resamplings,
                 resampled,
                 input_dtype,
