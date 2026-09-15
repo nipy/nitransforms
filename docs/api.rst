@@ -5,11 +5,13 @@ Information on specific functions, classes, and methods for developers.
 .. toctree::
    :maxdepth: 1
 
+   _api/analysis
    _api/base
+   _api/interp
    _api/io
    _api/linear
    _api/manip
    _api/nonlinear
-   _api/surface
-   _api/interp
    _api/patched
+   _api/resampling
+   _api/surface
