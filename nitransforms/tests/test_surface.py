@@ -138,6 +138,7 @@ def test_SurfaceCoordinateTransformIO(testdata_path, tmpdir):
     assert sct == sct2
 
 
+@pytest.mark.slow
 def test_ProjectUnproject(testdata_path):
     sphere_reg_path = (
         testdata_path
@@ -165,6 +166,7 @@ def test_ProjectUnproject(testdata_path):
     assert np.all(transformed._triangles == projunproj_ref.agg_data()[1])
 
 
+@pytest.mark.slow
 def test_SurfaceResampler(testdata_path, tmpdir):
     dif_tol = 0.001
     fslr_sphere_path = testdata_path / "tpl-fsLR_hemi-R_den-32k_sphere.surf.gii"
