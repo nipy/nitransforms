@@ -46,9 +46,6 @@ async def _apply_serial(
     data: np.ndarray,
     spatialimage: SpatialImage,
     targets: np.ndarray,
-    transform: TransformBase,
-    ref_ndim: int,
-    ref_ndcoords: np.ndarray,
     n_resamplings: int,
     output: np.ndarray,
     input_dtype: np.dtype,
@@ -69,14 +66,8 @@ async def _apply_serial(
         The image object containing the data to be resampled in reference
         space
     targets : :obj:`~numpy.ndarray`
-        The target coordinates for mapping.
-    transform : :obj:`~nitransforms.base.TransformBase`
-        The 3D, 3D+t, or 4D transform through which data will be resampled.
-    ref_ndim : :obj:`int`
-        Dimensionality of the resampling target (reference image).
-    ref_ndcoords : :obj:`~numpy.ndarray`
-        Physical coordinates (RAS+) where data will be interpolated, if the resampling
-        target is a grid, the scanner coordinates of all voxels.
+        The precomputed target coordinates for mapping, with shape
+        ``(n_xfms, n_dim, n_vox)``.
     n_resamplings : :obj:`int`
         Total number of 3D resamplings (can be defined by the input image, the transform,
         or be matched, that is, same number of volumes in the input and number of transforms).
@@ -110,17 +101,9 @@ async def _apply_serial(
     semaphore = asyncio.Semaphore(max_concurrent)
 
     for t in range(n_resamplings):
-        xfm_t = (
-            transform if (n_resamplings == 1 or transform.ndim < 4) else transform[t]
-        )
-
-        targets_t = (
-            ImageGrid(spatialimage).index(
-                _as_homogeneous(xfm_t.map(ref_ndcoords), dim=ref_ndim)
-            )
-            if targets is None
-            else targets[t, ...]
-        )
+        # A 4D transform has one coordinate set per volume; a 3D transform has a
+        # single set (shape[0] == 1) reused for every volume.
+        targets_t = targets[t if targets.shape[0] > 1 else 0, ...]
 
         data_t = (
             data
@@ -259,7 +242,6 @@ def apply(
     targets = None
     ref_ndcoords = _ref.ndcoords
 
-    # Targets' shape is (Nt, 3, Nv) with Nv = Num. voxels, Nt = Num. timepoints.
     targets = (
         ImageGrid(spatialimage).index(
             _as_homogeneous(transform.map(ref_ndcoords), dim=_ref.ndim)
@@ -268,8 +250,11 @@ def apply(
         else targets
     )
 
-    if targets.ndim == 2:
+    # Ensure consistent targets shape
+    if targets.ndim == 2:  # (Nv, 3) -> (Nt {1}, 3, Nv)
         targets = targets.T[np.newaxis, ...]
+    else:  # (Nt, Nv, 3) -> (Nt, 3, Nv)
+        targets = np.moveaxis(targets, -1, 1)
 
     if serialize_4d:
         data = (
@@ -284,17 +269,11 @@ def apply(
             (len(ref_ndcoords), n_resamplings), dtype=input_dtype, order="F"
         )
 
-        if targets.ndim == 3:
-            targets = np.rollaxis(targets, targets.ndim - 1, 1)
-
         resampled = asyncio.run(
             _apply_serial(
                 data,
                 spatialimage,
                 targets,
-                transform,
-                _ref.ndim,
-                ref_ndcoords,
                 n_resamplings,
                 resampled,
                 input_dtype,
@@ -308,31 +287,27 @@ def apply(
     else:
         data = np.asanyarray(spatialimage.dataobj, dtype=input_dtype)
 
-        if targets.ndim == 3:
-            targets = np.rollaxis(targets, targets.ndim - 1, 0)
+        n_dim, n_vox = targets.shape[1:]
 
-        if data_nvols == 1 and xfm_nvols == 1:
-            targets = np.squeeze(targets)
-            assert targets.ndim == 2
-        # Cast 3D data into 4D if 4D nonsequential transform
-        elif data_nvols == 1 and xfm_nvols > 1:
-            data = data[..., np.newaxis]
-
-        if xfm_nvols > 1:
-            assert targets.ndim == 3
-
-            # Targets must have shape (n_dim x n_time x n_vox)
-            n_dim, n_time, n_vox = targets.shape
-            # Reshape to (3, n_time x n_vox)
-            ijk_targets = targets.reshape((n_dim, -1))
-            time_row = np.repeat(np.arange(n_time), n_vox)[None, :]
-
-            # Now targets is (4, n_vox x n_time), with indexes (t, i, j, k)
-            # t is the slowest-changing axis, so we put it first
-            targets = np.vstack((time_row, ijk_targets))
-            data = np.rollaxis(data, data.ndim - 1, 0)
+        if n_resamplings == 1:
+            # single volume: coordinates used directly, no volume index
+            targets = targets[0]
         else:
-            targets = targets.T
+            # One coordinate set per output volume, flatten to (n_dim, n_vols * n_vox)
+            coords = (
+                targets
+                if targets.shape[0] > 1
+                else np.broadcast_to(targets, (n_resamplings, n_dim, n_vox))
+            )
+            ijk_targets = np.moveaxis(coords, 0, -2).reshape(n_dim, -1)
+
+            if data_nvols > 1: # 4D
+                time_row = np.repeat(np.arange(n_resamplings), n_vox)[None, :]
+                targets = np.vstack((time_row, ijk_targets))  # (t,i,j,k)
+                # match data axis order to targets rows
+                data = np.rollaxis(data, data.ndim - 1, 0)  # (x,y,z,t)->(t,x,y,z)
+            else:  # 3D
+                targets = ijk_targets
 
         resampled = ndi.map_coordinates(
             data,
