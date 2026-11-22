@@ -44,7 +44,7 @@ class TransformChain(TransformBase):
 
     def __add__(self, b):
         """
-        Compose this and other transforms.
+        Compose this and other transforms into a new chain.
 
         Example
         -------
@@ -57,8 +57,9 @@ class TransformChain(TransformBase):
         3
 
         """
-        self.append(b)
-        return self
+        retval = self.__class__(self.transforms + _as_chain(b))
+        retval._reference = self._reference
+        return retval
 
     def __getitem__(self, i):
         """
