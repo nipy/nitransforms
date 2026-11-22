@@ -209,6 +209,20 @@ def test_densefield_oob_resampling(is_deltas):
     assert np.allclose(mapped[1], points[1] + 1)
 
 
+@pytest.mark.parametrize("offset", [0.0, 0.01])
+@pytest.mark.parametrize("x", [-44.0, 44.0])
+def test_densefield_map_outside_grid(x, offset):
+    """Points beyond the field are not displaced, whether they fall on its grid or not."""
+    deltas = np.zeros((21, 21, 21, 3), dtype="float32")
+    deltas[0, ..., 0] = deltas[-1, ..., 0] = 100.0
+    xfm = DenseFieldTransform(
+        nb.Nifti1Image(deltas, nb.affines.from_matvec(np.eye(3) * 4, [-40] * 3))
+    )
+
+    points = [[x + np.sign(x) * offset, 0.0, 0.0]]
+    assert np.allclose(xfm.map(points), points)
+
+
 def test_bspline_map_gridpoints():
     """BSpline mapping matches dense field on grid points."""
     ref = nb.Nifti1Image(np.zeros((5, 5, 5), dtype="uint8"), np.eye(4))
