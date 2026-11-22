@@ -8,6 +8,7 @@ import pytest
 import numpy as np
 import nibabel as nb
 from nitransforms.base import ImageGrid, TransformError
+from nitransforms.interp.bspline import grid_bspline_weights
 from nitransforms.nonlinear import (
     BSplineFieldTransform,
     DenseFieldTransform,
@@ -299,6 +300,27 @@ def test_bspline_to_field_orientation(linear):
     assert np.allclose(
         field._deltas.reshape(-1, 3), ImageGrid(target).ndcoords, atol=1e-3
     )
+
+
+@pytest.mark.parametrize(
+    "linear",
+    [
+        pytest.param(np.eye(3), id="RAS"),
+        pytest.param(np.diag([-1.0, 1, 1]), id="LAS"),
+        pytest.param([[0.0, 0, 1], [1, 0, 0], [0, 1, 0]], id="permuted"),
+        pytest.param([[_COS, -_SIN, 0], [_SIN, _COS, 0], [0, 0, 1]], id="oblique"),
+    ],
+)
+def test_grid_bspline_weights(linear):
+    """The deprecated weights still follow the orientation of the target."""
+    xfm = _linear_bspline()
+    target = _centered_grid(np.asarray(linear) * 3, (11, 11, 11))
+
+    with pytest.deprecated_call():
+        weights = grid_bspline_weights(target, xfm._knots)
+
+    field = (xfm._coeffs.reshape(-1, 3).T @ weights).T
+    assert np.allclose(field, ImageGrid(target).ndcoords, atol=1e-3)
 
 
 def test_bspline_to_field_new_reference():
