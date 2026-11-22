@@ -74,6 +74,9 @@ jobs:
         include:
           - python-version: "3.11"
             dependencies: min
+          # h5py has no cp315 wheels on PyPI yet; add "latest" when it does
+          - python-version: "3.15"
+            dependencies: pre
         exclude:
           # Do not test pre-releases for versions out of SPEC0
           - python-version: "3.11"
