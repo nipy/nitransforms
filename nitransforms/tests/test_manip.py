@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 import nibabel as nb
 import h5py
-from ..base import TransformError
+from ..base import TransformBase, TransformError
 from ..manip import TransformChain
 from ..linear import Affine
 from ..nonlinear import DenseFieldTransform
@@ -42,6 +42,17 @@ def test_collapse_affines(tmp_path, data_path, ext0, ext1, ext2):
             fmt=f"{FMT[ext2]}",
         ).matrix,
     )
+
+
+@pytest.mark.parametrize("position", [0, 1, 2])
+def test_asaffine_identity(position):
+    """An identity ``TransformBase`` in the chain leaves the collapsed affine unchanged."""
+    first = Affine.from_matvec(vec=(2, -10, 3))
+    second = Affine.from_matvec(mat=[[0, 1, 0], [0, 0, 1], [1, 0, 0]])
+    transforms = [first, second]
+    transforms.insert(position, TransformBase())
+
+    assert TransformChain(transforms).asaffine() == second @ first
 
 
 def test_transformchain_x5_roundtrip(tmp_path):

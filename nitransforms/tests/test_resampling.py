@@ -15,6 +15,7 @@ from nitransforms import linear as nitl
 from nitransforms import nonlinear as nitnl
 from nitransforms import manip as nitm
 from nitransforms import io
+from nitransforms.base import TransformBase
 from nitransforms.resampling import apply
 
 RMSE_TOL_LINEAR = 0.09
@@ -399,6 +400,18 @@ def test_apply_3d():
     mat = np.eye(4)
     mat[0, 3] = 1  # shift by one voxel along x
     _assert_apply(img, nitl.Affine(mat), [((8, 2, 2), 7)])
+
+
+def test_apply_chain_with_identity():
+    """An identity ``TransformBase`` in a chain does not change the resampling."""
+    base = np.zeros((10, 5, 5), dtype=np.float32)
+    base[9, 2, 2] = 7
+    img = nb.Nifti1Image(base, np.eye(4))
+
+    mat = np.eye(4)
+    mat[0, 3] = 1  # shift by one voxel along x
+    chain = nitm.TransformChain([TransformBase(), nitl.Affine(mat)])
+    _assert_apply(img, chain, [((8, 2, 2), 7)])
 
 
 @pytest.mark.parametrize("serialize_4d", [True, False])
