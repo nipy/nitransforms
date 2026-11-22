@@ -149,7 +149,7 @@ jobs:
 
   test_package:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PAT
@@ -201,7 +201,7 @@ jobs:
 
   deploy_pypi:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PAT
