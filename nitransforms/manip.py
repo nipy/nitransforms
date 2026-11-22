@@ -80,8 +80,9 @@ class TransformChain(TransformBase):
 
     @property
     def ndim(self):
-        """Get the number of dimensions."""
-        return max(x.ndim for x in self._transforms)
+        """Get the number of dimensions, ignoring identity transforms."""
+        ndims = [x.ndim for x in self._transforms if not _is_identity(x)]
+        return max(ndims) if ndims else super().ndim
 
     @property
     def transforms(self):
@@ -197,6 +198,7 @@ class TransformChain(TransformBase):
         affines = (
             self.transforms if indices is None else np.take(self.transforms, indices)
         )
+        affines = [xfm for xfm in affines if not _is_identity(xfm)] or [Affine()]
         retval = affines[0]
         for xfm in affines[1:]:
             retval = xfm @ retval
@@ -284,6 +286,11 @@ class TransformChain(TransformBase):
             cg.create_dataset(str(len(cg)), data="/".join(str(i) for i in xfm_chain))
 
         return filename
+
+
+def _is_identity(x):
+    """Check whether a transform is the identity :obj:`~nitransforms.base.TransformBase`."""
+    return type(x) is TransformBase
 
 
 def _as_chain(x):
