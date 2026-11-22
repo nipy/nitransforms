@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 jobs:
   build_pytest:
     machine:
@@ -219,7 +219,7 @@ jobs:
             python3 -m twine upload dist/*
 
 workflows:
-  version: 2
+  version: 2.1
   build_test_deploy:
     jobs:
       - build_pytest:
