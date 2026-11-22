@@ -7,6 +7,7 @@ import pytest
 
 import numpy as np
 import nibabel as nb
+from scipy.interpolate import BSpline
 from nitransforms.base import ImageGrid, TransformError
 from nitransforms.interp.bspline import grid_bspline_weights
 from nitransforms.nonlinear import (
@@ -234,7 +235,12 @@ def test_bspline_map_manual():
     bspline = BSplineFieldTransform(coeff, reference=ref)
 
     from nitransforms.base import _as_homogeneous
-    from nitransforms.interp.bspline import _cubic_bspline
+
+    def _cubic_bspline(d):
+        d = np.abs(d)
+        return np.where(
+            d < 1, (4 - 6 * d**2 + 3 * d**3) / 6, np.where(d < 2, (2 - d) ** 3 / 6, 0)
+        )
 
     def manual_map(x):
         ijk = (bspline._knots.inverse @ _as_homogeneous(x).squeeze())[:3]
@@ -339,3 +345,24 @@ def test_bspline_to_field_new_reference():
         assert np.allclose(
             field._deltas.reshape(-1, 3), ImageGrid(target).ndcoords, atol=1e-3
         )
+
+
+@pytest.mark.parametrize("order", [1, 2, 3, 4, 5])
+def test_bspline_order(order):
+    """B-spline fields are evaluated with basis functions of the requested order."""
+    rng = np.random.default_rng(0)
+    coeffs = rng.normal(size=(6, 6, 6, 3)).astype("float32")
+    xfm = BSplineFieldTransform(nb.Nifti1Image(coeffs, np.eye(4)), order=order)
+    points = rng.uniform(1, 4, size=(10, 3))
+
+    # Tensor product of 1D basis functions, each centered on its knot
+    basis = BSpline.basis_element(
+        np.arange(order + 2) - (order + 1) / 2, extrapolate=False
+    )
+    weights = np.nan_to_num(
+        basis(points[:, np.newaxis, :] - np.arange(6)[:, np.newaxis])
+    )
+    expected = np.einsum(
+        "pi,pj,pk,ijkc->pc", weights[..., 0], weights[..., 1], weights[..., 2], coeffs
+    )
+    assert np.allclose(xfm.map(points) - points, expected, atol=1e-5)
