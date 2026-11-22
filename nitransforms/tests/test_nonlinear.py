@@ -7,7 +7,7 @@ import pytest
 
 import numpy as np
 import nibabel as nb
-from nitransforms.base import TransformError
+from nitransforms.base import ImageGrid, TransformError
 from nitransforms.nonlinear import (
     BSplineFieldTransform,
     DenseFieldTransform,
@@ -258,3 +258,44 @@ def test_bspline_map_manual():
     pts = np.array([[1.2, 1.5, 2.0], [3.3, 1.7, 2.4]])
     expected = np.vstack([manual_map(p) for p in pts])
     assert np.allclose(bspline.map(pts), expected, atol=1e-6)
+
+
+def _centered_grid(linear, shape):
+    """An empty image of the given shape and linear part, centered at the origin."""
+    linear = np.asarray(linear)
+    affine = nb.affines.from_matvec(linear, -linear @ (np.array(shape) - 1) / 2)
+    return nb.Nifti1Image(np.zeros(shape), affine)
+
+
+def _linear_bspline():
+    """A B-spline whose coefficients are the positions of their knots.
+
+    Cubic B-splines reproduce linear functions, so the displacement at any point
+    well inside the lattice is the position of that point.
+    """
+    knots = ImageGrid(_centered_grid(np.eye(3) * 10, (10, 10, 10)))
+    coeffs = knots.ndcoords.reshape(10, 10, 10, 3).astype("float32")
+    return BSplineFieldTransform(nb.Nifti1Image(coeffs, knots.affine))
+
+
+_COS, _SIN = np.cos(np.pi / 6), np.sin(np.pi / 6)
+
+
+@pytest.mark.parametrize(
+    "linear",
+    [
+        pytest.param(np.eye(3), id="RAS"),
+        pytest.param(np.diag([-1.0, 1, 1]), id="LAS"),
+        pytest.param([[0.0, 0, 1], [1, 0, 0], [0, 1, 0]], id="permuted"),
+        pytest.param([[_COS, -_SIN, 0], [_SIN, _COS, 0], [0, 0, 1]], id="oblique"),
+    ],
+)
+def test_bspline_to_field_orientation(linear):
+    """B-spline fields are evaluated at the reference's voxels, whatever its orientation."""
+    target = _centered_grid(np.asarray(linear) * 3, (11, 11, 11))
+
+    field = _linear_bspline().to_field(reference=target)
+
+    assert np.allclose(
+        field._deltas.reshape(-1, 3), ImageGrid(target).ndcoords, atol=1e-3
+    )
