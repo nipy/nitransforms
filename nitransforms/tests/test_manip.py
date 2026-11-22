@@ -97,3 +97,13 @@ def test_empty_chain(transforms):
     chain.append(Affine.from_matvec(vec=(1, 0, 0)))
     chain.append(Affine.from_matvec(vec=(0, 2, 0)))
     assert np.allclose(chain.map([[0, 0, 0]]), [[1, 2, 0]])
+
+
+def test_add_chain_flattens():
+    """Prepend an affine to a chain."""
+    chain = Affine.from_matvec(vec=(1, 0, 0)) + TransformChain(
+        [Affine.from_matvec(vec=(0, 2, 0)), Affine.from_matvec(vec=(0, 0, 3))]
+    )
+
+    assert len(chain) == 3
+    assert np.allclose(chain.asaffine().matrix[:3, 3], [1, 2, 3])
