@@ -118,3 +118,14 @@ def test_add_chain_flattens():
 
     assert len(chain) == 3
     assert np.allclose(chain.asaffine().matrix[:3, 3], [1, 2, 3])
+
+
+def test_chain_from_list_with_chain():
+    """Build a chain from a list that holds a chain."""
+    inner = TransformChain(
+        [Affine.from_matvec(vec=(0, 2, 0)), Affine.from_matvec(vec=(0, 0, 3))]
+    )
+    chain = TransformChain([Affine.from_matvec(vec=(1, 0, 0)), inner])
+
+    assert len(chain) == 3
+    assert np.allclose(chain.asaffine().matrix[:3, 3], [1, 2, 3])
