@@ -299,3 +299,21 @@ def test_bspline_to_field_orientation(linear):
     assert np.allclose(
         field._deltas.reshape(-1, 3), ImageGrid(target).ndcoords, atol=1e-3
     )
+
+
+def test_bspline_to_field_new_reference():
+    """Each call to ``to_field`` evaluates the field at its own reference."""
+    xfm = _linear_bspline()
+    first = _centered_grid(np.eye(3) * 3, (11, 11, 11))
+    shifted = nb.Nifti1Image(
+        first.dataobj, nb.affines.from_matvec(np.eye(3) * 3, [-10.0, -12, -14])
+    )
+    smaller = _centered_grid(np.eye(3) * 3, (5, 5, 5))
+
+    xfm.to_field(reference=first)
+
+    for target in (shifted, smaller):
+        field = xfm.to_field(reference=target)
+        assert np.allclose(
+            field._deltas.reshape(-1, 3), ImageGrid(target).ndcoords, atol=1e-3
+        )
