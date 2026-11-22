@@ -294,13 +294,13 @@ def _is_identity(x):
 
 
 def _as_chain(x):
-    """Convert a value into a transform chain."""
+    """Convert a value into a flat list of transforms, splicing in nested chains."""
     if isinstance(x, TransformChain):
         return x.transforms
     if isinstance(x, TransformBase):
         return [x]
     if isinstance(x, Iterable):
-        return list(x)
+        return [xfm for item in x for xfm in _as_chain(item)]
     return [x]
 
 
