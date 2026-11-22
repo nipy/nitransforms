@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 jobs:
   build_pytest:
     machine:
@@ -149,7 +149,7 @@ jobs:
 
   test_package:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PAT
@@ -201,7 +201,7 @@ jobs:
 
   deploy_pypi:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PAT
@@ -219,7 +219,7 @@ jobs:
             python3 -m twine upload dist/*
 
 workflows:
-  version: 2
+  version: 2.1
   build_test_deploy:
     jobs:
       - build_pytest:

@@ -301,7 +301,7 @@ def apply(
             )
             ijk_targets = np.moveaxis(coords, 0, -2).reshape(n_dim, -1)
 
-            if data_nvols > 1: # 4D
+            if data_nvols > 1:  # 4D
                 time_row = np.repeat(np.arange(n_resamplings), n_vox)[None, :]
                 targets = np.vstack((time_row, ijk_targets))  # (t,i,j,k)
                 # match data axis order to targets rows
