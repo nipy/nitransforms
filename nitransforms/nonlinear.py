@@ -343,12 +343,17 @@ class BSplineFieldTransform(TransformBase):
 
         self._coeffs = np.asanyarray(coefficients.dataobj)
         self._knots = ImageGrid(coefficients)
-        # Four zero coefficients per side make the outermost polynomial pieces
-        # identically zero, so the field is 0 beyond the support of the lattice.
+        # Center each basis function on its knot. order + 1 zero coefficients per
+        # side make the outermost polynomial pieces identically zero, so the field
+        # is 0 beyond the support of the lattice.
+        pad = order + 1
         self._spline = NdBSpline(
-            tuple(np.arange(-6, n + 6, dtype="float64") for n in self._knots.shape),
-            np.pad(self._coeffs, [(4, 4)] * self._knots.ndim + [(0, 0)]),
-            3,
+            tuple(
+                np.arange(-pad, n + pad + order + 1) - (order + 1) / 2
+                for n in self._knots.shape
+            ),
+            np.pad(self._coeffs, [(pad, pad)] * self._knots.ndim + [(0, 0)]),
+            order,
         )
         if reference is not None:
             self.reference = reference
