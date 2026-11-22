@@ -37,7 +37,7 @@ class TransformChain(TransformBase):
     def __init__(self, transforms=None):
         """Initialize a chain of transforms."""
         super().__init__()
-        self._transforms = None
+        self._transforms = []
 
         if transforms is not None:
             self.transforms = transforms
@@ -91,7 +91,7 @@ class TransformChain(TransformBase):
     @transforms.setter
     def transforms(self, value):
         self._transforms = _as_chain(value)
-        if self.transforms[0].reference:
+        if self.transforms and self.transforms[0].reference:
             self.reference = self.transforms[0].reference
 
     def append(self, x):
