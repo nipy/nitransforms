@@ -181,8 +181,12 @@ class DenseFieldTransform(TransformBase):
             raise NotImplementedError
 
         ijk = self.reference.index(np.array(x, dtype="float32"))
+        # Points up to the outermost voxel centers, with the tolerance of the grid check
+        inside = np.all(
+            (ijk > -1e-3) & (ijk < np.array(self.reference.shape) - 1 + 1e-3), axis=1
+        )
         indexes = np.round(ijk).astype("int")
-        ongrid = np.where(np.linalg.norm(ijk - indexes, axis=1) < 1e-3)[0]
+        ongrid = np.where(inside & (np.linalg.norm(ijk - indexes, axis=1) < 1e-3))[0]
 
         if ongrid.size == np.shape(x)[0]:
             # return self._field[*indexes.T, :]  # From Python 3.11
