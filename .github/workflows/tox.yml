@@ -20,6 +20,7 @@ env:
   # Force tox and pytest to use color
   FORCE_COLOR: true
   TEST_DATA_HOME: /home/runner/testdata/nitransforms-tests
+  TEST_DATA_REPO: https://github.com/nipreps-data/nitransforms-tests
 
 jobs:
   cache-test-data:
@@ -44,23 +45,23 @@ jobs:
       - name: Check remote HEAD
         id: test-head
         run: |
-          git ls-remote https://gin.g-node.org/oesteban/nitransforms-tests \
+          git ls-remote $TEST_DATA_REPO \
             | awk '/HEAD/{ print "SHA=" $1 }' >> $GITHUB_OUTPUT
 
       - uses: actions/cache@v5
         with:
           path: ${{ env.TEST_DATA_HOME }}
-          key: data-cache-v2-${{ steps.test-head.outputs.SHA }}
+          key: data-cache-v3-${{ steps.test-head.outputs.SHA }}
           restore-keys: |
-            data-cache-v2-${{ steps.test-head.outputs.SHA }}
-            data-cache-v2
+            data-cache-v3-${{ steps.test-head.outputs.SHA }}
+            data-cache-v3
 
       - name: Install test data
         run: |
           export PATH=$CONDA/bin:$PATH
           mkdir -p /home/runner/testdata
 
-          datalad install -s https://gin.g-node.org/oesteban/nitransforms-tests $TEST_DATA_HOME
+          datalad install -s $TEST_DATA_REPO $TEST_DATA_HOME
           datalad update --merge -d $TEST_DATA_HOME
           datalad get -J 2 -d $TEST_DATA_HOME
 
@@ -97,7 +98,7 @@ jobs:
       - uses: actions/cache/restore@v5
         with:
           path: ${{ env.TEST_DATA_HOME }}
-          key: data-cache-v2-${{ needs.cache-test-data.outputs.SHA }}
+          key: data-cache-v3-${{ needs.cache-test-data.outputs.SHA }}
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
