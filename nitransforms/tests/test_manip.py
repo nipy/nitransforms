@@ -86,3 +86,14 @@ def test_transformchain_x5_roundtrip(tmp_path):
     assert len(loaded0) == len(chain)
     assert len(loaded1) == len(chain)
     assert np.allclose(chain.map([[0, 0, 0]]), loaded1.map([[0, 0, 0]]))
+
+
+@pytest.mark.parametrize("transforms", [None, []])
+def test_empty_chain(transforms):
+    """Build a chain up from nothing."""
+    chain = TransformChain(transforms)
+    assert len(chain) == 0
+
+    chain.append(Affine.from_matvec(vec=(1, 0, 0)))
+    chain.append(Affine.from_matvec(vec=(0, 2, 0)))
+    assert np.allclose(chain.map([[0, 0, 0]]), [[1, 2, 0]])
