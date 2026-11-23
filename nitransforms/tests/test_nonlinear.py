@@ -7,7 +7,9 @@ import pytest
 
 import numpy as np
 import nibabel as nb
-from nitransforms.base import TransformError
+from scipy.interpolate import BSpline
+from nitransforms.base import ImageGrid, TransformError
+from nitransforms.interp.bspline import grid_bspline_weights
 from nitransforms.nonlinear import (
     BSplineFieldTransform,
     DenseFieldTransform,
@@ -233,7 +235,12 @@ def test_bspline_map_manual():
     bspline = BSplineFieldTransform(coeff, reference=ref)
 
     from nitransforms.base import _as_homogeneous
-    from nitransforms.interp.bspline import _cubic_bspline
+
+    def _cubic_bspline(d):
+        d = np.abs(d)
+        return np.where(
+            d < 1, (4 - 6 * d**2 + 3 * d**3) / 6, np.where(d < 2, (2 - d) ** 3 / 6, 0)
+        )
 
     def manual_map(x):
         ijk = (bspline._knots.inverse @ _as_homogeneous(x).squeeze())[:3]
@@ -258,3 +265,104 @@ def test_bspline_map_manual():
     pts = np.array([[1.2, 1.5, 2.0], [3.3, 1.7, 2.4]])
     expected = np.vstack([manual_map(p) for p in pts])
     assert np.allclose(bspline.map(pts), expected, atol=1e-6)
+
+
+def _centered_grid(linear, shape):
+    """An empty image of the given shape and linear part, centered at the origin."""
+    linear = np.asarray(linear)
+    affine = nb.affines.from_matvec(linear, -linear @ (np.array(shape) - 1) / 2)
+    return nb.Nifti1Image(np.zeros(shape), affine)
+
+
+def _linear_bspline():
+    """A B-spline whose coefficients are the positions of their knots.
+
+    Cubic B-splines reproduce linear functions, so the displacement at any point
+    well inside the lattice is the position of that point.
+    """
+    knots = ImageGrid(_centered_grid(np.eye(3) * 10, (10, 10, 10)))
+    coeffs = knots.ndcoords.reshape(10, 10, 10, 3).astype("float32")
+    return BSplineFieldTransform(nb.Nifti1Image(coeffs, knots.affine))
+
+
+_COS, _SIN = np.cos(np.pi / 6), np.sin(np.pi / 6)
+
+
+@pytest.mark.parametrize(
+    "linear",
+    [
+        pytest.param(np.eye(3), id="RAS"),
+        pytest.param(np.diag([-1.0, 1, 1]), id="LAS"),
+        pytest.param([[0.0, 0, 1], [1, 0, 0], [0, 1, 0]], id="permuted"),
+        pytest.param([[_COS, -_SIN, 0], [_SIN, _COS, 0], [0, 0, 1]], id="oblique"),
+    ],
+)
+def test_bspline_to_field_orientation(linear):
+    """B-spline fields are evaluated at the reference's voxels, whatever its orientation."""
+    target = _centered_grid(np.asarray(linear) * 3, (11, 11, 11))
+
+    field = _linear_bspline().to_field(reference=target)
+
+    assert np.allclose(
+        field._deltas.reshape(-1, 3), ImageGrid(target).ndcoords, atol=1e-3
+    )
+
+
+@pytest.mark.parametrize(
+    "linear",
+    [
+        pytest.param(np.eye(3), id="RAS"),
+        pytest.param(np.diag([-1.0, 1, 1]), id="LAS"),
+        pytest.param([[0.0, 0, 1], [1, 0, 0], [0, 1, 0]], id="permuted"),
+        pytest.param([[_COS, -_SIN, 0], [_SIN, _COS, 0], [0, 0, 1]], id="oblique"),
+    ],
+)
+def test_grid_bspline_weights(linear):
+    """The deprecated weights still follow the orientation of the target."""
+    xfm = _linear_bspline()
+    target = _centered_grid(np.asarray(linear) * 3, (11, 11, 11))
+
+    with pytest.deprecated_call():
+        weights = grid_bspline_weights(target, xfm._knots)
+
+    field = (xfm._coeffs.reshape(-1, 3).T @ weights).T
+    assert np.allclose(field, ImageGrid(target).ndcoords, atol=1e-3)
+
+
+def test_bspline_to_field_new_reference():
+    """Each call to ``to_field`` evaluates the field at its own reference."""
+    xfm = _linear_bspline()
+    first = _centered_grid(np.eye(3) * 3, (11, 11, 11))
+    shifted = nb.Nifti1Image(
+        first.dataobj, nb.affines.from_matvec(np.eye(3) * 3, [-10.0, -12, -14])
+    )
+    smaller = _centered_grid(np.eye(3) * 3, (5, 5, 5))
+
+    xfm.to_field(reference=first)
+
+    for target in (shifted, smaller):
+        field = xfm.to_field(reference=target)
+        assert np.allclose(
+            field._deltas.reshape(-1, 3), ImageGrid(target).ndcoords, atol=1e-3
+        )
+
+
+@pytest.mark.parametrize("order", [1, 2, 3, 4, 5])
+def test_bspline_order(order):
+    """B-spline fields are evaluated with basis functions of the requested order."""
+    rng = np.random.default_rng(0)
+    coeffs = rng.normal(size=(6, 6, 6, 3)).astype("float32")
+    xfm = BSplineFieldTransform(nb.Nifti1Image(coeffs, np.eye(4)), order=order)
+    points = rng.uniform(1, 4, size=(10, 3))
+
+    # Tensor product of 1D basis functions, each centered on its knot
+    basis = BSpline.basis_element(
+        np.arange(order + 2) - (order + 1) / 2, extrapolate=False
+    )
+    weights = np.nan_to_num(
+        basis(points[:, np.newaxis, :] - np.arange(6)[:, np.newaxis])
+    )
+    expected = np.einsum(
+        "pi,pj,pk,ijkc->pc", weights[..., 0], weights[..., 1], weights[..., 2], coeffs
+    )
+    assert np.allclose(xfm.map(points) - points, expected, atol=1e-5)

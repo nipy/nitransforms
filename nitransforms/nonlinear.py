@@ -9,7 +9,6 @@
 """Nonlinear transforms."""
 
 import warnings
-from functools import partial
 from collections import namedtuple
 import numpy as np
 import nibabel as nb
@@ -17,14 +16,13 @@ import nibabel as nb
 from nitransforms import io
 from nitransforms.io.base import _ensure_image
 from nitransforms.io.x5 import from_filename as load_x5
-from nitransforms.interp.bspline import grid_bspline_weights, _cubic_bspline
 from nitransforms.base import (
     TransformBase,
     TransformError,
     ImageGrid,
-    _as_homogeneous,
 )
 from scipy.ndimage import map_coordinates
+from scipy.interpolate import NdBSpline
 
 # Avoids circular imports
 try:
@@ -334,7 +332,7 @@ load = DenseFieldTransform.from_filename
 class BSplineFieldTransform(TransformBase):
     """Represent a nonlinear transform parameterized by BSpline basis."""
 
-    __slots__ = ["_coeffs", "_knots", "_weights", "_order", "_moving"]
+    __slots__ = ["_coeffs", "_knots", "_spline", "_order", "_moving"]
 
     def __init__(self, coefficients, reference=None, order=3):
         """Create a smooth deformation field using B-Spline basis."""
@@ -345,7 +343,18 @@ class BSplineFieldTransform(TransformBase):
 
         self._coeffs = np.asanyarray(coefficients.dataobj)
         self._knots = ImageGrid(coefficients)
-        self._weights = None
+        # Center each basis function on its knot. order + 1 zero coefficients per
+        # side make the outermost polynomial pieces identically zero, so the field
+        # is 0 beyond the support of the lattice.
+        pad = order + 1
+        self._spline = NdBSpline(
+            tuple(
+                np.arange(-pad, n + pad + order + 1) - (order + 1) / 2
+                for n in self._knots.shape
+            ),
+            np.pad(self._coeffs, [(pad, pad)] * self._knots.ndim + [(0, 0)]),
+            order,
+        )
         if reference is not None:
             self.reference = reference
 
@@ -415,14 +424,7 @@ class BSplineFieldTransform(TransformBase):
         if _ref is None:
             raise TransformError("A reference must be defined")
 
-        if self._weights is None:
-            self._weights = grid_bspline_weights(_ref, self._knots)
-
-        field = np.zeros((_ref.npoints, self.ndim))
-
-        for d in range(self.ndim):
-            #  1 x Nvox :                          (1 x K) @ (K x Nvox)
-            field[:, d] = self._coeffs[..., d].reshape(-1) @ self._weights
+        field = self._spline(self._knots.index(_ref.ndcoords))
 
         return DenseFieldTransform(
             field.astype(dtype).reshape(*_ref.shape, -1), reference=_ref
@@ -482,16 +484,11 @@ class BSplineFieldTransform(TransformBase):
         [[-6.5, -36.475114..., -19.5]]
 
         >>> xfm.map([[-6.5, -36., -19.5], [-1., -41.5, -11.25]]).tolist()  # doctest: +ELLIPSIS
-        [[-6.5, -36.475114..., -19.5], [-1.0, -42.03878957..., -11.25]]
+        [[-6.5, -36.475114..., -19.5], [-1.0, -42.038789..., -11.25]]
 
         """
-        vfunc = partial(
-            _map_xyz,
-            reference=self.reference,
-            knots=self._knots,
-            coeffs=self._coeffs,
-        )
-        return np.array([vfunc(_x).tolist() for _x in np.atleast_2d(x)])
+        x = np.atleast_2d(x)
+        return x + self._spline(self._knots.index(x))
 
 
 def from_x5(x5_list, x5_position=0):
@@ -517,37 +514,3 @@ def from_x5(x5_list, x5_position=0):
     )
 
     return Transform(xfm_params, reference=reference, **xfm_kwargs)
-
-
-def _map_xyz(x, reference, knots, coeffs):
-    """Apply the transformation to just one coordinate."""
-    ndim = len(x)
-    # Calculate the index coordinates of the point in the B-Spline grid
-    ijk = (knots.inverse @ _as_homogeneous(x).squeeze())[:ndim]
-
-    # Determine the window within distance 2.0 (where the B-Spline is nonzero).
-    # Probably this will change if the order of the B-Spline is different
-    w_start, w_end = np.ceil(ijk - 2).astype(int), np.floor(ijk + 2).astype(int)
-
-    # Generate a grid of indexes corresponding to the window, clipped to the
-    # coefficient grid boundaries
-    nonzero_knots = []
-    for start, end, size in zip(w_start, w_end, knots.shape):
-        start = max(start, 0)
-        end = min(end, size - 1)
-        nonzero_knots.append(np.arange(start, end + 1))
-    nonzero_knots = tuple(np.meshgrid(*nonzero_knots, indexing="ij"))
-    window = np.array(nonzero_knots).reshape((ndim, -1))
-
-    # Calculate the absolute distance of the location w.r.t. all voxels in
-    # the window. Distances are expressed in knot-grid voxel units
-    distance = np.abs(window.T - ijk)
-    # Since this is a grid, distance only takes a few float values
-    unique_d, indices = np.unique(distance.reshape(-1), return_inverse=True)
-    # Calculate the B-Spline weight corresponding to the distance.
-    # Then multiply the three weights of each knot (tensor-product B-Spline)
-    tensor_bspline = _cubic_bspline(unique_d)[indices].reshape(distance.shape).prod(1)
-    # Extract the values of the coefficients in the window
-    coeffs = coeffs[nonzero_knots].reshape((-1, ndim))
-    # Inference: the displacement is the product of coefficients x tensor-product B-Splines
-    return x + coeffs.T @ tensor_bspline

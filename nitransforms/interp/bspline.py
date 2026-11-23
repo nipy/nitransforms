@@ -10,27 +10,18 @@
 
 import numpy as np
 import nibabel as nb
-from scipy.sparse import csr_matrix, kron
+from scipy.interpolate import NdBSpline
+from scipy.sparse import coo_array, csr_array
+
+from nitransforms._deprecated import deprecate_with_version
 
 
-def _cubic_bspline(d, order=3):
-    """Evaluate the cubic B-spline at distance ``d`` from the center."""
-
-    if order != 3:
-        raise NotImplementedError
-
-    d = np.abs(d)
-    out = np.zeros_like(d, dtype="float32")
-
-    mask1 = d < 1.0
-    mask2 = (d >= 1.0) & (d < 2.0)
-
-    out[mask1] = (4.0 - 6.0 * d[mask1] ** 2 + 3.0 * d[mask1] ** 3) / 6.0
-    out[mask2] = (2.0 - d[mask2]) ** 3 / 6.0
-
-    return out
-
-
+@deprecate_with_version(
+    "grid_bspline_weights is deprecated. "
+    "Please use `scipy.interpolate.NdBSpline.design_matrix` instead.",
+    since="26.0.0",
+    until="28.0.0",
+)
 def grid_bspline_weights(target_grid, ctrl_grid):
     r"""
     Evaluate tensor-product B-Spline weights on a grid.
@@ -45,53 +36,43 @@ def grid_bspline_weights(target_grid, ctrl_grid):
         \label{eq:bspline_weights}\tag{1}
 
     where each :math:`\beta^3` represents the cubic B-Spline for one dimension.
-    The 1D B-Spline kernel implementation uses :obj:`numpy.piecewise`, and is based on the
-    closed-form given by Eq. (6) of [Unser1999]_.
-
-    By iterating over dimensions, the data samples that fall outside of the compact
-    support of the tensor-product kernel associated to each control point can be filtered
-    out and dismissed to lighten computation.
-
-    Finally, the resulting weights matrix :math:`\Psi^3(\mathbf{k}, \mathbf{s})`
-    can be easily identified in Eq. :math:`\eqref{eq:1}` and used as the design matrix
-    for approximation of data.
+    The resulting weights matrix :math:`\Psi^3(\mathbf{k}, \mathbf{s})` can be used
+    as the design matrix for approximation of data.
 
     Parameters
     ----------
-    target_grid : :obj:`~nitransforms.base.ImageGrid` or :obj:`nibabel.spatialimages`
+    target_grid : :class:`~nitransforms.base.ImageGrid` or :class:`~nibabel.spatialimages.SpatialImage`
         Regular grid of :math:`N` locations at which tensor B-Spline basis will be evaluated.
-    ctrl_grid : :obj:`~nitransforms.base.ImageGrid` or :obj:`nibabel.spatialimages`
+    ctrl_grid : :class:`~nitransforms.base.ImageGrid` or :class:`~nibabel.spatialimages.SpatialImage`
         Regular grid of :math:`K` control points (knot) where B-Spline basis are defined.
 
     Returns
     -------
-    weights : :obj:`numpy.ndarray` (:math:`K \times N`)
+    weights : :class:`scipy.sparse.coo_array` (:math:`K \times N`)
         A sparse matrix of interpolating weights :math:`\Psi^3(\mathbf{k}, \mathbf{s})`
         for the *N* voxels of the target EPI, for each of the total *K* knots.
         This sparse matrix can be directly used as design matrix for the fitting
         step of approximation/extrapolation.
 
-    """
+    """  # noqa: E501
     shape = target_grid.shape[:3]
-    ctrl_sp = nb.affines.voxel_sizes(ctrl_grid.affine)[:3]
-    ras2ijk = np.linalg.inv(ctrl_grid.affine)
-    # IJK index in the control point image of the first index in the target image
-    origin = nb.affines.apply_affine(ras2ijk, [tuple(target_grid.affine[:3, 3])])[0]
+    ctrl_shape = ctrl_grid.shape[:3]
+    # Target voxel indices, in the index space of the control points
+    vox2vox = np.linalg.inv(ctrl_grid.affine) @ target_grid.affine
+    ijk = nb.affines.apply_affine(vox2vox, np.indices(shape).reshape(3, -1).T)
 
-    wd = []
-    for i, (o, n, sp) in enumerate(
-        zip(origin, shape, nb.affines.voxel_sizes(target_grid.affine)[:3])
-    ):
-        # Locations of voxels in target image in control point image
-        locations = np.arange(0, n, dtype="float16") * sp / ctrl_sp[i] + o
-        knots = np.arange(0, ctrl_grid.shape[i], dtype="float16")
-        distance = np.abs(locations[np.newaxis, ...] - knots[..., np.newaxis])
+    # Four zero coefficients per side keep the weights at 0 beyond the lattice,
+    # and are dropped from the result.
+    knots = tuple(np.arange(-6, n + 6, dtype="float64") for n in ctrl_shape)
+    padded_shape = [n + 8 for n in ctrl_shape]
+    padded = np.ravel_multi_index(
+        np.indices(ctrl_shape).reshape(3, -1) + 4, padded_shape
+    )
 
-        within_support = distance < 2.0
-        d_vals, d_idxs = np.unique(distance[within_support], return_inverse=True)
-        bs_w = _cubic_bspline(d_vals)
-        weights = np.zeros_like(distance, dtype="float32")
-        weights[within_support] = bs_w[d_idxs]
-        wd.append(csr_matrix(weights))
-
-    return kron(kron(wd[0], wd[1]), wd[2])
+    weights = NdBSpline.design_matrix(ijk, knots, 3)
+    # design_matrix stops at the last column with a nonzero weight
+    weights = csr_array(
+        (weights.data, weights.indices, weights.indptr),
+        shape=(len(ijk), np.prod(padded_shape)),
+    )
+    return coo_array(weights.tocsc()[:, padded].T, dtype="float32")
