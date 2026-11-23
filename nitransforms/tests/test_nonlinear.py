@@ -169,6 +169,11 @@ def test_densefield_map(get_testdata, image_orientation, ongrid):
             / ongrid_xyz.shape[0]
         ) < 0.5
 
+    # Exercise cached prefilter
+    remapped = xfm.map(coords_xyz)
+    assert remapped is not mapped
+    assert np.array_equal(remapped, mapped)
+
 
 def test_densefield_map_vs_bspline(tmp_path, testdata_path):
     """Cross-check B-Splines and displacements field."""
