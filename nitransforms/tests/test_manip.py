@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 import nibabel as nb
 import h5py
-from ..base import TransformError
+from ..base import TransformBase, TransformError
 from ..manip import TransformChain
 from ..linear import Affine
 from ..nonlinear import DenseFieldTransform
@@ -42,6 +42,17 @@ def test_collapse_affines(tmp_path, data_path, ext0, ext1, ext2):
             fmt=f"{FMT[ext2]}",
         ).matrix,
     )
+
+
+@pytest.mark.parametrize("position", [0, 1, 2])
+def test_asaffine_identity(position):
+    """An identity ``TransformBase`` in the chain leaves the collapsed affine unchanged."""
+    first = Affine.from_matvec(vec=(2, -10, 3))
+    second = Affine.from_matvec(mat=[[0, 1, 0], [0, 0, 1], [1, 0, 0]])
+    transforms = [first, second]
+    transforms.insert(position, TransformBase())
+
+    assert TransformChain(transforms).asaffine() == second @ first
 
 
 def test_transformchain_x5_roundtrip(tmp_path):
@@ -86,3 +97,35 @@ def test_transformchain_x5_roundtrip(tmp_path):
     assert len(loaded0) == len(chain)
     assert len(loaded1) == len(chain)
     assert np.allclose(chain.map([[0, 0, 0]]), loaded1.map([[0, 0, 0]]))
+
+
+@pytest.mark.parametrize("transforms", [None, []])
+def test_empty_chain(transforms):
+    """Build a chain up from nothing."""
+    chain = TransformChain(transforms)
+    assert len(chain) == 0
+
+    chain.append(Affine.from_matvec(vec=(1, 0, 0)))
+    chain.append(Affine.from_matvec(vec=(0, 2, 0)))
+    assert np.allclose(chain.map([[0, 0, 0]]), [[1, 2, 0]])
+
+
+def test_add_chain_flattens():
+    """Prepend an affine to a chain."""
+    chain = Affine.from_matvec(vec=(1, 0, 0)) + TransformChain(
+        [Affine.from_matvec(vec=(0, 2, 0)), Affine.from_matvec(vec=(0, 0, 3))]
+    )
+
+    assert len(chain) == 3
+    assert np.allclose(chain.asaffine().matrix[:3, 3], [1, 2, 3])
+
+
+def test_chain_from_list_with_chain():
+    """Build a chain from a list that holds a chain."""
+    inner = TransformChain(
+        [Affine.from_matvec(vec=(0, 2, 0)), Affine.from_matvec(vec=(0, 0, 3))]
+    )
+    chain = TransformChain([Affine.from_matvec(vec=(1, 0, 0)), inner])
+
+    assert len(chain) == 3
+    assert np.allclose(chain.asaffine().matrix[:3, 3], [1, 2, 3])

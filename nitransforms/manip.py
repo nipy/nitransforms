@@ -37,7 +37,7 @@ class TransformChain(TransformBase):
     def __init__(self, transforms=None):
         """Initialize a chain of transforms."""
         super().__init__()
-        self._transforms = None
+        self._transforms = []
 
         if transforms is not None:
             self.transforms = transforms
@@ -80,8 +80,9 @@ class TransformChain(TransformBase):
 
     @property
     def ndim(self):
-        """Get the number of dimensions."""
-        return max(x.ndim for x in self._transforms)
+        """Get the number of dimensions, ignoring identity transforms."""
+        ndims = [x.ndim for x in self._transforms if not _is_identity(x)]
+        return max(ndims) if ndims else super().ndim
 
     @property
     def transforms(self):
@@ -91,7 +92,7 @@ class TransformChain(TransformBase):
     @transforms.setter
     def transforms(self, value):
         self._transforms = _as_chain(value)
-        if self.transforms[0].reference:
+        if self.transforms and self.transforms[0].reference:
             self.reference = self.transforms[0].reference
 
     def append(self, x):
@@ -197,6 +198,7 @@ class TransformChain(TransformBase):
         affines = (
             self.transforms if indices is None else np.take(self.transforms, indices)
         )
+        affines = [xfm for xfm in affines if not _is_identity(xfm)] or [Affine()]
         retval = affines[0]
         for xfm in affines[1:]:
             retval = xfm @ retval
@@ -286,14 +288,19 @@ class TransformChain(TransformBase):
         return filename
 
 
+def _is_identity(x):
+    """Check whether a transform is the identity :obj:`~nitransforms.base.TransformBase`."""
+    return type(x) is TransformBase
+
+
 def _as_chain(x):
-    """Convert a value into a transform chain."""
+    """Convert a value into a flat list of transforms, splicing in nested chains."""
     if isinstance(x, TransformChain):
         return x.transforms
     if isinstance(x, TransformBase):
         return [x]
     if isinstance(x, Iterable):
-        return list(x)
+        return [xfm for item in x for xfm in _as_chain(item)]
     return [x]
 
 
