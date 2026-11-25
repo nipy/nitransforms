@@ -61,6 +61,25 @@ class TransformChain(TransformBase):
         retval._reference = self._reference
         return retval
 
+    def __iadd__(self, b):
+        """
+        Append transforms to this chain in-place.
+
+        Example
+        -------
+        >>> T1 = TransformBase()
+        >>> added = T1 + TransformBase()
+        >>> isinstance(added, TransformChain)
+        True
+        >>> orig = added
+        >>> added += TransformBase()
+        >>> len(orig.transforms)
+        3
+
+        """
+        self.transforms += _as_chain(b)
+        return self
+
     def __getitem__(self, i):
         """
         Enable indexed access of transform chains.
