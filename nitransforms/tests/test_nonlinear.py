@@ -169,6 +169,11 @@ def test_densefield_map(get_testdata, image_orientation, ongrid):
             / ongrid_xyz.shape[0]
         ) < 0.5
 
+    # Exercise cached prefilter
+    remapped = xfm.map(coords_xyz)
+    assert remapped is not mapped
+    assert np.array_equal(remapped, mapped)
+
 
 def test_densefield_map_vs_bspline(tmp_path, testdata_path):
     """Cross-check B-Splines and displacements field."""
@@ -207,6 +212,53 @@ def test_densefield_oob_resampling(is_deltas):
     assert np.allclose(mapped[0], points[0])
     assert np.allclose(mapped[2], points[2])
     assert np.allclose(mapped[1], points[1] + 1)
+
+
+@pytest.mark.parametrize("offset", [0.0, 0.01])
+@pytest.mark.parametrize("x", [-44.0, 44.0])
+def test_densefield_map_outside_grid(x, offset):
+    """Points beyond the field are not displaced, whether they fall on its grid or not."""
+    deltas = np.zeros((21, 21, 21, 3), dtype="float32")
+    deltas[0, ..., 0] = deltas[-1, ..., 0] = 100.0
+    xfm = DenseFieldTransform(
+        nb.Nifti1Image(deltas, nb.affines.from_matvec(np.eye(3) * 4, [-40] * 3))
+    )
+
+    points = [[x + np.sign(x) * offset, 0.0, 0.0]]
+    assert np.allclose(xfm.map(points), points)
+
+
+@pytest.mark.parametrize("is_deltas", [True, False])
+def test_densefield_map_affine(is_deltas):
+    """Reproduce an affine transform with a warp field.
+
+    Cubic splines can recover linear fields exactly, for testing interpolation.
+    """
+    grid = nb.Nifti1Image(
+        np.zeros((21, 21, 21)), nb.affines.from_matvec(np.eye(3) * 4, [-40] * 3)
+    )
+    # This affine is a linear displacement (delta), note the zeroed diagonal
+    displacement_affine = np.array([
+        [0., 0.1, 0., 6.],
+        [0., 0., -0.05, -3.],
+        [0.08, 0., 0., 2.],
+        [0., 0., 0., 1.],
+    ])
+    locs = nb.affines.apply_affine(grid.affine, np.moveaxis(np.indices(grid.shape), 0, -1))
+    displacement = nb.affines.apply_affine(displacement_affine, locs)
+    field = displacement + (0 if is_deltas else locs)
+    xfm = DenseFieldTransform(
+        nb.Nifti1Image(field.astype("float32"), grid.affine), is_deltas=is_deltas
+    )
+
+    # Off-grid points from one edge of the field to the other
+    coords = np.array([-39.5, -38.5, -30.5, -20.5, 0.5, 20.5, 30.5, 38.5, 39.5])
+    points = np.stack(np.meshgrid(coords, coords, coords), axis=-1).reshape(-1, 3)
+    assert np.allclose(
+        xfm.map(points) - points,
+        nb.affines.apply_affine(displacement_affine, points),
+        atol=1e-4,
+    )
 
 
 def test_bspline_map_gridpoints():

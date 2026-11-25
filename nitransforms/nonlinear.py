@@ -21,7 +21,7 @@ from nitransforms.base import (
     TransformError,
     ImageGrid,
 )
-from scipy.ndimage import map_coordinates
+from scipy.ndimage import map_coordinates, spline_filter
 from scipy.interpolate import NdBSpline
 
 # Avoids circular imports
@@ -34,7 +34,7 @@ except ModuleNotFoundError:  # pragma: no cover
 class DenseFieldTransform(TransformBase):
     """Represents dense field (voxel-wise) transforms."""
 
-    __slots__ = ("_field", "_deltas", "_is_deltas")
+    __slots__ = ("_field", "_deltas", "_is_deltas", "_prefiltered")
 
     def __init__(self, field=None, is_deltas=True, reference=None):
         """
@@ -97,6 +97,7 @@ class DenseFieldTransform(TransformBase):
             )
 
         self._is_deltas = is_deltas
+        self._prefiltered = None
         self._field = self.reference.ndcoords.reshape(fieldshape)
 
         if self.is_deltas:
@@ -181,29 +182,54 @@ class DenseFieldTransform(TransformBase):
             raise NotImplementedError
 
         ijk = self.reference.index(np.array(x, dtype="float32"))
+        # Points up to the outermost voxel centers, with the tolerance of the grid check
+        inside = np.all(
+            (ijk > -1e-3) & (ijk < np.array(self.reference.shape) - 1 + 1e-3), axis=1
+        )
         indexes = np.round(ijk).astype("int")
-        ongrid = np.where(np.linalg.norm(ijk - indexes, axis=1) < 1e-3)[0]
+        ongrid = np.where(inside & (np.linalg.norm(ijk - indexes, axis=1) < 1e-3))[0]
 
         if ongrid.size == np.shape(x)[0]:
             # return self._field[*indexes.T, :]  # From Python 3.11
             return self._field[tuple(indexes.T) + (np.s_[:],)]
 
+        # map_coordinates does not support `mode='reflect', reflect_type='odd'`,
+        # so perform our own padding and prefiltering to extend the positions
+        # linearly past the edges. 12 is sufficient padding to ensure the spline
+        # reproduces the field up to the outermost voxel centers.
+        #
+        # Cache the prefiltered field to speed up multiple calls.
+        pad = 12
+        if self._prefiltered is None:
+            # Filter once, on first use, rather than on every call
+            field = np.pad(
+                self._field,
+                [(pad, pad)] * self.reference.ndim + [(0, 0)],
+                mode="reflect",
+                reflect_type="odd",
+            )
+            self._prefiltered = np.stack(
+                [
+                    spline_filter(field[..., i], order=3, mode="nearest")
+                    for i in range(self.reference.ndim)
+                ],
+                axis=-1,
+            )
         mapped_coords = np.vstack(
             tuple(
                 map_coordinates(
-                    self._field[..., i],
-                    ijk.T,
+                    self._prefiltered[..., i],
+                    ijk.T + pad,
                     order=3,
-                    mode="constant",
-                    cval=np.nan,
-                    prefilter=True,
+                    mode="nearest",
+                    prefilter=False,
                 )
                 for i in range(self.reference.ndim)
             )
         ).T
 
-        # Set NaN values back to the original coordinates value = no displacement
-        mapped_coords[np.isnan(mapped_coords)] = np.array(x)[np.isnan(mapped_coords)]
+        # Leave points beyond the field in place
+        mapped_coords[~inside] = np.asarray(x)[~inside]
         return mapped_coords
 
     def __matmul__(self, b):
