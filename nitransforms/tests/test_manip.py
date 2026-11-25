@@ -142,3 +142,15 @@ def test_chain_add_leaves_operands():
     assert np.allclose(to_a.map([[0, 0, 0]]), [[1, 2, 0]])
     assert np.allclose(to_b.map([[0, 0, 0]]), [[1, 0, 3]])
     assert to_a.reference == base.reference
+
+
+def test_chain_iadd():
+    """__iadd__ modifies chain in-place"""
+    orig = chain = TransformChain([Affine.from_matvec(vec=(1, 0, 0))])
+    chain.reference = nb.Nifti1Image(np.zeros((5, 5, 5)), np.eye(4))
+    chain += Affine.from_matvec(vec=(0, 2, 0))
+    chain += Affine.from_matvec(vec=(0, 0, 3))
+
+    assert chain is orig
+    assert len(chain.transforms) == 3
+    assert np.allclose(chain.map([[0, 0, 0]]), [[1, 2, 3]])
