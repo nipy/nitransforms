@@ -39,14 +39,13 @@ extensions = [
     "sphinx.ext.viewcode",
     "nbsphinx",
     "IPython.sphinxext.ipython_console_highlighting",
+    "matplotlib.sphinxext.plot_directive",
 ]
 
 autodoc_mock_imports = [
-    "matplotlib",
     "nilearn",
     "nipy",
     "nitime",
-    "numpy",
     "pandas",
     "seaborn",
     "skimage",
