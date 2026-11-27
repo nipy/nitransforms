@@ -29,11 +29,28 @@ from nitransforms.base import (
     SpatialReference,
     _as_homogeneous,
 )
+from nitransforms.manip import TransformChain
 
 R = TypeVar("R")
 
 SERIALIZE_VOLUME_WINDOW_WIDTH: int = 8
 """Minimum number of volumes to automatically serialize 4D transforms."""
+
+
+def _xfm_nvols(transform: TransformBase) -> int:
+    """Return the number of volumes represented by a transform or chain."""
+    if isinstance(transform, TransformChain):
+        nvols = {
+            _xfm_nvols(xfm)
+            for xfm in transform.transforms
+            if type(xfm) is not TransformBase
+        } - {1}
+        if len(nvols) > 1:
+            raise ValueError(
+                "Transform chain contains 4D transforms with inconsistent lengths."
+            )
+        return nvols.pop() if nvols else 1
+    return 1 if transform.ndim < 4 else len(transform)
 
 
 async def worker(job: Callable[[], R], semaphore) -> R:
@@ -225,8 +242,8 @@ def apply(
 
     # Number of data volumes
     data_nvols = 1 if spatialimage.ndim < 4 else spatialimage.shape[-1]
-    # Number of transforms: transforms chains (e.g., affine + field, are a single transform)
-    xfm_nvols = 1 if transform.ndim < 4 else len(transform)
+    # Number of transform volumes (chains count volumes of 4D members, not member count)
+    xfm_nvols = _xfm_nvols(transform)
 
     if data_nvols != xfm_nvols and min(data_nvols, xfm_nvols) > 1:
         raise ValueError(

@@ -471,3 +471,55 @@ def test_apply_4d(serialize_4d):
 
     expected = [((9 - vol, 2, 2), 1) for vol in range(nvols)]
     _assert_apply(img, xfm, expected, **kwargs)
+
+
+@pytest.mark.parametrize("serialize_4d", [True, False])
+def test_apply_4d_transform_chain(serialize_4d):
+    """A 4D TransformChain uses its volume count rather than member count (gh-311)."""
+    nvols = 5
+    rng = np.random.default_rng(0)
+    bold = nb.Nifti1Image(rng.normal(size=(10, 10, 10, nvols)), np.eye(4))
+    boldref = bold.slicer[..., 0]
+    kwargs = {"serialize_nvols": 2 if serialize_4d else nvols + 1}
+
+    coreg = nitl.Affine.from_matvec(vec=(1, 0, 0))
+    hmc = nitl.LinearTransformsMapping(
+        [nitl.Affine.from_matvec(vec=(0, t, 0)) for t in range(nvols)]
+    )
+    collapsed = nitl.LinearTransformsMapping([xfm @ coreg for xfm in hmc])
+
+    expected_4d = apply(collapsed, bold, reference=boldref, **kwargs)
+    moved_4d = apply(
+        nitm.TransformChain([coreg, hmc]), bold, reference=boldref, **kwargs
+    )
+    assert np.allclose(moved_4d.get_fdata(), expected_4d.get_fdata())
+
+    moved_with_id = apply(
+        nitm.TransformChain([TransformBase(), coreg, hmc]),
+        bold,
+        reference=boldref,
+        **kwargs,
+    )
+    assert np.allclose(moved_with_id.get_fdata(), expected_4d.get_fdata())
+
+    expected_3d = apply(collapsed, boldref, reference=boldref, **kwargs)
+    moved_3d = apply(
+        nitm.TransformChain([coreg, hmc]), boldref, reference=boldref, **kwargs
+    )
+    assert moved_3d.shape == (*boldref.shape, nvols)
+    assert np.allclose(moved_3d.get_fdata(), expected_3d.get_fdata())
+
+    # Mismatched volume counts raise ValueError even when data_nvols == len(chain)
+    short_bold = bold.slicer[..., :2]
+    with pytest.raises(ValueError, match="fourth dimension"):
+        apply(
+            nitm.TransformChain([coreg, hmc]), short_bold, reference=boldref, **kwargs
+        )
+
+    hmc_short = nitl.LinearTransformsMapping(
+        [nitl.Affine.from_matvec(vec=(0, t, 0)) for t in range(3)]
+    )
+    with pytest.raises(ValueError, match="inconsistent"):
+        apply(
+            nitm.TransformChain([hmc, hmc_short]), bold, reference=boldref, **kwargs
+        )
